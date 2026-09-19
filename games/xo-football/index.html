@@ -107,13 +107,13 @@ function drawMascot() {
     return;
   }
   if (k === 'worm') { // face down, body rippling, legs kicking behind
-    const gy = baseY + 46, ph = frame * 0.35;
+    const gy = baseY + 46, ph = frame * 0.16;   // slow, smooth worm
     const pts = []; for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push({ x: x - 34 + t * 52, y: gy - 4 + Math.sin(t * 6 - ph) * 7 }); }
     ink.path(pts, id + 30, col, w + 0.3, 1);
     const h = pts[8]; head(h.x + 12, h.y - 4 + Math.sin(ph) * 3, 'o', 0.9);
     const tail = pts[0]; ink.line(tail.x, tail.y, tail.x - 14, tail.y - 10 - Math.sin(ph) * 6, id + 31, col, w, 1); ink.line(tail.x, tail.y, tail.x - 12, tail.y + 6 + Math.sin(ph) * 5, id + 32, col, w, 1);
     ink.line(pts[5].x, pts[5].y, pts[5].x + 4, pts[5].y - 16, id + 33, col, w, 1);
-    if (el % 50 < 28) ink.text(el < 60 ? 'the worm!' : 'uh huh', x - 20, baseY - 6, { ...PH, rot: -0.08 });
+    if (el < 110 || el % 70 < 40) ink.text(el < 110 ? 'worm time!' : 'oh yeah', x - 20, baseY - 6, { ...PH, size: 17, rot: -0.08 });
     return;
   }
   if (k === 'headpunt') { // pull head off, drop it, punt it out of the margin, wait for it to land back on
@@ -581,7 +581,7 @@ function endPlay(kind, text, at) {
   if (kind === 'td') { result.text = 'TOUCHDOWN!'; game.you += 7; SFX.td(); note(`TOUCHDOWN! +7 (auto extra point)`, INK); cheer(240); }
   else if (kind === 'int' || kind === 'pick6') setMood('headpunt', 260);   // any interception (or a fumbled lateral)
   else if (kind === 'sack') setMood('squash', 130);
-  else if (gain >= 20) setMood('worm', 220);
+  else if (gain >= 20) setMood('worm', 300);
   else if (kind === 'int') { note('pencils ball.', RED); SFX.whistle(); }
   else if (kind === 'pick6') { game.pencils += 7; note('PICK SIX. pencils +7.', RED); SFX.bad(); }
   else { note(`${downText()}: ${result.text}${kind === 'sack' ? ' (sack)' : kind === 'inc' ? '' : ''}`, GRAPHITE); }
