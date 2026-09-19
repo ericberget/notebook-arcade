@@ -128,7 +128,7 @@ function updateUI() {
 }
 
 // ---------- pitches ----------
-const PITCHES = { fast: { spd: 4.4, sway: 0, name: 'fastball' }, curve: { spd: 3.3, sway: 46, name: 'curveball' }, change: { spd: 2.7, sway: 8, name: 'changeup' } };
+const PITCHES = { fast: { spd: 2.3, sway: 0, name: 'fastball' }, curve: { spd: 1.8, sway: 46, name: 'curveball' }, change: { spd: 1.45, sway: 8, name: 'changeup' } };
 function nextPitch() {
   if (game.over) return;
   if (!batting() && game.balls === 0 && game.strikes === 0 && !pitch) pencilIdx = (pencilIdx + (state === 'pitchpick' ? 0 : 1)) % PENCIL_NAMES.length;
@@ -140,7 +140,7 @@ function nextPitch() {
 function cpuPickPitch() { const r = Math.random(); return r < 0.5 ? 'fast' : r < 0.8 ? 'curve' : 'change'; }
 function throwPitch(type, targetX) { // targetX: offset from the middle of the plate. |x| <= 30 is a strike
   const p = PITCHES[type]; const err = (Math.random() - .5) * (batting() ? 14 : 22);
-  pitch = { type, x: MOUND.x, y: MOUND.y + 10, t: 0, T: (HOME.y - MOUND.y - 10) / p.spd, tx: targetX + err, spd: p.spd, sway: p.sway * (Math.random() > .5 ? 1 : -1) };
+  pitch = { type, x: MOUND.x, y: MOUND.y + 10, t: 0, wind: 26, T: (HOME.y - MOUND.y - 10) / p.spd, tx: targetX + err, spd: p.spd, sway: p.sway * (Math.random() > .5 ? 1 : -1) };
   pitch.name = p.name; state = batting() ? 'batting' : 'pitching'; SFX.pencil();
 }
 function pitchPos(pt, t) { // where the pitch is at time t: drifts to its target, curves break late
@@ -151,10 +151,10 @@ function pitchPos(pt, t) { // where the pitch is at time t: drifts to its target
 // ---------- contact ----------
 function swingAt(clickPos) { // you swing: timing -> direction & power, click height -> launch angle
   if (!pitch || swing) return;
-  const dt = (pitch.T - pitch.t);                 // frames until it reaches the plate; + = early
+  const dt = (pitch.T - pitch.t) + pitch.wind;                 // frames until it reaches the plate; + = early
   const pos = pitchPos(pitch, pitch.t);
   swing = { t: 0 }; SFX.whiff();
-  const early = dt / 6, inReach = Math.abs(pos.x - HOME.x) < 46;
+  const early = dt / 11, inReach = Math.abs(pos.x - HOME.x) < 46;
   if (Math.abs(early) > 1.4 || !inReach) { pitch.result = 'swing-miss'; popup(!inReach ? 'out of reach' : early > 0 ? 'way early' : 'way late', HOME.x + 70, HOME.y - 40, GRAPHITE, 18); return; }
   popup(Math.abs(early) < 0.22 ? 'PERFECT!' : Math.abs(early) < 0.6 ? (early > 0 ? 'a bit early' : 'a bit late') : (early > 0 ? 'early' : 'late'), HOME.x + 70, HOME.y - 40, Math.abs(early) < 0.22 ? RED : INK, Math.abs(early) < 0.22 ? 26 : 18);
   const dir = -90 - early * 40 + (Math.random() - .5) * 8;      // early = pulled to left (screen up-left), late = right field
@@ -308,7 +308,8 @@ function step() {
   if (play && play.phase === 'flight' && frame % 2 === 0) trail.push({ x: play.x, y: play.y - play.z * 0.5, life: 40 }); trail = trail.filter(t => --t.life > 0);
   if (swing) swing.t++;
   if (pitch && (state === 'batting' || state === 'pitching')) {
-    pitch.t++;
+    if (pitch.wind > 0) { pitch.wind--; if (pitch.wind === 0) SFX.pencil(); }
+    else pitch.t++;
     if (state === 'pitching' && !pitch.result && pitch.t >= pitch.T - 5) cpuSwing();
     if (pitch.t >= pitch.T) { if (pitch.result === 'contact') { state = 'play'; launch(pitch.contact); } else resolvePitch(); }
   }
@@ -373,7 +374,8 @@ function drawPeople() {
   const pf = rv(90, 30); if (pf <= 0) return;
   ink.setAlpha(pf);
   const youField = !batting();
-  for (const k in fielders) { const f = fielders[k]; if (k === 'C' && batting()) { stick(f.x, f.y + 4, f.id, youField ? INK : PEN_MD, true); continue; } stick(f.x, f.y, f.id, youField ? INK : PEN_MD, true, play && play.fielder === k ? 4 : 0); }
+  for (const k in fielders) { const f = fielders[k]; if (k === 'C' && batting()) { stick(f.x, f.y + 4, f.id, youField ? INK : PEN_MD, true); continue; } stick(f.x, f.y, f.id, youField ? INK : PEN_MD, true, play && play.fielder === k ? 4 : 0);
+    if (k === 'P' && pitch && pitch.wind > 0) { const u = pitch.wind / 26, col = youField ? INK : PEN_MD; ink.line(f.x, f.y - 12, f.x - 6 - 10 * (1 - u), f.y - 30 + 8 * (1 - u), f.id + 9, col, 1.4, 1); drawBallAt(f.x - 8 - 10 * (1 - u), f.y - 33 + 8 * (1 - u), 0, 0.9); } }
   // batter at the plate
   if ((state === 'batting' || state === 'pitching' || state === 'pitchpick') && !play) {
     const bx = HOME.x + 26, by = HOME.y + 2, col = batting() ? INK : PEN_MD;
@@ -390,7 +392,7 @@ function drawPeople() {
 }
 function drawBallAt(x, y, z, big = 1) { const k = (1 + z / 120) * big; ctx.save(); ctx.translate(x, y - z * 0.5); ctx.scale(k, k); ctx.fillStyle = '#fbf8ee'; ctx.strokeStyle = PEN_DK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, 7); ctx.fill(); ctx.stroke(); ctx.strokeStyle = RED; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(-1.5, 0, 3.5, -1.1, 1.1); ctx.stroke(); ctx.beginPath(); ctx.arc(1.5, 0, 3.5, Math.PI - 1.1, Math.PI + 1.1); ctx.stroke(); ctx.restore(); }
 function drawBall() {
-  if (pitch && (state === 'batting' || state === 'pitching')) { const p = pitchPos(pitch, pitch.t); ctx.fillStyle = 'rgba(0,0,0,.1)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 3, 4, 2, 0, 0, 7); ctx.fill(); drawBallAt(p.x, p.y, 4, 1.1); if (aimSpot) { ctx.setLineDash([2, 3]); ctx.strokeStyle = RED; ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(aimSpot.x, aimSpot.y, 6, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; } }
+  if (pitch && pitch.wind === 0 && (state === 'batting' || state === 'pitching')) { const p = pitchPos(pitch, pitch.t); ctx.fillStyle = 'rgba(0,0,0,.1)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 3, 4, 2, 0, 0, 7); ctx.fill(); drawBallAt(p.x, p.y, 4, 1.1); if (aimSpot) { ctx.setLineDash([2, 3]); ctx.strokeStyle = RED; ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(aimSpot.x, aimSpot.y, 6, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; } }
   if (play) {
     if (play.phase === 'throw') { const f = play.cut, u = Math.min(1, play.t / 24), x = f.x + (BASES[1].x - f.x) * u, y = f.y + (BASES[1].y - f.y) * u, z = Math.sin(u * Math.PI) * 30; drawBallAt(x, y, z); }
     else if (play.phase !== 'done' || play.outcome.kind === 'hr') { ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.ellipse(play.x, play.y + 3, 5, 2.5, 0, 0, 7); ctx.fill(); drawBallAt(play.x, play.y, play.z); }
@@ -400,7 +402,7 @@ function drawBall() {
 }
 function drawSwingHint() {
   if (state !== 'batting' || play) return;
-  const hot = pitch && !swing && Math.abs(pitch.T - pitch.t) <= 8;           // the ball is in the hittable window
+  const hot = pitch && !swing && pitch.wind === 0 && Math.abs(pitch.T - pitch.t) <= 14;   // the ball is in the hittable window
   ctx.setLineDash(hot ? [] : [3, 4]); ctx.strokeStyle = hot ? RED : INK; ctx.globalAlpha = hot ? 0.9 : 0.4; ctx.lineWidth = hot ? 3 : 1.2;
   ctx.beginPath(); ctx.moveTo(HOME.x - 50, HOME.y - 26); ctx.lineTo(HOME.x + 50, HOME.y - 26); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
   if (game.abs <= 2 && !swing) { // first couple of at-bats: spell it out
@@ -469,7 +471,7 @@ function drawScorecard() {
 }
 function drawExtras() {
   // pitch name as it leaves his hand
-  if (pitch && pitch.t > 4 && pitch.t < 40 && (state === 'batting' || state === 'pitching')) ink.text(pitch.name, MOUND.x + 44, MOUND.y - 14, { size: 15, color: PEN_MD, font: 'Patrick Hand', weight: 400, alpha: Math.min(1, (40 - pitch.t) / 12), align: 'left', rot: -0.06 });
+  if (pitch && pitch.t < 36 && (state === 'batting' || state === 'pitching')) ink.text(pitch.name, MOUND.x + 44, MOUND.y - 14, { size: 15, color: PEN_MD, font: 'Patrick Hand', weight: 400, alpha: Math.min(1, (36 - pitch.t) / 12), align: 'left', rot: -0.06 });
   ctx.fillStyle = INK; for (const t of trail) { ctx.globalAlpha = t.life / 40 * 0.35; ctx.beginPath(); ctx.arc(t.x, t.y, 1.8, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
   for (const p of popups) ink.text(p.text, p.x, p.y - (55 - p.life) * 0.5, { size: p.size, color: p.color, font: p.size > 22 ? 'Caveat' : 'Patrick Hand', weight: p.size > 22 ? 700 : 400, alpha: Math.min(1, p.life / 15), rot: -0.05 });
   for (const b of bursts) { const r = 6 + b.t * 2.2, a = 1 - b.t / 50; for (let i = 0; i < 9; i++) { const ang = b.seed + i / 9 * 6.28; ctx.globalAlpha = a * 0.8; ink.line(b.x + Math.cos(ang) * r * 0.55, b.y + Math.sin(ang) * r * 0.55, b.x + Math.cos(ang) * r, b.y + Math.sin(ang) * r, 900 + i + Math.floor(b.seed), b.color, 1.6, 1); } ctx.globalAlpha = 1; }
