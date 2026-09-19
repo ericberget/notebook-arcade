@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notebook Arcade</title>
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Caveat:wght@700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #e9e4d6; overflow: hidden; font-family: 'Patrick Hand', cursive; }
+  #wrap { position: relative; width: 100vw; height: 100vh; }
+  #stage { position: relative; width: 1200px; height: 720px; transform-origin: top left; }
+  canvas#bg { display: block; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+  #ui { position: absolute; inset: 0; }
+  h1 { position: absolute; left: 150px; top: 24px; margin: 0; font-family: 'Caveat', cursive; font-size: 82px; color: #1f3d9e; line-height: 1; transform: rotate(-2deg); letter-spacing: 1px; }
+  h1 small { display: block; font-family: 'Patrick Hand', cursive; font-size: 22px; color: #4a4a4f; opacity: .7; letter-spacing: 0; margin-top: -2px; margin-left: 6px; transform: rotate(1deg); }
+  #toc { position: absolute; left: 150px; top: 200px; width: 980px; }
+  .row { position: relative; display: flex; align-items: center; gap: 26px; height: 118px; text-decoration: none; color: #1f3d9e; }
+  .row .num { font-family: 'Caveat', cursive; font-size: 44px; width: 44px; text-align: right; color: #1f3d9e; }
+  .row .swatch { position: relative; width: 168px; height: 100px; flex: none; box-shadow: 2px 3px 8px rgba(0,0,0,.25); transform: rotate(-2.5deg); transition: transform .15s; }
+  .row:nth-child(even) .swatch { transform: rotate(2deg); }
+  .row .swatch canvas { display: block; width: 100%; height: 100%; }
+  .row .swatch::before { content: ''; position: absolute; left: 50%; top: -9px; width: 64px; height: 18px; margin-left: -32px; background: rgba(255,240,180,.75); border: 1px solid rgba(0,0,0,.08); transform: rotate(-1deg); }
+  .row .text { flex: 1; }
+  .row .title { font-family: 'Caveat', cursive; font-size: 40px; line-height: 1; }
+  .row .desc { font-size: 21px; color: #333; opacity: .85; }
+  .row .paper { font-size: 17px; color: #4a4a4f; opacity: .65; transform: rotate(-.5deg); }
+  .row .play { font-family: 'Caveat', cursive; font-size: 34px; color: #c0392b; transform: rotate(-3deg); white-space: nowrap; padding: 2px 14px; border: 2.5px solid #c0392b; border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; }
+  .row:hover .play { background: rgba(192,57,43,.1); }
+  .row:hover .swatch { transform: rotate(0deg) scale(1.06); }
+  .row.soon { color: #4a4a4f; opacity: .55; pointer-events: none; }
+  .row.soon .num, .row.soon .title { color: #4a4a4f; }
+  .row.soon .play { color: #4a4a4f; border-style: dashed; border-color: #4a4a4f; font-size: 24px; }
+  .row.soon .swatch { box-shadow: none; }
+  .row.soon .swatch::after { content: '?'; position: absolute; inset: 0; display: grid; place-items: center; font-family: 'Caveat', cursive; font-size: 64px; color: #4a4a4f; opacity: .6; }
+  #foot { position: absolute; left: 150px; bottom: 26px; font-size: 18px; color: #4a4a4f; opacity: .6; transform: rotate(-.5deg); }
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <canvas id="bg" width="1200" height="720"></canvas>
+  <div id="ui">
+    <h1>Notebook Arcade<small>every game on its own kind of paper. ballpoint, pencil &amp; the occasional red pen.</small></h1>
+    <div id="toc"></div>
+    <div id="foot">table of contents · doodled during 4th period</div>
+  </div>
+</div></div>
+<script src="shared/paper.js"></script>
+<script>
+const W = 1200, H = 720;
+const stage = document.getElementById('stage');
+function fit() {
+  const s = Math.min(window.innerWidth / W, window.innerHeight / H);
+  stage.style.transform = `scale(${s})`;
+  stage.style.marginLeft = ((window.innerWidth - W * s) / 2) + 'px';
+  stage.style.marginTop = ((window.innerHeight - H * s) / 2) + 'px';
+}
+window.addEventListener('resize', fit); fit();
+
+// the arcade's own page is plain ruled paper
+const bg = document.getElementById('bg').getContext('2d');
+NotebookPaper.draw(bg, W, H, 'ruled');
+
+// -------- the games --------
+// paper: which shared paper style the game is drawn on; thumb: a little ink doodle for the swatch
+const GAMES = [
+  { title: 'Doodle Slingshot', desc: 'fling angry doodles at scribbled towers. nine pages, red pen finale.', paper: 'ruled', href: 'games/slingshot/index.html',
+    thumb(c, w, h) {
+      ink(c, [[30, h - 12], [30, h - 44]], 3); ink(c, [[30, h - 44], [20, h - 60]], 3); ink(c, [[30, h - 44], [40, h - 60]], 3);
+      circle(c, 30, h - 62, 8, '#1f3d9e'); dots(c, 26, h - 64, 34, h - 64);
+      ink(c, [[w - 60, h - 12], [w - 60, h - 40]], 3); ink(c, [[w - 34, h - 12], [w - 34, h - 40]], 3); ink(c, [[w - 68, h - 42], [w - 26, h - 42]], 3);
+      circle(c, w - 47, h - 56, 10, '#c0392b'); xeyes(c, w - 47, h - 58);
+      c.strokeStyle = '#1f3d9e'; c.setLineDash([2, 4]); c.beginPath(); c.moveTo(38, h - 66); c.quadraticCurveTo(w / 2, 4, w - 58, h - 66); c.stroke(); c.setLineDash([]);
+    } },
+  { title: "X's & O's Football", desc: "draw up the play, hike, throw or hand it off, then steer the runner past the X's.", paper: 'sketchpad', href: 'games/xo-football/index.html',
+    thumb(c, w, h) {
+      for (let y = 40; y < h; y += 40) ink(c, [[30, y], [w - 30, y]], 1);
+      const O = (x, y) => circle(c, x, y, 7, '#1f3d9e'); const X = (x, y) => { ink(c, [[x - 6, y - 6], [x + 6, y + 6]], 2.2, '#3a3a40'); ink(c, [[x + 6, y - 6], [x - 6, y + 6]], 2.2, '#3a3a40'); };
+      [[140, 150], [168, 150], [196, 150], [168, 178], [80, 150], [256, 150]].forEach(([x, y]) => O(x, y));
+      [[140, 122], [168, 122], [196, 122], [80, 110], [256, 110], [168, 70]].forEach(([x, y]) => X(x, y));
+      ink(c, [[80, 143], [80, 90], [120, 60]], 2); ink(c, [[120, 60], [110, 62]], 2); ink(c, [[120, 60], [118, 70]], 2);
+      ink(c, [[256, 143], [256, 60]], 2); ink(c, [[256, 60], [250, 68]], 2); ink(c, [[256, 60], [262, 68]], 2);
+    } },
+  { title: 'Paper Football', desc: 'flick the folded triangle. hang it over the edge, then kick it through the fingers.', paper: 'legal', href: 'games/paper-football/index.html',
+    thumb(c, w, h) {
+      ink(c, [[40, 30], [40, h - 30]], 1.5); ink(c, [[w - 40, 30], [w - 40, h - 30]], 1.5); ink(c, [[w / 2, 30], [w / 2, h - 30]], 1);
+      ink(c, [[w - 70, h / 2 - 22], [w - 70, h / 2 + 22]], 2, '#4a4a4f'); ink(c, [[w - 70, h / 2 - 22], [w - 30, h / 2 - 26]], 2, '#4a4a4f'); ink(c, [[w - 70, h / 2 + 22], [w - 30, h / 2 + 26]], 2, '#4a4a4f');
+      const tri = [[110, h / 2 - 11], [144, h / 2], [110, h / 2 + 11]]; c.fillStyle = '#fbf8ee'; c.beginPath(); tri.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fill(); ink(c, [...tri, tri[0]], 2);
+      c.strokeStyle = '#1f3d9e'; c.setLineDash([2, 4]); c.beginPath(); c.moveTo(150, h / 2); c.lineTo(w - 76, h / 2 - 4); c.stroke(); c.setLineDash([]);
+    } },
+  { title: 'Dot Connect', desc: 'boxes. the classic. against a very smug pencil.', paper: 'dots', soon: true },
+];
+
+// tiny ink helpers for the thumbnails
+function ink(c, pts, w = 2, color = '#1f3d9e') { c.strokeStyle = color; c.lineWidth = w; c.lineCap = 'round'; c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x + (Math.random() - .5) * 1.5, y + (Math.random() - .5) * 1.5) : c.moveTo(x, y)); c.stroke(); }
+function circle(c, x, y, r, color) { c.strokeStyle = color; c.lineWidth = 2; for (let k = 0; k < 2; k++) { c.beginPath(); for (let i = 0; i <= 20; i++) { const t = i / 20 * 6.283; const rr = r + (Math.random() - .5) * 1.5; i ? c.lineTo(x + Math.cos(t) * rr, y + Math.sin(t) * rr) : c.moveTo(x + rr, y); } c.stroke(); } }
+function dots(c, x1, y1, x2, y2) { c.fillStyle = '#1f3d9e'; c.beginPath(); c.arc(x1, y1, 1.5, 0, 7); c.arc(x2, y2, 1.5, 0, 7); c.fill(); }
+function xeyes(c, x, y) { for (const ex of [-4, 4]) { ink(c, [[x + ex - 2, y - 2], [x + ex + 2, y + 2]], 1.5, '#c0392b'); ink(c, [[x + ex + 2, y - 2], [x + ex - 2, y + 2]], 1.5, '#c0392b'); } }
+
+const toc = document.getElementById('toc');
+const scratch = document.createElement('canvas'); scratch.width = W; scratch.height = H; const sc = scratch.getContext('2d');
+GAMES.forEach((g, i) => {
+  const row = document.createElement(g.soon ? 'div' : 'a');
+  row.className = 'row' + (g.soon ? ' soon' : ''); if (!g.soon) row.href = g.href;
+  const swatch = document.createElement('div'); swatch.className = 'swatch';
+  const cv = document.createElement('canvas'); cv.width = 336; cv.height = 200; swatch.appendChild(cv);
+  // render the game's paper at full size, then scale a crop of it into the swatch
+  NotebookPaper.draw(sc, W, H, g.paper);
+  const c = cv.getContext('2d'); c.drawImage(scratch, 0, 0, 900, 540, 0, 0, 336, 200);
+  if (g.thumb) g.thumb(c, 336, 200);
+  row.innerHTML = `<div class="num">${i + 1}.</div>`;
+  row.appendChild(swatch);
+  row.insertAdjacentHTML('beforeend', `<div class="text"><div class="title">${g.title}</div><div class="desc">${g.desc}</div><div class="paper">paper: ${NotebookPaper.describe(g.paper)}</div></div><div class="play">${g.soon ? 'coming soon' : 'play →'}</div>`);
+  toc.appendChild(row);
+});
+</script>
+</body>
+</html>

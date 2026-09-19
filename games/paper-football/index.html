@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper Football</title>
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Caveat:wght@700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #e9e4d6; overflow: hidden; font-family: 'Patrick Hand', cursive; }
+  #wrap { position: relative; width: 100vw; height: 100vh; }
+  #stage { position: relative; width: 1200px; height: 720px; transform-origin: top left; }
+  canvas { display: block; box-shadow: 0 10px 30px rgba(0,0,0,.25); cursor: crosshair; touch-action: none; }
+  #hud { position: absolute; left: 50%; top: 26px; transform: translateX(-50%); pointer-events: none; text-align: center; color: #1f3d9e; }
+  #hud h1 { font-family: 'Caveat', cursive; font-size: 44px; margin: 0; transform: rotate(-1.5deg); }
+  #buttons { position: absolute; right: 24px; top: 30px; display: flex; gap: 10px; align-items: center; }
+  button, #back { font-family: 'Patrick Hand', cursive; font-size: 20px; background: transparent; border: 2px solid #1f3d9e; color: #1f3d9e; padding: 4px 14px; border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; cursor: pointer; transform: rotate(1deg); }
+  button:hover { background: rgba(31,61,158,.08); }
+  #back { border: none; border-bottom: 2px solid #1f3d9e; border-radius: 0; text-decoration: none; padding: 6px 10px; transform: rotate(-1.5deg); }
+  #help { position: absolute; left: 150px; bottom: 22px; font-size: 18px; color: #4a4a4f; opacity: .65; pointer-events: none; transform: rotate(-.4deg); }
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <canvas id="c" width="1200" height="720"></canvas>
+  <div id="hud"><h1>Paper Football</h1></div>
+  <div id="buttons"><a href="../../index.html" id="back">← arcade</a><button id="mute">sound: on</button><button id="reset">new game</button></div>
+  <div id="help">drag back from the football &amp; let go to flick · hang it over the far edge = touchdown · first to 21</div>
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script src="../../shared/paper.js"></script>
+<script src="../../shared/ink.js"></script>
+<script>
+const { Engine, World, Bodies, Body, Vertices } = Matter;
+const W = 1200, H = 720;
+const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+const ink = NotebookInk(ctx); const { INK, RED, GRAPHITE } = ink;
+const stage = document.getElementById('stage');
+function fit() { const s = Math.min(window.innerWidth / W, window.innerHeight / H); stage.style.transform = `scale(${s})`; stage.style.marginLeft = ((window.innerWidth - W * s) / 2) + 'px'; stage.style.marginTop = ((window.innerHeight - H * s) / 2) + 'px'; }
+window.addEventListener('resize', fit); fit();
+
+// the legal pad is the desk. the playing surface is the table rectangle; beyond it is the floor.
+const paper = document.createElement('canvas'); paper.width = W; paper.height = H;
+NotebookPaper.draw(paper.getContext('2d'), W, H, 'legal');
+const TABLE = { x1: 150, x2: 1050, y1: 130, y2: 620 };
+const MID = (TABLE.y1 + TABLE.y2) / 2;
+const POST = { half: 46 };          // half the gap between finger uprights
+const FRICTION = 0.032;             // air friction = how fast the football slides to a stop
+const FLICK = 0.10, MAX_PULL = 130; // pull distance -> launch speed
+
+// ---------- sound ----------
+const SFX = (() => {
+  let ac, master, noiseBuf, muted = false, slide, slideGain;
+  function init() { if (ac) return; ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = 0.7; master.connect(ac.destination);
+    noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    slide = ac.createBufferSource(); slide.buffer = noiseBuf; slide.loop = true; const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 0.7; slideGain = ac.createGain(); slideGain.gain.value = 0; slide.connect(f).connect(slideGain).connect(master); slide.start(); }
+  const now = () => ac.currentTime;
+  function env(g, t, a, peak, d) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
+  function tone(type, f0, f1, dur, vol, t = now(), lp) { const o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur); const g = ac.createGain(); env(g, t, 0.005, vol, dur); let n = o; if (lp) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; o.connect(f); n = f; } n.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.05); }
+  function noise(dur, vol, t = now(), o = {}) { const n = ac.createBufferSource(); n.buffer = noiseBuf; const f = ac.createBiquadFilter(); f.type = o.type || 'bandpass'; f.Q.value = o.q || 1; f.frequency.setValueAtTime(o.f0 || 1000, t); if (o.f1) f.frequency.exponentialRampToValueAtTime(o.f1, t + dur); const g = ac.createGain(); env(g, t, o.attack || 0.003, vol, dur); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + dur + 0.05); }
+  return {
+    resume() { init(); if (ac.state === 'suspended') ac.resume(); },
+    toggleMute() { muted = !muted; if (master) master.gain.value = muted ? 0 : 0.7; return muted; },
+    flick(p) { if (!ac || muted) return; const t = now(); noise(0.05, 0.5, t, { type: 'highpass', f0: 2500 }); tone('sine', 900, 200, 0.06, 0.3, t); noise(0.18, 0.25 * p, t + 0.02, { f0: 1500, f1: 400, q: 1 }); },
+    slide(speed) { if (!ac) return; slideGain.gain.setTargetAtTime(muted ? 0 : Math.min(0.12, speed * 0.012), now(), 0.04); },
+    hang() { if (!ac || muted) return; tone('sine', 1200, 1600, 0.08, 0.15); tone('sine', 1600, 2000, 0.1, 0.12, now() + 0.09); },
+    off() { if (!ac || muted) return; const t = now(); for (let i = 0; i < 5; i++) noise(0.08, 0.18, t + i * 0.07, { f0: 900 - i * 120, q: 2 }); tone('sine', 160, 50, 0.25, 0.35, t + 0.4); noise(0.1, 0.3, t + 0.4, { type: 'lowpass', f0: 500 }); },
+    td() { if (!ac || muted) return; const t = now(); [523, 659, 784, 1047].forEach((f, i) => { tone('triangle', f, f, 0.35, 0.22, t + i * 0.1); }); tone('triangle', 1047, 1047, 0.9, 0.2, t + 0.45); tone('triangle', 1319, 1319, 0.9, 0.15, t + 0.45); noise(0.8, 0.12, t + 0.3, { f0: 1500, f1: 5000, q: 0.5, attack: 0.2 }); },
+    whistle() { if (!ac || muted) return; const t = now(); tone('sine', 1800, 2400, 0.25, 0.25, t); tone('sine', 2400, 2600, 0.35, 0.2, t + 0.25); },
+    good() { if (!ac || muted) return; const t = now(); tone('square', 880, 880, 0.12, 0.08, t, 2500); tone('square', 1175, 1175, 0.25, 0.08, t + 0.12, 2500); },
+    miss() { if (!ac || muted) return; const t = now(); tone('sawtooth', 220, 180, 0.35, 0.16, t, 700); tone('sawtooth', 165, 140, 0.5, 0.16, t + 0.3, 600); },
+    click() { if (!ac || muted) return; noise(0.03, 0.2, now(), { f0: 2500, q: 5 }); },
+    win() { if (!ac || muted) return; const t = now(); [[262, 330, 392], [294, 370, 440], [330, 415, 494], [392, 494, 587, 784]].forEach((ch, i) => ch.forEach(f => tone('triangle', f, f, 0.5, 0.14, t + i * 0.25))); },
+  };
+})();
+
+// ---------- state ----------
+let engine, world, ball, turn = 'you', mode = 'aim', score = { you: 0, pencil: 0 }, shooter = 'you';
+let dragging = false, dragPos = null, msg = null, kickResult = null, aiTimer = 0, wasMoving = false, trail = [], flutter = [];
+let moveStart = 0, gameOver = false, resultPending = 0;
+const opp = who => who === 'you' ? 'pencil' : 'you';
+const edgeOf = who => who === 'you' ? TABLE.x2 : TABLE.x1;   // the edge each player scores on
+
+function makeBall(x, y, angle = 0) {
+  if (ball) World.remove(world, ball);
+  const L = 34, Wd = 22;
+  ball = Bodies.fromVertices(x, y, [[{ x: -L / 2, y: -Wd / 2 }, { x: L / 2, y: 0 }, { x: -L / 2, y: Wd / 2 }]], { frictionAir: FRICTION, friction: 0.2, restitution: 0.3, density: 0.002 });
+  Body.setAngle(ball, angle); World.add(world, ball);
+}
+function setup() {
+  engine = Engine.create(); world = engine.world; engine.gravity.y = 0;
+  score = { you: 0, pencil: 0 }; gameOver = false; msg = null;
+  startDrive('you', TABLE.x1 + 110);
+}
+function startDrive(who, x) { turn = who; mode = who === 'you' ? 'aim' : 'ai'; aiTimer = 70; trail = []; makeBall(x, MID + (Math.random() - .5) * 120, who === 'you' ? 0 : Math.PI); }
+function say(text, color = RED, sub = '') { msg = { text, sub, color, life: 150 }; }
+
+// ---------- flicking ----------
+function canvasPos(e) { const r = canvas.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: (t.clientX - r.left) * W / r.width, y: (t.clientY - r.top) * H / r.height }; }
+function onDown(e) { SFX.resume(); if (gameOver) return; if (mode !== 'aim' && mode !== 'kick') return; const p = canvasPos(e); if (Math.hypot(p.x - ball.position.x, p.y - ball.position.y) < 70) { dragging = true; dragPos = p; e.preventDefault(); } }
+function onMove(e) { if (!dragging) return; const p = canvasPos(e); let dx = p.x - ball.position.x, dy = p.y - ball.position.y; const d = Math.hypot(dx, dy); if (d > MAX_PULL) { dx *= MAX_PULL / d; dy *= MAX_PULL / d; } dragPos = { x: ball.position.x + dx, y: ball.position.y + dy }; e.preventDefault(); }
+function onUp() {
+  if (!dragging) return; dragging = false;
+  const dx = ball.position.x - dragPos.x, dy = ball.position.y - dragPos.y, d = Math.hypot(dx, dy);
+  if (d < 10) return;
+  flick({ x: dx * FLICK, y: dy * FLICK }, 'you');
+}
+function flick(v, who) {
+  shooter = who; Body.setVelocity(ball, v); Body.setAngularVelocity(ball, (Math.random() - .5) * 0.6);
+  mode = mode === 'kick' || mode === 'aikick' ? 'kicking' : 'moving'; moveStart = performance.now(); wasMoving = true; trail = [];
+  SFX.flick(Math.min(1, Math.hypot(v.x, v.y) / 13));
+}
+canvas.addEventListener('mousedown', onDown); window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+canvas.addEventListener('touchstart', onDown, { passive: false }); window.addEventListener('touchmove', onMove, { passive: false }); window.addEventListener('touchend', onUp);
+document.getElementById('reset').onclick = () => { SFX.resume(); SFX.click(); setup(); };
+document.getElementById('mute').onclick = e => { SFX.resume(); e.target.textContent = SFX.toggleMute() ? 'sound: off' : 'sound: on'; };
+
+// ---------- the pencil (AI) ----------
+function aiFlick() {
+  const b = ball.position;
+  if (mode === 'aikick') { // kicks: mostly good, sometimes shanks it
+    const good = Math.random() < 0.72; const ty = MID + (good ? (Math.random() - .5) * 50 : (Math.random() > .5 ? 1 : -1) * (POST.half + 20 + Math.random() * 40));
+    const dx = TABLE.x1 - 80 - b.x, dy = ty - b.y, d = Math.hypot(dx, dy); const sp = 11 + Math.random() * 3;
+    flick({ x: dx / d * sp, y: dy / d * sp }, 'pencil'); return;
+  }
+  // aim to stop with the nose just over the left edge; stopping distance ≈ v0 / frictionAir
+  const wantX = TABLE.x1 - 6 + (Math.random() - .5) * 26;
+  const dist = b.x - wantX; const err = 1 + (Math.random() - .5) * 0.22;
+  const ty = b.y + (MID - b.y) * 0.5 + (Math.random() - .5) * 60;
+  const ang = Math.atan2(ty - b.y, -Math.abs(dist));
+  const sp = Math.max(0.5, dist * FRICTION * err) / Math.max(0.3, Math.abs(Math.cos(ang)));
+  flick({ x: Math.cos(ang) * sp, y: Math.sin(ang) * sp }, 'pencil');
+}
+
+// ---------- rules ----------
+function offTable(p) { return p.x < TABLE.x1 || p.x > TABLE.x2 || p.y < TABLE.y1 || p.y > TABLE.y2; }
+function hangsOver(who) { // some part of the football past the scoring edge, but its middle still on the table
+  const e = edgeOf(who), vs = ball.vertices, c = ball.position;
+  if (offTable(c)) return false;
+  return who === 'you' ? vs.some(v => v.x > e) : vs.some(v => v.x < e);
+}
+function settle() {
+  const c = ball.position;
+  if (mode === 'kicking') return;
+  if (offTable(c)) {
+    SFX.off(); dropFlutter(c);
+    const other = opp(shooter);
+    say(shooter === 'you' ? 'off the table!' : 'the pencil knocked it off!', shooter === 'you' ? RED : INK, `${other === 'you' ? 'your' : "pencil's"} ball`);
+    // the other player sets up one hand-width off their own edge
+    startDrive(other, other === 'you' ? TABLE.x1 + 90 : TABLE.x2 - 90); return;
+  }
+  if (hangsOver(shooter)) {
+    SFX.td(); score[shooter] += 6; say('TOUCHDOWN!', shooter === 'you' ? INK : RED, shooter === 'you' ? 'now kick the extra point' : 'the pencil lines up a kick');
+    // extra point: kick from the tee toward the scoring edge
+    turn = shooter; mode = shooter === 'you' ? 'kick' : 'aikick'; aiTimer = 90;
+    makeBall(shooter === 'you' ? TABLE.x2 - 240 : TABLE.x1 + 240, MID, shooter === 'you' ? 0 : Math.PI); trail = [];
+    return;
+  }
+  // nothing happened: other player's turn from where it lies
+  turn = opp(shooter); mode = turn === 'you' ? 'aim' : 'ai'; aiTimer = 60;
+  if (Math.abs(c.x - edgeOf(shooter)) < 40) { SFX.hang(); say('so close...', GRAPHITE, "just short of the edge"); }
+}
+function checkKick() {
+  const e = edgeOf(shooter), c = ball.position;
+  const crossed = shooter === 'you' ? c.x >= e : c.x <= e;
+  const stopped = Math.hypot(ball.velocity.x, ball.velocity.y) < 0.15 && performance.now() - moveStart > 600;
+  if (crossed) {
+    const good = Math.abs(c.y - MID) < POST.half && Math.hypot(ball.velocity.x, ball.velocity.y) > 0.7;
+    finishKick(good, good ? "it's good!" : Math.abs(c.y - MID) >= POST.half ? 'wide!' : 'not enough leg');
+  } else if (stopped || offTable(c)) finishKick(false, offTable(c) ? 'shanked it' : 'short!');
+}
+function finishKick(good, text) {
+  if (good) { score[shooter] += 1; SFX.good(); } else SFX.miss();
+  say(text, good ? (shooter === 'you' ? INK : RED) : GRAPHITE, good ? '+1' : 'no good');
+  if (score.you >= 21 || score.pencil >= 21) { gameOver = true; mode = 'over'; setTimeout(() => { say(score.you > score.pencil ? 'YOU WIN!' : 'the pencil wins.', score.you > score.pencil ? INK : RED, 'press new game'); msg.life = 9999; SFX.win(); }, 1600); return; }
+  // kickoff: the other team starts from their own end
+  const other = opp(shooter);
+  setTimeout(() => { if (!gameOver) startDrive(other, other === 'you' ? TABLE.x1 + 110 : TABLE.x2 - 110); }, 1400);
+  mode = 'pause';
+}
+function dropFlutter(c) { for (let i = 0; i < 14; i++) flutter.push({ x: c.x, y: c.y, vx: (Math.random() - .5) * 3, vy: (Math.random() - .5) * 3 + 1, life: 40 + Math.random() * 30, id: Math.random() * 1e5 }); }
+
+// ---------- drawing ----------
+function drawTable() {
+  const { x1, x2, y1, y2 } = TABLE;
+  // floor beyond the desk: pencil smudge all round
+  ink.smudge([{ x: 0, y: 0 }, { x: W, y: 0 }, { x: W, y: y1 }, { x: 0, y: y1 }], 1, 0.05, -0.3, 6);
+  ink.smudge([{ x: 0, y: y2 }, { x: W, y: y2 }, { x: W, y: H }, { x: 0, y: H }], 2, 0.05, -0.3, 6);
+  ink.smudge([{ x: 0, y: y1 }, { x: x1, y: y1 }, { x: x1, y: y2 }, { x: 0, y: y2 }], 3, 0.05, -0.3, 6);
+  ink.smudge([{ x: x2, y: y1 }, { x: W, y: y1 }, { x: W, y: y2 }, { x: x2, y: y2 }], 4, 0.05, -0.3, 6);
+  // desk edge: bold pencil with a darker underside
+  ink.pencilPath([{ x: x1, y: y1 }, { x: x2, y: y1 }, { x: x2, y: y2 }, { x: x1, y: y2 }], 10, 1, true);
+  ink.smudge([{ x: x1, y: y2 }, { x: x2, y: y2 }, { x: x2, y: y2 + 14 }, { x: x1, y: y2 + 14 }], 5, 0.16, 0, 3);
+  ink.smudge([{ x: x2, y: y1 }, { x: x2 + 10, y: y1 }, { x: x2 + 10, y: y2 }, { x: x2, y: y2 }], 6, 0.12, 0, 3);
+  // yard lines in ink, numbers every 10
+  const n = 18, step = (x2 - x1) / n;
+  for (let i = 1; i < n; i++) {
+    const x = x1 + i * step, big = i % 2 === 0;
+    ink.line(x, y1 + 8, x, y2 - 8, 100 + i, INK, big ? 1.6 : 1, 1);
+    if (big && i !== 9) { const yd = i < 9 ? i * 5 : (18 - i) * 5; ink.text(String(yd), x, y1 + 40, { size: 24, color: INK, alpha: 0.7, rot: -0.05 }); ink.text(String(yd), x, y2 - 22, { size: 24, color: INK, alpha: 0.7, rot: 0.04 }); }
+    if (i === 9) { ink.text('50', x, y1 + 40, { size: 26, color: RED, alpha: 0.75 }); ink.text('50', x, y2 - 22, { size: 26, color: RED, alpha: 0.75 }); }
+  }
+  // hash marks
+  for (let i = 1; i < n * 4; i++) { const x = x1 + i * step / 4; ink.line(x, MID - 60, x, MID - 52, 300 + i, INK, 1, 1); ink.line(x, MID + 52, x, MID + 60, 400 + i, INK, 1, 1); }
+  // end zone words
+  ink.text('PENCIL', x1 + 22, MID + 14, { size: 30, color: GRAPHITE, rot: -Math.PI / 2, alpha: 0.45 });
+  ink.text('YOU', x2 - 22, MID - 10, { size: 30, color: INK, rot: Math.PI / 2, alpha: 0.45 });
+  // goalposts: two hands, thumbs touching as the crossbar, index fingers up as uprights
+  drawHands(x2, mode === 'kick' || (mode === 'kicking' && shooter === 'you') ? 1 : 0.28, 1);
+  drawHands(x1, mode === 'aikick' || (mode === 'kicking' && shooter === 'pencil') ? 1 : 0.28, -1);
+}
+function drawHands(x, alpha, dir) {
+  ctx.globalAlpha = alpha;
+  const h = POST.half, id = 500 + dir * 3;
+  // crossbar (thumbs)
+  ink.pencil(x, MID - h, x, MID + h, id, 1); ink.pencil(x + dir * 4, MID - h + 6, x + dir * 4, MID + h - 6, id + 1, 0.6);
+  // uprights (index fingers) sticking out past the edge
+  for (const s of [-1, 1]) {
+    const y = MID + s * h;
+    ink.pencil(x, y, x + dir * 70, y + s * 6, id + 10 + s, 1); ink.pencil(x, y + s * 12, x + dir * 66, y + s * 16, id + 12 + s, 1);
+    ink.pencil(x + dir * 70, y + s * 6, x + dir * 66, y + s * 16, id + 14 + s, 1); // fingertip
+    ink.pencil(x + dir * 30, y + s * 8, x + dir * 36, y + s * 9, id + 16 + s, 0.5); // knuckle
+    // fingernail
+    ctx.strokeStyle = GRAPHITE; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x + dir * 60, y + s * 11, 5, 3, 0, 0, 7); ctx.stroke();
+    // the rest of the hand curls back behind the edge
+    ink.pencil(x, y + s * 12, x - dir * 20, y + s * 30, id + 18 + s, 0.7); ink.pencil(x - dir * 20, y + s * 30, x - dir * 12, y + s * 52, id + 20 + s, 0.7);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawBall() {
+  const vs = ball.vertices, id = 900;
+  // shadow when moving fast (it's skimming)
+  ctx.fillStyle = 'rgba(0,0,0,.08)'; ctx.beginPath(); vs.forEach((v, i) => i ? ctx.lineTo(v.x + 3, v.y + 4) : ctx.moveTo(v.x + 3, v.y + 4)); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#fbf8ee'; ctx.beginPath(); vs.forEach((v, i) => i ? ctx.lineTo(v.x, v.y) : ctx.moveTo(v.x, v.y)); ctx.closePath(); ctx.fill();
+  ink.hatch(vs, id, GRAPHITE, 5, ball.angle + 0.9, 0.25);
+  ink.poly(vs, id, INK, 2.4);
+  // fold lines + laces
+  const c = ball.position, a = ball.angle, P = (px, py) => ({ x: c.x + px * Math.cos(a) - py * Math.sin(a), y: c.y + px * Math.sin(a) + py * Math.cos(a) });
+  const f1 = P(-17, 0), f2 = P(17, 0); ink.pencil(f1.x, f1.y, f2.x, f2.y, id + 40, 0.6, 1);
+  const f3 = P(-17, -11), f4 = P(6, 4); ink.pencil(f3.x, f3.y, f4.x, f4.y, id + 41, 0.5, 1);
+  for (let i = 0; i < 3; i++) { const l1 = P(-8 + i * 5, -3), l2 = P(-8 + i * 5, 3); ink.line(l1.x, l1.y, l2.x, l2.y, id + 50 + i, INK, 1.2, 1); }
+}
+function drawAim() {
+  if (!dragging) return;
+  const b = ball.position, dx = b.x - dragPos.x, dy = b.y - dragPos.y, d = Math.hypot(dx, dy);
+  // pull-back band and a scribbled finger
+  ink.line(dragPos.x, dragPos.y, b.x, b.y, 800, GRAPHITE, 1.5, 1);
+  const fx = dragPos.x - dx / d * 12, fy = dragPos.y - dy / d * 12;
+  ink.pencil(fx, fy, fx - dx / d * 60 + dy / d * 8, fy - dy / d * 60 - dx / d * 8, 801, 1); ink.pencil(fx + dy / d * 10, fy - dx / d * 10, fx - dx / d * 58 + dy / d * 16, fy - dy / d * 58 - dx / d * 16, 802, 1);
+  ctx.strokeStyle = GRAPHITE; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(fx + dy / d * 5, fy - dx / d * 5, 4, 6, Math.atan2(dy, dx), 0, 7); ctx.stroke();
+  // predicted slide: v decays by (1 - FRICTION) per step
+  let vx = dx * FLICK, vy = dy * FLICK, x = b.x, y = b.y; ctx.fillStyle = INK; ctx.globalAlpha = 0.3;
+  for (let i = 0; i < 60; i++) { for (let s = 0; s < 4; s++) { vx *= 1 - FRICTION; vy *= 1 - FRICTION; x += vx; y += vy; } if (i % 2 === 0) { ctx.beginPath(); ctx.arc(x, y, 2, 0, 7); ctx.fill(); } if (Math.hypot(vx, vy) < 0.2) break; }
+  ctx.globalAlpha = 1;
+  const pw = Math.min(1, d / MAX_PULL); ink.text(pw > 0.9 ? 'full send' : pw > 0.55 ? 'medium' : 'soft', dragPos.x, dragPos.y + 34, { size: 20, color: GRAPHITE, font: 'Patrick Hand', weight: 400, alpha: 0.7 });
+}
+function drawScore() {
+  ink.text('you', 300, 100, { size: 30, color: INK, rot: -0.05 }); ink.text(String(score.you), 360, 104, { size: 46, color: INK, rot: -0.05 });
+  ink.text('the pencil', 860, 100, { size: 30, color: GRAPHITE, rot: 0.04 }); ink.text(String(score.pencil), 950, 104, { size: 46, color: GRAPHITE, rot: 0.04 });
+  const who = turn === 'you' ? '← your flick' : "the pencil's flick →";
+  if (!gameOver && mode !== 'pause') ink.text(mode === 'kick' ? 'kick it between the fingers!' : mode === 'aikick' ? 'the pencil is kicking...' : who, 600, 104, { size: 24, color: turn === 'you' ? INK : GRAPHITE, font: 'Patrick Hand', weight: 400, alpha: 0.5 + Math.sin(ink.frame * 0.1) * 0.2 });
+}
+function drawMsg() {
+  if (!msg) return;
+  const a = Math.min(1, msg.life / 30), s = 1 + Math.max(0, (msg.life - 140)) * 0.06;
+  ctx.save(); ctx.globalAlpha = a; ctx.translate(600, 330); ctx.scale(s, s);
+  ink.text(msg.text, 0, 0, { size: 84, color: msg.color, rot: -0.04 }); if (msg.sub) ink.text(msg.sub, 0, 40, { size: 26, color: GRAPHITE, font: 'Patrick Hand', weight: 400 });
+  ctx.restore(); ctx.globalAlpha = 1;
+}
+
+// ---------- loop ----------
+function tick() {
+  ink.tick();
+  Engine.update(engine, 1000 / 60);
+  if (msg && --msg.life <= 0) msg = null;
+  flutter = flutter.filter(f => (f.x += f.vx, f.y += f.vy, f.vx *= 0.97, --f.life > 0));
+  const speed = Math.hypot(ball.velocity.x, ball.velocity.y);
+  SFX.slide(mode === 'moving' || mode === 'kicking' ? speed : 0);
+  if ((mode === 'moving' || mode === 'kicking') && ink.frame % 2 === 0 && speed > 0.5) trail.push({ x: ball.position.x, y: ball.position.y });
+  if (mode === 'kicking') checkKick();
+  if (mode === 'moving' && (offTable(ball.position) || (speed < 0.06 && performance.now() - moveStart > 400) || performance.now() - moveStart > 9000)) settle();
+  if ((mode === 'ai' || mode === 'aikick') && !gameOver && --aiTimer <= 0) aiFlick();
+
+  ctx.drawImage(paper, 0, 0);
+  drawTable();
+  ctx.fillStyle = INK; ctx.globalAlpha = 0.25; trail.forEach((p, i) => { if (i % 2 === 0) { ctx.beginPath(); ctx.arc(p.x, p.y, 1.6, 0, 7); ctx.fill(); } }); ctx.globalAlpha = 1;
+  drawBall();
+  for (const f of flutter) { ctx.globalAlpha = Math.min(1, f.life / 20); ink.line(f.x, f.y, f.x + 6, f.y - 3, f.id, GRAPHITE, 1.5, 1); } ctx.globalAlpha = 1;
+  drawAim(); drawScore(); drawMsg();
+  requestAnimationFrame(tick);
+}
+setup(); tick();
+</script>
+</body>
+</html>
