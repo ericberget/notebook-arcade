@@ -37,6 +37,7 @@
     <div class="label" id="pitchLabel">pick a pitch, then click a spot in the zone</div>
     <div id="pitches"><button data-p="fast">fastball</button><button data-p="curve">curve</button><button data-p="change">changeup</button></div>
     <div id="hint"></div>
+    <button id="howto">how to play</button>
   </div>
 </div></div>
 <script src="../../shared/paper.js"></script>
@@ -98,11 +99,11 @@ const PENCIL_NAMES = ['Stubby', 'No. 2', 'Eraserhead', 'Sharpie', 'Mechanical', 
 function popup(text, x, y, color = INK, size = 22) { popups.push({ text, x, y, color, size, life: 55 }); }
 function burst(x, y, color) { bursts.push({ x, y, color, t: 0, seed: Math.random() * 1000 }); }
 function fanDo(kind, len) { fan = { kind, t: len, len }; }
-const NAME_BOX = { x: 952, y: 146, w: 110, h: 26 };
+const NAME_BOX = { x: 952, y: 114, w: 110, h: 26 };
 function renameTeam() {
   if (document.getElementById('rename')) return;
   const inp = document.createElement('input'); inp.id = 'rename'; inp.maxLength = 10; inp.value = teamName === 'YOU' ? '' : teamName; inp.placeholder = 'team name';
-  inp.style.cssText = "position:absolute;left:958px;top:146px;width:100px;font-family:'Patrick Hand',cursive;font-size:18px;color:#4a4a50;background:#fdfbf4;border:none;border-bottom:2px solid #9a9aa0;outline:none;padding:0 2px";
+  inp.style.cssText = "position:absolute;left:958px;top:114px;width:100px;font-family:'Patrick Hand',cursive;font-size:18px;color:#4a4a50;background:#fdfbf4;border:none;border-bottom:2px solid #9a9aa0;outline:none;padding:0 2px";
   stage.appendChild(inp); inp.focus(); inp.select();
   const done = save => { if (save) { const v = inp.value.trim().slice(0, 10); teamName = v || 'YOU'; localStorage.setItem('bb.team', teamName); } inp.remove(); };
   inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); });
@@ -112,17 +113,17 @@ function renameTeam() {
 function newGame() {
   game = { inning: 1, half: 'top', outs: 0, balls: 0, strikes: 0, bases: [null, null, null], score: { you: 0, pencils: 0 }, line: { you: [], pencils: [] }, hits: { you: 0, pencils: 0 }, over: false };
   introT = 0; stage.classList.add('intro'); msg = null; play = null; pitch = null; runnersAnim = []; popups = []; bursts = []; trail = []; fan = { kind: 'idle', t: 0, len: 0 };
-  resetFielders(); say(teamName === 'YOU' ? 'play ball!' : `${teamName} vs the pencils. play ball!`, INK, 150);
-  setTimeout(nextPitch, 2600); updateUI();
+  resetFielders(); game.abs = 0; game.pabs = 0;
+  setTimeout(() => { state = 'howto'; updateUI(); }, 2400); updateUI();
 }
-function batting() { return game.half === 'bottom'; }          // you are the home team: you pitch in the top, bat in the bottom
+function batting() { return game.half === 'top'; }             // you're the visitors: you bat first, then pitch
 function resetFielders() { for (const k in FIELD_SPOTS) fielders[k] = { x: FIELD_SPOTS[k].x, y: FIELD_SPOTS[k].y, tx: FIELD_SPOTS[k].x, ty: FIELD_SPOTS[k].y, id: 300 + Object.keys(fielders).length * 7 }; }
 function say(text, color = INK, life = 110, sub = '') { msg = { text, color, life, sub }; }
 function updateUI() {
   const b = batting();
   pitchesEl.classList.toggle('on', !b && !game.over);
-  pitchLabel.textContent = b ? 'batting' : 'pitching';
-  hintEl.textContent = game.over ? 'game over. new game to play again.' : b ? 'click to swing when the ball reaches the plate. early pulls it left, late goes right. click above the ball to lift it, below to chop it.' : 'pick a pitch, then click where you want it in the zone. corners get weaker contact.';
+  hintEl.textContent = game.over ? 'game over. new game to play again.' : state === 'howto' ? '' : b ? 'BATTING: click (or space) the moment the ball crosses the dashed line. early = left field, late = right. click above the ball to lift it, below to chop it.' : 'PITCHING: pick a pitch above, then click a spot inside the red zone at the plate. corners get weaker contact.';
+  pitchLabel.textContent = b ? 'you\'re batting' : 'you\'re pitching';
   [...pitchesEl.querySelectorAll('button')].forEach(bt => bt.classList.toggle('sel', bt.dataset.p === pitchType));
 }
 
@@ -132,6 +133,7 @@ function nextPitch() {
   if (game.over) return;
   if (!batting() && game.balls === 0 && game.strikes === 0 && !pitch) pencilIdx = (pencilIdx + (state === 'pitchpick' ? 0 : 1)) % PENCIL_NAMES.length;
   state = batting() ? 'batting' : 'pitchpick'; pitch = null; play = null; swing = null; aimSpot = null; runnersAnim = [];
+  if (game.balls === 0 && game.strikes === 0) { if (batting()) game.abs++; else game.pabs++; }
   if (batting()) setTimeout(() => { if (state === 'batting' && !pitch) throwPitch(cpuPickPitch(), (Math.random() - .5) * 70); }, 900 + Math.random() * 900);
   updateUI();
 }
@@ -240,15 +242,16 @@ function resolvePlay() {
 function recordOut() { game.outs++; game.balls = 0; game.strikes = 0; }
 function afterPlay() {
   play = null; pitch = null; swing = null; resetFielders();
+  if (game.half === 'bottom' && game.inning >= 3 && game.score.pencils > game.score.you) { setTimeout(endGame, 1200); return; }
   if (game.outs >= 3) { setTimeout(changeSides, 1500); return; }
   setTimeout(nextPitch, 1500);
 }
 function changeSides() {
   game.outs = 0; game.balls = 0; game.strikes = 0; game.bases = [null, null, null];
-  if (game.half === 'top') { game.half = 'bottom'; if (game.inning >= 3 && game.score.you > game.score.pencils) return endGame(); say('bottom of the ' + ordinal(game.inning), GRAPHITE, 120, 'you\'re up'); }
+  if (game.half === 'top') { game.half = 'bottom'; if (game.inning >= 3 && game.score.pencils > game.score.you) return endGame(); say('bottom of the ' + ordinal(game.inning), GRAPHITE, 120, 'the pencils bat. you\'re pitching'); }
   else {
     if (game.inning >= 3 && game.score.you !== game.score.pencils) return endGame();
-    game.inning++; game.half = 'top'; say(game.inning > 3 ? 'extra innings!' : 'top of the ' + ordinal(game.inning), GRAPHITE, 120, 'you\'re pitching');
+    game.inning++; game.half = 'top'; say(game.inning > 3 ? 'extra innings!' : 'top of the ' + ordinal(game.inning), GRAPHITE, 120, 'you\'re up');
   }
   for (const s of ['you', 'pencils']) while (game.line[s].length < game.inning) game.line[s].push(0);
   setTimeout(nextPitch, 1800); updateUI();
@@ -276,11 +279,12 @@ function canvasPos(e) { const r = canvas.getBoundingClientRect(); const t = e.to
 function onDown(e) {
   SFX.resume(); const p = canvasPos(e); mouse = p;
   if (introT < 120) return;
+  if (state === 'howto') { dismissHowto(); e.preventDefault(); return; }
   if (p.x >= NAME_BOX.x && p.x <= NAME_BOX.x + NAME_BOX.w && p.y >= NAME_BOX.y && p.y <= NAME_BOX.y + NAME_BOX.h && state !== 'play') { renameTeam(); e.preventDefault(); return; }
   if (game.over) return;
   if (state === 'batting' && pitch && !swing) { swingAt(p); e.preventDefault(); }
   else if (state === 'pitchpick' && !pitch) { // aim within the zone box in front of the plate
-    if (Math.abs(p.x - HOME.x) < 70 && Math.abs(p.y - (HOME.y - 26)) < 40) { aimSpot = p; throwPitch(pitchType, p.x - HOME.x); e.preventDefault(); }
+    if (Math.abs(p.x - HOME.x) < 60 && Math.abs(p.y - (HOME.y - 34)) < 44) { aimSpot = p; throwPitch(pitchType, Math.max(-44, Math.min(44, p.x - HOME.x))); e.preventDefault(); }
   }
 }
 canvas.addEventListener('mousedown', onDown); canvas.addEventListener('touchstart', onDown, { passive: false });
@@ -288,6 +292,8 @@ window.addEventListener('mousemove', e => { mouse = canvasPos(e); });
 window.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.code === 'Space' && state === 'batting' && pitch && !swing) { e.preventDefault(); swingAt({ x: HOME.x, y: pitchPos(pitch, pitch.t).y }); } });
 pitchesEl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; SFX.click(); pitchType = b.dataset.p; updateUI(); });
 document.getElementById('newgame').onclick = () => { SFX.resume(); SFX.click(); newGame(); };
+document.getElementById('howto').onclick = () => { SFX.resume(); SFX.click(); if (!pitch && !play && !game.over) { state = 'howto'; updateUI(); } };
+function dismissHowto() { state = 'idle'; say('play ball!', INK, 90, batting() ? 'you\'re up first' : ''); setTimeout(nextPitch, 1200); updateUI(); }
 const SPK_ON = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="#7a7a82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L9 10 L16 4.5 L16.4 21.5 L9 16.5 L3.2 16.2 Z"/><path d="M21 9.5 Q24 13 21 16.8"/><path d="M25 6 Q30 13 25.3 20.2"/></svg>';
 const SPK_OFF = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="#7a7a82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L9 10 L16 4.5 L16.4 21.5 L9 16.5 L3.2 16.2 Z"/><path d="M21 8.5 L30 17.5"/><path d="M30 8.2 L21.2 17.8"/></svg>';
 const muteBtn = document.getElementById('mute'); muteBtn.innerHTML = SPK_ON;
@@ -355,8 +361,7 @@ function drawField() {
   ink.circle(MOUND.x, MOUND.y, 22, 70, DIRT, 1.4, 1); ink.line(MOUND.x - 8, MOUND.y - 4, MOUND.x + 8, MOUND.y - 4, 71, INK, 2, 1);
   // batter's boxes
   for (const s of [-1, 1]) ink.poly([{ x: HOME.x + s * 14, y: HOME.y - 18 }, { x: HOME.x + s * 34, y: HOME.y - 18 }, { x: HOME.x + s * 34, y: HOME.y + 18 }, { x: HOME.x + s * 14, y: HOME.y + 18 }], 80 + s * 3, INK, 1.2, 1);
-  // the strike zone when you're pitching
-  if (state === 'pitchpick' && !pitch) { ctx.setLineDash([4, 5]); ctx.strokeStyle = RED; ctx.globalAlpha = 0.6; ctx.lineWidth = 1.5; ctx.strokeRect(HOME.x - 30, HOME.y - 56, 60, 44); ctx.setLineDash([]); ctx.globalAlpha = 1; ink.text('the zone', HOME.x, HOME.y - 62, { size: 14, color: RED, font: 'Patrick Hand', weight: 400, alpha: 0.7 }); }
+  if (state === 'pitchpick' && !pitch) ink.text('the zone', HOME.x, HOME.y - 66, { size: 14, color: RED, font: 'Patrick Hand', weight: 400, alpha: 0.7 });
 }
 function stick(x, y, id, col = PEN_MD, glove = false, tilt = 0) { // a pencil fielder
   ink.circle(x, y - 22, 6, id, col, 1.4, 1); ink.line(x, y - 16, x, y - 2, id + 1, col, 1.3, 1);
@@ -393,7 +398,49 @@ function drawBall() {
     if (play.phase === 'flight' && !play.cut) { ctx.setLineDash([3, 4]); ctx.strokeStyle = GRAPHITE; ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.arc(play.land.x, play.land.y, 7, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
   }
 }
-function drawSwingHint() { if (state !== 'batting' || !pitch || swing) return; ctx.setLineDash([3, 4]); ctx.strokeStyle = INK; ctx.globalAlpha = 0.35; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(HOME.x - 46, HOME.y - 26); ctx.lineTo(HOME.x + 46, HOME.y - 26); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
+function drawSwingHint() {
+  if (state !== 'batting' || play) return;
+  const hot = pitch && !swing && Math.abs(pitch.T - pitch.t) <= 8;           // the ball is in the hittable window
+  ctx.setLineDash(hot ? [] : [3, 4]); ctx.strokeStyle = hot ? RED : INK; ctx.globalAlpha = hot ? 0.9 : 0.4; ctx.lineWidth = hot ? 3 : 1.2;
+  ctx.beginPath(); ctx.moveTo(HOME.x - 50, HOME.y - 26); ctx.lineTo(HOME.x + 50, HOME.y - 26); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  if (game.abs <= 2 && !swing) { // first couple of at-bats: spell it out
+    ink.text(hot ? 'SWING!' : 'click when the ball crosses this line', HOME.x - 60, HOME.y - 34, { size: hot ? 26 : 16, color: hot ? RED : PEN_DK, font: hot ? 'Caveat' : 'Patrick Hand', weight: hot ? 700 : 400, align: 'right', rot: -0.04 });
+    ink.line(HOME.x - 62, HOME.y - 30, HOME.x - 52, HOME.y - 27, 950, PEN_DK, 1.2, 1); ink.line(HOME.x - 52, HOME.y - 27, HOME.x - 58, HOME.y - 23, 951, PEN_DK, 1.2, 1);
+    if (!pitch) ink.text('here comes the pitch...', MOUND.x + 40, MOUND.y - 30, { size: 15, color: PEN_MD, font: 'Patrick Hand', weight: 400, align: 'left', alpha: 0.5 + Math.sin(frame * 0.1) * 0.3 });
+  }
+}
+function drawPitchHint() {
+  if (state !== 'pitchpick' || pitch) return;
+  const pulse = 1 + Math.sin(frame * 0.12) * 0.08;
+  ctx.save(); ctx.translate(HOME.x, HOME.y - 34); ctx.scale(pulse, pulse); ctx.setLineDash([4, 5]); ctx.strokeStyle = RED; ctx.globalAlpha = 0.75; ctx.lineWidth = 1.8; ctx.strokeRect(-32, -24, 64, 48); ctx.setLineDash([]); ctx.restore(); ctx.globalAlpha = 1;
+  if (game.pabs <= 2) {
+    ink.text('click a spot in here to pitch', HOME.x - 44, HOME.y - 44, { size: 16, color: RED, font: 'Patrick Hand', weight: 400, align: 'right', rot: -0.04 });
+    ink.line(HOME.x - 46, HOME.y - 40, HOME.x - 34, HOME.y - 34, 960, RED, 1.2, 1); ink.line(HOME.x - 34, HOME.y - 34, HOME.x - 42, HOME.y - 33, 961, RED, 1.2, 1);
+    ink.text(`(${PITCHES[pitchType].name} · change it on the right →)`, HOME.x + 60, HOME.y - 60, { size: 14, color: PEN_MD, font: 'Patrick Hand', weight: 400, align: 'left' });
+  }
+}
+function drawHowto() {
+  if (state !== 'howto') return;
+  const X = 250, Y = 150, Wd = 620, Hh = 400;
+  ctx.fillStyle = 'rgba(253,251,244,.94)'; ctx.fillRect(X, Y, Wd, Hh);
+  box(X, Y, Wd, Hh, 700, PEN_DK, 2.2);
+  ink.text('how to play', X + Wd / 2, Y + 50, { size: 44, color: INK, rot: -0.03 });
+  const PH = { font: 'Patrick Hand', weight: 400, color: PEN_DK, align: 'left' };
+  ink.text('BATTING', X + 40, Y + 105, { size: 24, color: INK, align: 'left' });
+  ink.text('the pencil pitcher throws. click (or press space) the moment', X + 40, Y + 132, { ...PH, size: 18 });
+  ink.text('the ball crosses the dashed line in front of the plate.', X + 40, Y + 154, { ...PH, size: 18 });
+  ink.text('early = left field · perfect = up the middle, hardest · late = right field', X + 40, Y + 178, { ...PH, size: 16, color: PEN_MD });
+  ink.text('click above the ball to lift a fly ball, below it to chop a grounder.', X + 40, Y + 200, { ...PH, size: 16, color: PEN_MD });
+  // little doodle: ball and the line
+  ctx.setLineDash([3, 4]); ctx.strokeStyle = INK; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X + 500, Y + 150); ctx.lineTo(X + 580, Y + 150); ctx.stroke(); ctx.setLineDash([]);
+  drawBallAt(X + 540, Y + 118, 0, 1.3); ink.line(X + 540, Y + 128, X + 540, Y + 142, 710, PEN_MD, 1, 1); ink.text('click!', X + 552, Y + 172, { size: 16, color: RED, font: 'Caveat', weight: 700, align: 'left', rot: -0.1 });
+  ink.text('PITCHING', X + 40, Y + 250, { size: 24, color: INK, align: 'left' });
+  ink.text('pick fastball, curve or changeup on the right, then click a spot', X + 40, Y + 277, { ...PH, size: 18 });
+  ink.text('inside the red zone at the plate. corners are harder to hit.', X + 40, Y + 299, { ...PH, size: 18 });
+  ctx.setLineDash([4, 5]); ctx.strokeStyle = RED; ctx.lineWidth = 1.5; ctx.strokeRect(X + 510, Y + 255, 56, 44); ctx.setLineDash([]); ink.text('click!', X + 566, Y + 322, { size: 16, color: RED, font: 'Caveat', weight: 700, align: 'left', rot: -0.1 }); ink.circle(X + 548, Y + 280, 3, 720, RED, 1.2, 1);
+  ink.text('three innings against the pencils. you bat first.', X + 40, Y + 342, { ...PH, size: 17, color: PEN_MD });
+  ink.text('click anywhere to play ball', X + Wd / 2, Y + 378, { size: 24, color: RED, rot: -0.03, alpha: 0.6 + Math.sin(frame * 0.1) * 0.3 });
+}
 function box(x, y, w, h, id, color, width, prog = 1) { ink.line(x, y, x + w, y, id, color, width, 2, prog * 4); ink.line(x + w, y, x + w, y + h, id + 1, color, width, 2, prog * 4 - 1); ink.line(x + w, y + h, x, y + h, id + 2, color, width, 2, prog * 4 - 2); ink.line(x, y + h, x, y, id + 3, color, width, 2, prog * 4 - 3); }
 function drawScorecard() {
   const X = 950, Wd = 232, PH = 'Patrick Hand';
@@ -403,15 +450,15 @@ function drawScorecard() {
   const inn = Math.max(3, game.inning), cw = Math.min(28, 150 / inn), x0 = X + 68;
   for (let i = 0; i < inn; i++) ink.text(String(i + 1), x0 + i * cw + cw / 2, 100, { size: 13, color: PEN_LT, font: PH, weight: 400 });
   ink.text('R', X + Wd - 16, 100, { size: 13, color: PEN_LT, font: PH, weight: 400 });
-  const rowY = [128, 160]; [['pencils', 'PENCILS', PEN_MD], ['you', teamName, PEN_MD]].forEach(([k, label, col], ri) => {
+  const rowY = [128, 160]; [['you', teamName, PEN_MD], ['pencils', 'PENCILS', PEN_MD]].forEach(([k, label, col], ri) => {
     const y = rowY[ri]; const shown = k === 'you' && document.getElementById('rename') ? '' : label; ink.text(shown, X + 10, y, { size: label.length > 7 ? 15 : 18, color: col, font: PH, weight: 400, align: 'left' });
     if (k === 'you') ink.text('✎', X + 14 + Math.min(80, label.length * (label.length > 7 ? 7 : 9)), y - 2, { size: 11, color: PEN_LT, font: PH, weight: 400, alpha: 0.7, align: 'left' });
-    for (let i = 0; i < inn; i++) { const v = game.line[k][i]; const cur = game.inning === i + 1 && ((k === 'pencils') === (game.half === 'top')); ink.text(v === undefined ? (cur ? '·' : '') : String(v), x0 + i * cw + cw / 2, y, { size: 16, color: cur ? PEN_DK : PEN_MD, font: PH, weight: 400 }); }
+    for (let i = 0; i < inn; i++) { const v = game.line[k][i]; const cur = game.inning === i + 1 && ((k === 'you') === (game.half === 'top')); ink.text(v === undefined ? (cur ? '·' : '') : String(v), x0 + i * cw + cw / 2, y, { size: 16, color: cur ? PEN_DK : PEN_MD, font: PH, weight: 400 }); }
     ink.text(String(game.score[k]), X + Wd - 16, y + 2, { size: 24, color: PEN_DK });
   });
   ink.line(X + 8, 142, X + Wd - 8, 142, 830, PEN_LT, 1, 1);
   ink.text(`${game.half} ${ordinal(game.inning)}`, X + 10, 188, { size: 14, color: PEN_LT, font: PH, weight: 400, align: 'left' });
-  ink.text(`H ${game.hits.pencils}–${game.hits.you}`, X + Wd - 10, 188, { size: 14, color: PEN_LT, font: PH, weight: 400, align: 'right' });
+  ink.text(`H ${game.hits.you}–${game.hits.pencils}`, X + Wd - 10, 188, { size: 14, color: PEN_LT, font: PH, weight: 400, align: 'right' });
   // the count
   const cp = rv(100, 20); box(X, 212, Wd, 64, 850, PEN_LT, 1.6, cp); ink.setAlpha(rv(112, 16));
   const dots = (label, n, max, x, col) => { ink.text(label, x, 244, { size: 15, color: PEN_MD, font: PH, weight: 400, align: 'left' }); for (let i = 0; i < max; i++) { const cx = x + 14 + i * 16, cy = 256; if (i < n) { ctx.fillStyle = col; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 7); ctx.fill(); ctx.globalAlpha = 1; } else ink.circle(cx, cy, 5, 860 + i, PEN_LT, 1, 1); } };
@@ -448,7 +495,7 @@ function drawMsg() {
 }
 function draw() {
   ctx.drawImage(paper, 0, 0);
-  drawField(); drawSwingHint(); drawPeople(); drawBall(); drawExtras(); drawScorecard(); drawMsg();
+  drawField(); drawSwingHint(); drawPitchHint(); drawPeople(); drawBall(); drawExtras(); drawScorecard(); drawMsg(); drawHowto();
 }
 newGame(); tick();
 </script>
