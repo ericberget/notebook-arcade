@@ -13,13 +13,14 @@
   #top { position: absolute; left: 74px; top: 14px; }
   #sys { position: absolute; left: 74px; top: 600px; display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
   #sys button, #top #back { color: #7a7a82; border-color: #9a9aa0; }
+  #mute { padding: 4px 8px 1px; line-height: 0; }
   #rename { position: absolute; left: 84px; top: 147px; width: 96px; font-family: 'Patrick Hand', cursive; font-size: 22px; color: #4a4a50; background: #fbf8ee; border: none; border-bottom: 2px solid #9a9aa0; outline: none; padding: 0 2px; }
   #sys button:hover { background: rgba(80,80,90,.07); }
   button, #back { font-family: 'Patrick Hand', cursive; font-size: 18px; background: transparent; border: 2px solid #1f3d9e; color: #1f3d9e; padding: 3px 12px; border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; cursor: pointer; transform: rotate(1deg); }
   button:hover { background: rgba(31,61,158,.08); }
   button:disabled { opacity: .35; cursor: default; }
   #back { border: none; border-bottom: 2px solid #1f3d9e; border-radius: 0; text-decoration: none; padding: 6px 10px; transform: rotate(-1.5deg); }
-  #side { position: absolute; left: 950px; top: 110px; width: 230px; display: flex; flex-direction: column; gap: 10px; }
+  #side { position: absolute; left: 950px; top: 190px; width: 230px; display: flex; flex-direction: column; gap: 10px; }
   #side, #sys, #top { transition: opacity .7s; }
   #stage.intro #side, #stage.intro #sys, #stage.intro #top { opacity: 0; }
   #side .label { font-size: 16px; color: #4a4a4f; opacity: .65; margin-top: 4px; transform: rotate(-.5deg); line-height: 1.2; }
@@ -37,7 +38,7 @@
 <div id="wrap"><div id="stage">
   <canvas id="c" width="1200" height="720"></canvas>
   <div id="top"><a href="../../index.html" id="back">← arcade</a></div>
-  <div id="sys"><button id="mute">sound: on</button><button id="newgame">new game</button></div>
+  <div id="sys"><button id="mute" title="sound" aria-label="sound on"></button><button id="newgame">new game</button></div>
   <div id="side">
     <button id="hike">HIKE!</button>
     <div id="fourth"><button id="fg">kick field goal</button><button id="punt">punt</button></div>
@@ -77,7 +78,7 @@ function setMood(kind, len) { mood = { kind, t: len, len }; }
 function cheer(n = 240) { setMood('cheer', n); }
 function sulk() {}
 function drawMascot() {
-  const x = 1066, baseY = 500, col = PEN_MD, w = 1.5;
+  const x = 1066, baseY = 590, col = PEN_MD, w = 1.5;
   if (mood.t > 0) mood.t--; else mood.kind = 'idle';
   const k = mood.kind, el = mood.len - mood.t;                       // el: frames elapsed in the current bit
   const flip = k === 'idle' ? 0 : Math.floor(frame / 8) % 3;           // flipbook only while something is happening
@@ -153,6 +154,17 @@ const stage = document.getElementById('stage');
 function fit() { const s = Math.min(window.innerWidth / W, window.innerHeight / H); stage.style.transform = `scale(${s})`; stage.style.marginLeft = ((window.innerWidth - W * s) / 2) + 'px'; stage.style.marginTop = ((window.innerHeight - H * s) / 2) + 'px'; }
 window.addEventListener('resize', fit); fit();
 
+// hand-drawn title: its baked-in paper background gets keyed out so only the pen strokes sit on our page
+const logo = new Image(); logo.src = 'logo.webp'; let logoCut = null;
+logo.onload = () => {
+  const sx = Math.round(logo.naturalWidth * 0.13), sw = Math.round(logo.naturalWidth * 0.74), sy = Math.round(logo.naturalHeight * 0.24), sh = Math.round(logo.naturalHeight * 0.56);
+  const c = document.createElement('canvas'); c.width = sw; c.height = sh; const g = c.getContext('2d'); g.drawImage(logo, sx, sy, sw, sh, 0, 0, sw, sh);
+  const im = g.getImageData(0, 0, sw, sh), d = im.data;
+  // the background is the most common color: sample it from the corners
+  let br = 0, bg = 0, bb = 0; for (const [px, py] of [[2, 2], [sw - 3, 2], [2, sh - 3], [sw - 3, sh - 3]]) { const i = (py * sw + px) * 4; br += d[i] / 4; bg += d[i + 1] / 4; bb += d[i + 2] / 4; }
+  for (let i = 0; i < d.length; i += 4) { const dist = Math.hypot(d[i] - br, d[i + 1] - bg, d[i + 2] - bb); d[i + 3] = Math.round(255 * Math.max(0, Math.min(1, (dist - 22) / 45))); }
+  g.putImageData(im, 0, 0); logoCut = c;
+};
 const paper = document.createElement('canvas'); paper.width = W; paper.height = H;
 const PAPER_STYLE = 'sketchpad';   // unlined: the field draws its own lines
 NotebookPaper.draw(paper.getContext('2d'), W, H, PAPER_STYLE);
@@ -345,7 +357,10 @@ window.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') retu
 document.getElementById('hike').onclick = hike;
 document.getElementById('clear').onclick = () => { SFX.click(); for (const p of players) if (p.team === 'o') p.route = []; };
 document.getElementById('newgame').onclick = () => { SFX.resume(); SFX.click(); newGame(); };
-document.getElementById('mute').onclick = e => { SFX.resume(); e.target.textContent = SFX.toggleMute() ? 'sound: off' : 'sound: on'; };
+const SPK_ON = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="#7a7a82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L9 10 L16 4.5 L16.4 21.5 L9 16.5 L3.2 16.2 Z"/><path d="M21 9.5 Q24 13 21 16.8"/><path d="M25 6 Q30 13 25.3 20.2"/></svg>';
+const SPK_OFF = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="#7a7a82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L9 10 L16 4.5 L16.4 21.5 L9 16.5 L3.2 16.2 Z"/><path d="M21 8.5 L30 17.5"/><path d="M30 8.2 L21.2 17.8"/></svg>';
+const muteBtn = document.getElementById('mute'); muteBtn.innerHTML = SPK_ON;
+muteBtn.onclick = () => { SFX.resume(); const m = SFX.toggleMute(); muteBtn.innerHTML = m ? SPK_OFF : SPK_ON; muteBtn.setAttribute('aria-label', m ? 'sound off' : 'sound on'); };
 document.getElementById('fg').onclick = () => { if (state !== 'presnap') return; SFX.resume(); kickFG(); };
 document.getElementById('punt').onclick = () => { if (state !== 'presnap') return; SFX.resume(); SFX.kick(); note('punt.', GRAPHITE); endPossession('punt'); };
 for (const [id, group] of [['runs', RUNS], ['passes', PASSES]]) { const el = document.getElementById(id); Object.keys(group).forEach(n => { const b = document.createElement('button'); b.textContent = n; b.onclick = () => { SFX.resume(); SFX.click(); loadPreset(n); }; el.appendChild(b); }); }
@@ -717,12 +732,8 @@ function drawScoreboard() {
     ink.text(downText(), X + Wd / 2, 318, { size: 34, color: game.down === 4 ? RED : PEN_DK });
     ink.text(`on the ${game.los <= 50 ? 'own ' + game.los : 'pencils ' + (100 - game.los)}`, X + Wd / 2, 344, { size: 16, color: PEN_MD, font: PH, weight: 400 });
   }
-  // right column: title up top, play log underneath the controls
-  ink.setAlpha(rv(100, 18));
-  ink.text("X's & O's", 1065, 60, { size: 44, color: INK, rot: -0.03 }); ink.text('football', 1065, 92, { size: 26, color: GRAPHITE, font: 'Patrick Hand', weight: 400, alpha: 0.7 });
-  const lines = []; log.slice(-5).forEach((l, i, arr) => wrapText(l.text, 30).forEach(t => lines.push({ t, color: l.color, a: 0.5 + i / arr.length * 0.5 })));
-  ink.text('play log', 950, 574, { size: 16, color: GRAPHITE, font: 'Patrick Hand', weight: 400, alpha: 0.55, align: 'left' });
-  lines.slice(-7).forEach((l, i) => ink.text(l.t, 950, 594 + i * 18, { size: 15, color: l.color, font: 'Patrick Hand', weight: 400, alpha: l.a, align: 'left' }));
+  // right column: the logo, multiplied onto the paper so its own background vanishes
+  if (logoCut) { const lw = 244, lh = lw * logoCut.height / logoCut.width; ctx.globalAlpha = rv(100, 30); ctx.drawImage(logoCut, 942, 32, lw, lh); ctx.globalAlpha = 1; }
   ink.setAlpha(1);
 }
 function drawResult() {
