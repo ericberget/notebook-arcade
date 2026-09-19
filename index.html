@@ -87,7 +87,14 @@ const GAMES = [
       const tri = [[110, h / 2 - 11], [144, h / 2], [110, h / 2 + 11]]; c.fillStyle = '#fbf8ee'; c.beginPath(); tri.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fill(); ink(c, [...tri, tri[0]], 2);
       c.strokeStyle = '#1f3d9e'; c.setLineDash([2, 4]); c.beginPath(); c.moveTo(150, h / 2); c.lineTo(w - 76, h / 2 - 4); c.stroke(); c.setLineDash([]);
     } },
-  { title: 'Dot Connect', desc: 'boxes. the classic. against a very smug pencil.', paper: 'dots', soon: true },
+  { title: 'Doodle Ballpark', desc: 'time your swing, pick your pitches, three innings against the pencils.', paper: 'dots', href: 'games/baseball/index.html',
+    thumb(c, w, h) {
+      const hx = w / 2, hy = h - 30, d = 44;
+      ink(c, [[hx, hy], [hx + d, hy - d], [hx, hy - 2 * d], [hx - d, hy - d], [hx, hy]], 1.8);
+      ink(c, [[hx - 90, hy], [hx - 90, hy - 20], [hx - 70, hy - 60], [hx - 30, hy - 100], [hx, hy - 112], [hx + 30, hy - 100], [hx + 70, hy - 60], [hx + 90, hy - 20], [hx + 90, hy]], 1.5);
+      circle(c, hx, hy - d - 6, 5, '#1f3d9e'); circle(c, hx + 40, hy - 2 * d + 10, 3, '#3a3a40'); circle(c, hx - 60, hy - 2 * d - 20, 3, '#3a3a40');
+      c.fillStyle = '#fbf8ee'; c.strokeStyle = '#3a3a40'; c.beginPath(); c.arc(hx + 18, hy - 2 * d - 30, 4, 0, 7); c.fill(); c.stroke();
+    } },
 ];
 
 // tiny ink helpers for the thumbnails

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doodle Ballpark</title>
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Caveat:wght@700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #e9e4d6; overflow: hidden; font-family: 'Patrick Hand', cursive; }
+  #wrap { position: relative; width: 100vw; height: 100vh; }
+  #stage { position: relative; width: 1200px; height: 720px; transform-origin: top left; }
+  canvas { display: block; box-shadow: 0 10px 30px rgba(0,0,0,.25); cursor: crosshair; touch-action: none; }
+  button, #back { font-family: 'Patrick Hand', cursive; font-size: 18px; background: transparent; border: 2px solid #9a9aa0; color: #7a7a82; padding: 3px 12px; border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; cursor: pointer; transform: rotate(1deg); }
+  button:hover { background: rgba(80,80,90,.07); }
+  button:disabled { opacity: .35; cursor: default; }
+  #back { border: none; border-bottom: 2px solid #9a9aa0; border-radius: 0; text-decoration: none; padding: 6px 10px; transform: rotate(-1.5deg); }
+  #top { position: absolute; left: 84px; top: 14px; }
+  #sys { position: absolute; left: 84px; top: 610px; display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
+  #mute { padding: 4px 8px 1px; line-height: 0; }
+  #side { position: absolute; left: 950px; top: 300px; width: 230px; display: flex; flex-direction: column; gap: 8px; }
+  #side .label { font-size: 16px; color: #4a4a4f; opacity: .65; }
+  #pitches { display: none; flex-wrap: wrap; gap: 6px; }
+  #pitches.on { display: flex; }
+  #pitches button { color: #1f3d9e; border-color: #1f3d9e; font-size: 17px; }
+  #pitches button.sel { background: rgba(31,61,158,.12); }
+  #hint { font-size: 16px; color: #4a4a4f; opacity: .7; line-height: 1.25; }
+  #side, #sys, #top { transition: opacity .7s; }
+  #stage.intro #side, #stage.intro #sys, #stage.intro #top { opacity: 0; }
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <canvas id="c" width="1200" height="720"></canvas>
+  <div id="top"><a href="../../index.html" id="back">← arcade</a></div>
+  <div id="sys"><button id="mute" title="sound" aria-label="sound on"></button><button id="newgame">new game</button></div>
+  <div id="side">
+    <div class="label" id="pitchLabel">pick a pitch, then click a spot in the zone</div>
+    <div id="pitches"><button data-p="fast">fastball</button><button data-p="curve">curve</button><button data-p="change">changeup</button></div>
+    <div id="hint"></div>
+  </div>
+</div></div>
+<script src="../../shared/paper.js"></script>
+<script src="../../shared/ink.js"></script>
+<script>
+const W = 1200, H = 720;
+const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+const ink = NotebookInk(ctx); const { INK, RED, GRAPHITE } = ink;
+const PEN_LT = '#9a9aa0', PEN_MD = '#7a7a82', PEN_DK = '#4a4a50', DIRT = '#b58a5a';
+const stage = document.getElementById('stage');
+function fit() { const s = Math.min(window.innerWidth / W, window.innerHeight / H); stage.style.transform = `scale(${s})`; stage.style.marginLeft = ((window.innerWidth - W * s) / 2) + 'px'; stage.style.marginTop = ((window.innerHeight - H * s) / 2) + 'px'; }
+window.addEventListener('resize', fit); fit();
+const paper = document.createElement('canvas'); paper.width = W; paper.height = H;
+NotebookPaper.draw(paper.getContext('2d'), W, H, 'dots');
+
+// ---------- the diamond ----------
+const HOME = { x: 560, y: 612 }, BASE_D = 118;
+const BASES = [HOME, { x: HOME.x + BASE_D, y: HOME.y - BASE_D }, { x: HOME.x, y: HOME.y - 2 * BASE_D }, { x: HOME.x - BASE_D, y: HOME.y - BASE_D }];
+const MOUND = { x: HOME.x, y: HOME.y - 150 }, FENCE_R = 440;
+const FIELD_SPOTS = { P: MOUND, C: { x: HOME.x, y: HOME.y + 30 }, '1B': { x: HOME.x + 150, y: HOME.y - 140 }, '2B': { x: HOME.x + 60, y: HOME.y - 232 }, SS: { x: HOME.x - 60, y: HOME.y - 232 }, '3B': { x: HOME.x - 150, y: HOME.y - 140 }, LF: { x: HOME.x - 215, y: HOME.y - 330 }, CF: { x: HOME.x, y: HOME.y - 395 }, RF: { x: HOME.x + 215, y: HOME.y - 330 } };
+const GRAV = 0.32, FIELDER_SPD = 3.1, RUNNER_SPD = 2.9;
+
+// ---------- sound ----------
+const SFX = (() => {
+  let ac, master, noiseBuf, muted = false, crowdGain;
+  function init() { if (ac) return; ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = 0.7; master.connect(ac.destination);
+    noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const cr = ac.createBufferSource(); cr.buffer = noiseBuf; cr.loop = true; const cf = ac.createBiquadFilter(); cf.type = 'lowpass'; cf.frequency.value = 450; crowdGain = ac.createGain(); crowdGain.gain.value = 0.025; cr.connect(cf).connect(crowdGain).connect(master); cr.start(); }
+  const now = () => ac.currentTime;
+  function env(g, t, a, peak, d) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
+  function tone(type, f0, f1, dur, vol, t = now(), lp) { const o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur); const g = ac.createGain(); env(g, t, 0.004, vol, dur); let n = o; if (lp) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; o.connect(f); n = f; } n.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.05); }
+  function noise(dur, vol, t = now(), o = {}) { const n = ac.createBufferSource(); n.buffer = noiseBuf; const f = ac.createBiquadFilter(); f.type = o.type || 'bandpass'; f.Q.value = o.q || 1; f.frequency.setValueAtTime(o.f0 || 1000, t); if (o.f1) f.frequency.exponentialRampToValueAtTime(o.f1, t + dur); const g = ac.createGain(); env(g, t, o.attack || 0.003, vol, dur); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + dur + 0.05); }
+  return {
+    resume() { init(); if (ac.state === 'suspended') ac.resume(); },
+    toggleMute() { muted = !muted; if (master) master.gain.value = muted ? 0 : 0.7; return muted; },
+    crowd(l) { if (!ac) return; crowdGain.gain.setTargetAtTime(0.025 + l * 0.12, now(), 0.25); },
+    crack(p = 1) { if (!ac || muted) return; const t = now(); noise(0.04, 0.6, t, { type: 'highpass', f0: 2500 }); tone('square', 1400, 500, 0.05, 0.25 * p, t, 3000); tone('sine', 220, 90, 0.12, 0.35 * p, t); },
+    pop() { if (!ac || muted) return; const t = now(); noise(0.05, 0.45, t, { f0: 700, f1: 250, q: 1 }); tone('sine', 180, 70, 0.08, 0.3, t); },
+    whiff() { if (!ac || muted) return; noise(0.2, 0.25, now(), { f0: 900, f1: 2600, q: 1, attack: 0.05 }); },
+    strike() { if (!ac || muted) return; const t = now(); tone('sawtooth', 300, 220, 0.16, 0.18, t, 900); },
+    ball() { if (!ac || muted) return; tone('sine', 520, 440, 0.1, 0.1); },
+    out() { if (!ac || muted) return; const t = now(); tone('sawtooth', 260, 180, 0.3, 0.16, t, 700); },
+    hit(big) { if (!ac || muted) return; const t = now(); [523, 659, 784].forEach((f, i) => tone('triangle', f, f, 0.3, 0.16, t + i * 0.08)); if (big) { [1047, 1319].forEach((f, i) => tone('triangle', f, f, 0.8, 0.16, t + 0.3 + i * 0.1)); this.crowd(1); setTimeout(() => this.crowd(0), 2500); } else { this.crowd(0.4); setTimeout(() => this.crowd(0), 1200); } },
+    click() { if (!ac || muted) return; noise(0.03, 0.2, now(), { f0: 2500, q: 5 }); },
+    pencil() { if (!ac || muted) return; const t = now(); for (let i = 0; i < 3; i++) noise(0.12, 0.07, t + i * 0.13, { f0: 2800 + Math.random() * 1200, q: 1.5, attack: 0.03 }); },
+    win() { if (!ac || muted) return; const t = now(); [[262, 330, 392], [294, 370, 440], [330, 415, 494], [392, 494, 587, 784]].forEach((ch, i) => ch.forEach(f => tone('triangle', f, f, 0.5, 0.14, t + i * 0.25))); },
+  };
+})();
+
+// ---------- game state ----------
+let game, frame = 0, introT = 9999; const INTRO_LEN = 150;
+const rv = (s, d) => Math.max(0, Math.min(1, (introT - s) / d));
+let state = 'idle';           // 'pitching' (ball on the way) | 'play' (ball in play) | 'between' | 'pencilsAB' (waiting for the CPU) | 'over'
+let pitch = null, play = null, msg = null, swing = null, pitchType = 'fast', mouse = { x: 0, y: 0 }, aimSpot = null, fielders = {}, runnersAnim = [], note = '';
+const hintEl = document.getElementById('hint'), pitchesEl = document.getElementById('pitches'), pitchLabel = document.getElementById('pitchLabel');
+let teamName = (localStorage.getItem('bb.team') || 'YOU').slice(0, 10);
+let popups = [], bursts = [], trail = [], fan = { kind: 'idle', t: 0, len: 0 }, pencilIdx = 0;
+const PENCIL_NAMES = ['Stubby', 'No. 2', 'Eraserhead', 'Sharpie', 'Mechanical', 'Golf Pencil', 'Chewed Tip', 'Lefty', 'Big Graphite'];
+function popup(text, x, y, color = INK, size = 22) { popups.push({ text, x, y, color, size, life: 55 }); }
+function burst(x, y, color) { bursts.push({ x, y, color, t: 0, seed: Math.random() * 1000 }); }
+function fanDo(kind, len) { fan = { kind, t: len, len }; }
+const NAME_BOX = { x: 952, y: 146, w: 110, h: 26 };
+function renameTeam() {
+  if (document.getElementById('rename')) return;
+  const inp = document.createElement('input'); inp.id = 'rename'; inp.maxLength = 10; inp.value = teamName === 'YOU' ? '' : teamName; inp.placeholder = 'team name';
+  inp.style.cssText = "position:absolute;left:958px;top:146px;width:100px;font-family:'Patrick Hand',cursive;font-size:18px;color:#4a4a50;background:#fdfbf4;border:none;border-bottom:2px solid #9a9aa0;outline:none;padding:0 2px";
+  stage.appendChild(inp); inp.focus(); inp.select();
+  const done = save => { if (save) { const v = inp.value.trim().slice(0, 10); teamName = v || 'YOU'; localStorage.setItem('bb.team', teamName); } inp.remove(); };
+  inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); });
+  inp.addEventListener('blur', () => done(true));
+}
+
+function newGame() {
+  game = { inning: 1, half: 'top', outs: 0, balls: 0, strikes: 0, bases: [null, null, null], score: { you: 0, pencils: 0 }, line: { you: [], pencils: [] }, hits: { you: 0, pencils: 0 }, over: false };
+  introT = 0; stage.classList.add('intro'); msg = null; play = null; pitch = null; runnersAnim = []; popups = []; bursts = []; trail = []; fan = { kind: 'idle', t: 0, len: 0 };
+  resetFielders(); say(teamName === 'YOU' ? 'play ball!' : `${teamName} vs the pencils. play ball!`, INK, 150);
+  setTimeout(nextPitch, 2600); updateUI();
+}
+function batting() { return game.half === 'bottom'; }          // you are the home team: you pitch in the top, bat in the bottom
+function resetFielders() { for (const k in FIELD_SPOTS) fielders[k] = { x: FIELD_SPOTS[k].x, y: FIELD_SPOTS[k].y, tx: FIELD_SPOTS[k].x, ty: FIELD_SPOTS[k].y, id: 300 + Object.keys(fielders).length * 7 }; }
+function say(text, color = INK, life = 110, sub = '') { msg = { text, color, life, sub }; }
+function updateUI() {
+  const b = batting();
+  pitchesEl.classList.toggle('on', !b && !game.over);
+  pitchLabel.textContent = b ? 'batting' : 'pitching';
+  hintEl.textContent = game.over ? 'game over. new game to play again.' : b ? 'click to swing when the ball reaches the plate. early pulls it left, late goes right. click above the ball to lift it, below to chop it.' : 'pick a pitch, then click where you want it in the zone. corners get weaker contact.';
+  [...pitchesEl.querySelectorAll('button')].forEach(bt => bt.classList.toggle('sel', bt.dataset.p === pitchType));
+}
+
+// ---------- pitches ----------
+const PITCHES = { fast: { spd: 4.4, sway: 0, name: 'fastball' }, curve: { spd: 3.3, sway: 46, name: 'curveball' }, change: { spd: 2.7, sway: 8, name: 'changeup' } };
+function nextPitch() {
+  if (game.over) return;
+  if (!batting() && game.balls === 0 && game.strikes === 0 && !pitch) pencilIdx = (pencilIdx + (state === 'pitchpick' ? 0 : 1)) % PENCIL_NAMES.length;
+  state = batting() ? 'batting' : 'pitchpick'; pitch = null; play = null; swing = null; aimSpot = null; runnersAnim = [];
+  if (batting()) setTimeout(() => { if (state === 'batting' && !pitch) throwPitch(cpuPickPitch(), (Math.random() - .5) * 70); }, 900 + Math.random() * 900);
+  updateUI();
+}
+function cpuPickPitch() { const r = Math.random(); return r < 0.5 ? 'fast' : r < 0.8 ? 'curve' : 'change'; }
+function throwPitch(type, targetX) { // targetX: offset from the middle of the plate. |x| <= 30 is a strike
+  const p = PITCHES[type]; const err = (Math.random() - .5) * (batting() ? 14 : 22);
+  pitch = { type, x: MOUND.x, y: MOUND.y + 10, t: 0, T: (HOME.y - MOUND.y - 10) / p.spd, tx: targetX + err, spd: p.spd, sway: p.sway * (Math.random() > .5 ? 1 : -1) };
+  pitch.name = p.name; state = batting() ? 'batting' : 'pitching'; SFX.pencil();
+}
+function pitchPos(pt, t) { // where the pitch is at time t: drifts to its target, curves break late
+  const u = Math.min(1, t / pt.T), late = Math.max(0, u - 0.55) / 0.45;
+  return { x: MOUND.x + pt.tx * u + pt.sway * late * late, y: MOUND.y + 10 + (HOME.y - MOUND.y - 10) * u };
+}
+
+// ---------- contact ----------
+function swingAt(clickPos) { // you swing: timing -> direction & power, click height -> launch angle
+  if (!pitch || swing) return;
+  const dt = (pitch.T - pitch.t);                 // frames until it reaches the plate; + = early
+  const pos = pitchPos(pitch, pitch.t);
+  swing = { t: 0 }; SFX.whiff();
+  const early = dt / 6, inReach = Math.abs(pos.x - HOME.x) < 46;
+  if (Math.abs(early) > 1.4 || !inReach) { pitch.result = 'swing-miss'; popup(!inReach ? 'out of reach' : early > 0 ? 'way early' : 'way late', HOME.x + 70, HOME.y - 40, GRAPHITE, 18); return; }
+  popup(Math.abs(early) < 0.22 ? 'PERFECT!' : Math.abs(early) < 0.6 ? (early > 0 ? 'a bit early' : 'a bit late') : (early > 0 ? 'early' : 'late'), HOME.x + 70, HOME.y - 40, Math.abs(early) < 0.22 ? RED : INK, Math.abs(early) < 0.22 ? 26 : 18);
+  const dir = -90 - early * 40 + (Math.random() - .5) * 8;      // early = pulled to left (screen up-left), late = right field
+  const q = 1 - Math.abs(early) / 1.4;
+  const lift = 14 + (pos.y - clickPos.y) * 0.45 + (Math.random() - .5) * 6;
+  const ang = Math.max(-6, Math.min(58, lift));
+  const v = 7.5 + q * 6.5 + Math.random() * 1.2;
+  pitch.result = 'contact'; pitch.contact = { dir, ang, v };
+}
+function cpuSwing() { // the pencils' batter decides on your pitch
+  const off = Math.abs(pitch.tx + (pitch.sway || 0) * 0.9), inZone = off <= 30;
+  const swings = Math.random() < (inZone ? 0.85 : off < 55 ? 0.4 : 0.1);
+  if (!swings) { pitch.result = inZone ? 'called-strike' : 'ball'; return; }
+  swing = { t: 0 };
+  const base = { fast: 0.62, curve: 0.5, change: 0.55 }[pitch.type];
+  const contact = Math.random() < base * (inZone ? 1 : 0.55);
+  if (!contact) { pitch.result = 'swing-miss'; SFX.whiff(); return; }
+  const corner = Math.min(1, off / 30);
+  const q = Math.random() * (1 - corner * 0.45);
+  pitch.result = 'contact'; pitch.contact = { dir: -90 + (Math.random() - .5) * 96, ang: -4 + Math.random() * 60, v: 7 + q * 7 };
+}
+
+// ---------- the ball in play ----------
+function launch(c) {
+  SFX.crack(0.6 + (c.v - 7) / 7);
+  const rad = c.dir * Math.PI / 180, a = c.ang * Math.PI / 180;
+  const vz = c.v * Math.sin(a), vh = c.v * Math.cos(a);
+  const T = Math.max(6, 2 * vz / GRAV);
+  const land = { x: HOME.x + Math.cos(rad) * vh * T, y: HOME.y + Math.sin(rad) * vh * T };
+  const foul = c.dir > -44 || c.dir < -136;
+  play = { t: 0, T, x: HOME.x, y: HOME.y, z: 0, vx: Math.cos(rad) * vh, vy: Math.sin(rad) * vh, vz, land, dist: Math.hypot(land.x - HOME.x, land.y - HOME.y), foul, ang: c.ang, phase: 'flight', fielder: null, outcome: null, bounce: 0 };
+  state = 'play';
+  // who goes after it
+  const zAtFence = fenceHeightAt(play);
+  if (!foul && play.dist >= FENCE_R && zAtFence > 8) { play.outcome = { kind: 'hr' }; }
+  else {
+    let best = null, bd = 1e9; for (const k in fielders) { const f = fielders[k]; const d = Math.hypot(f.x - land.x, f.y - land.y); if (d < bd) { bd = d; best = k; } }
+    play.fielder = best; const f = fielders[best]; f.tx = land.x; f.ty = land.y;
+    const canReach = bd / FIELDER_SPD <= T - 4;
+    if (foul) play.outcome = { kind: canReach && c.ang > 22 ? 'foulout' : 'foul' };
+    else if (c.ang > 22) play.outcome = { kind: canReach ? 'flyout' : 'hit', bases: hitBases(play.dist, c.ang) };
+    else if (c.ang > 9) play.outcome = { kind: bd < 46 && canReach ? 'lineout' : 'hit', bases: hitBases(play.dist, c.ang) };
+    else { // grounder: an infielder tries to cut it off and beat the runner to first
+      const infield = ['1B', '2B', 'SS', '3B', 'P'].map(k => ({ k, f: fielders[k] }));
+      let cut = null;
+      for (let t = 4; t < 90; t += 3) { const bx = HOME.x + play.vx * t * Math.pow(0.985, t), by = HOME.y + play.vy * t * Math.pow(0.985, t); if (Math.hypot(bx - HOME.x, by - HOME.y) > 300) break; for (const { k, f } of infield) { if (Math.hypot(f.x - bx, f.y - by) / FIELDER_SPD <= t) { cut = { k, t, x: bx, y: by }; break; } } if (cut) break; }
+      if (cut) { const f = fielders[cut.k]; f.tx = cut.x; f.ty = cut.y; play.fielder = cut.k; const throwT = Math.hypot(cut.x - BASES[1].x, cut.y - BASES[1].y) / 9; const runnerT = 170 / RUNNER_SPD + 8; play.outcome = { kind: cut.t + 12 + throwT < runnerT ? 'groundout' : 'hit', bases: 1 }; play.cut = cut; }
+      else play.outcome = { kind: 'hit', bases: play.dist > 330 ? 2 : 1 };
+    }
+  }
+  // runners start moving on contact (they hold on fly balls until it drops)
+  const o = play.outcome; const goes = o.kind === 'hit' || o.kind === 'hr' || o.kind === 'groundout';
+  runnersAnim = []; if (goes) startRunners(o.kind === 'hr' ? 4 : o.bases || 1, o.kind === 'groundout');
+}
+function fenceHeightAt(p) { const th = FENCE_R / Math.hypot(p.vx, p.vy); return p.vz * th - 0.5 * GRAV * th * th; }
+function hitBases(dist, ang) { if (dist > 400) return 3; if (dist > 300) return 2; return 1; }
+function startRunners(n, batterOut) {
+  const runners = [];
+  for (let b = 2; b >= 0; b--) if (game.bases[b]) runners.push({ from: b + 1, to: Math.min(4, b + 1 + n), id: game.bases[b] });
+  if (!batterOut) runners.push({ from: 0, to: n, id: 'B' + frame });
+  else runners.push({ from: 0, to: 1, id: 'B' + frame, out: true });
+  runnersAnim = runners.map(r => ({ ...r, p: 0 }));
+}
+function resolvePlay() {
+  const o = play.outcome; let text = '', color = INK, sub = '';
+  const scoreFor = batting() ? 'you' : 'pencils';
+  const applyRunners = (n, batterOut) => {
+    const nb = [null, null, null]; let runs = 0;
+    for (let b = 2; b >= 0; b--) if (game.bases[b]) { const to = b + 1 + n; if (to >= 4) runs++; else nb[to - 1] = game.bases[b]; }
+    if (!batterOut) { if (n >= 4) runs++; else nb[n - 1] = 'r' + frame; }
+    game.bases = nb; if (runs) { game.score[scoreFor] += runs; game.line[scoreFor][game.inning - 1] = (game.line[scoreFor][game.inning - 1] || 0) + runs; }
+    return runs;
+  };
+  if (o.kind === 'hr') { const r = applyRunners(4, false); game.hits[scoreFor]++; text = 'HOME RUN!!'; const ft = Math.round(play.dist * 0.92 + Math.random() * 12); sub = `${ft} feet` + (r > 1 ? ` · ${r} runs score!` : '!'); color = batting() ? INK : RED; SFX.hit(true);
+    for (let i = 0; i < 5; i++) setTimeout(() => burst(HOME.x - 200 + Math.random() * 400, 120 + Math.random() * 150, i % 2 ? RED : INK), i * 180);
+    if (batting()) fanDo('cheer', 260); else fanDo('facepalm', 160); }
+  else if (o.kind === 'hit') { const r = applyRunners(o.bases, false); game.hits[scoreFor]++; text = ['', 'single!', 'DOUBLE!', 'TRIPLE!'][o.bases]; sub = r ? `${r} run${r > 1 ? 's' : ''} score${r > 1 ? '' : 's'}` : ''; color = batting() ? INK : RED; SFX.hit(o.bases > 1); if (batting()) fanDo('cheer', o.bases > 1 ? 200 : 120); }
+  else if (o.kind === 'groundout') { const r = applyRunners(1, true); text = 'ground out'; sub = 'thrown out at first' + (r ? `, ${r} scores` : ''); color = GRAPHITE; recordOut(); SFX.out(); }
+  else if (o.kind === 'flyout' || o.kind === 'lineout' || o.kind === 'foulout') { text = o.kind === 'lineout' ? 'lined out' : o.kind === 'foulout' ? 'foul out' : 'fly out'; sub = `caught by the ${play.fielder}`; color = GRAPHITE; recordOut(); SFX.pop(); if (!batting() && o.kind === 'lineout') fanDo('cheer', 100); }
+  else if (o.kind === 'foul') { text = 'foul ball'; color = GRAPHITE; if (game.strikes < 2) game.strikes++; }
+  say(text, color, 100, sub);
+  if (o.kind !== 'foul') { game.balls = 0; game.strikes = 0; }
+  afterPlay();
+}
+function recordOut() { game.outs++; game.balls = 0; game.strikes = 0; }
+function afterPlay() {
+  play = null; pitch = null; swing = null; resetFielders();
+  if (game.outs >= 3) { setTimeout(changeSides, 1500); return; }
+  setTimeout(nextPitch, 1500);
+}
+function changeSides() {
+  game.outs = 0; game.balls = 0; game.strikes = 0; game.bases = [null, null, null];
+  if (game.half === 'top') { game.half = 'bottom'; if (game.inning >= 3 && game.score.you > game.score.pencils) return endGame(); say('bottom of the ' + ordinal(game.inning), GRAPHITE, 120, 'you\'re up'); }
+  else {
+    if (game.inning >= 3 && game.score.you !== game.score.pencils) return endGame();
+    game.inning++; game.half = 'top'; say(game.inning > 3 ? 'extra innings!' : 'top of the ' + ordinal(game.inning), GRAPHITE, 120, 'you\'re pitching');
+  }
+  for (const s of ['you', 'pencils']) while (game.line[s].length < game.inning) game.line[s].push(0);
+  setTimeout(nextPitch, 1800); updateUI();
+}
+function ordinal(n) { return n + (['', 'st', 'nd', 'rd'][n] || 'th'); }
+function endGame() { game.over = true; state = 'over'; const w = game.score.you > game.score.pencils; say(w ? (teamName === 'YOU' ? 'YOU WIN!' : teamName + ' WINS!') : 'the pencils win.', w ? INK : RED, 9999, `final: ${game.score.you} – ${game.score.pencils}`); if (w) SFX.win(); else SFX.out(); updateUI(); }
+function walkOrK(kind) {
+  if (kind === 'K') { say('STRIKE THREE!', batting() ? RED : INK, 100, 'he\'s out'); recordOut(); SFX.out(); if (batting()) fanDo('facepalm', 150); else fanDo('cheer', 120); }
+  else { say('walk', GRAPHITE, 90, 'take your base'); // forced runners move up
+    const nb = [...game.bases]; let carry = 'w' + frame; for (let b = 0; b < 3; b++) { if (!carry) break; const was = nb[b]; nb[b] = carry; carry = was; }
+    if (carry) { const s = batting() ? 'you' : 'pencils'; game.score[s]++; game.line[s][game.inning - 1] = (game.line[s][game.inning - 1] || 0) + 1; }
+    game.bases = nb; game.balls = 0; game.strikes = 0; }
+  afterPlay();
+}
+function resolvePitch() {
+  const r = pitch.result || (Math.abs(pitchPos(pitch, pitch.T).x - HOME.x) <= 30 ? 'called-strike' : 'ball');
+  if (r === 'contact') { launch(pitch.contact); return; }
+  if (r === 'ball') { game.balls++; SFX.ball(); if (game.balls >= 4) return walkOrK('BB'); say('ball ' + game.balls, GRAPHITE, 50); }
+  else { game.strikes++; SFX.strike(); if (game.strikes >= 3) return walkOrK('K'); say(r === 'swing-miss' ? 'swing and a miss' : 'strike ' + game.strikes, GRAPHITE, 60); }
+  pitch = null; swing = null; setTimeout(nextPitch, 900);
+}
+
+// ---------- input ----------
+function canvasPos(e) { const r = canvas.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: (t.clientX - r.left) * W / r.width, y: (t.clientY - r.top) * H / r.height }; }
+function onDown(e) {
+  SFX.resume(); const p = canvasPos(e); mouse = p;
+  if (introT < 120) return;
+  if (p.x >= NAME_BOX.x && p.x <= NAME_BOX.x + NAME_BOX.w && p.y >= NAME_BOX.y && p.y <= NAME_BOX.y + NAME_BOX.h && state !== 'play') { renameTeam(); e.preventDefault(); return; }
+  if (game.over) return;
+  if (state === 'batting' && pitch && !swing) { swingAt(p); e.preventDefault(); }
+  else if (state === 'pitchpick' && !pitch) { // aim within the zone box in front of the plate
+    if (Math.abs(p.x - HOME.x) < 70 && Math.abs(p.y - (HOME.y - 26)) < 40) { aimSpot = p; throwPitch(pitchType, p.x - HOME.x); e.preventDefault(); }
+  }
+}
+canvas.addEventListener('mousedown', onDown); canvas.addEventListener('touchstart', onDown, { passive: false });
+window.addEventListener('mousemove', e => { mouse = canvasPos(e); });
+window.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.code === 'Space' && state === 'batting' && pitch && !swing) { e.preventDefault(); swingAt({ x: HOME.x, y: pitchPos(pitch, pitch.t).y }); } });
+pitchesEl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; SFX.click(); pitchType = b.dataset.p; updateUI(); });
+document.getElementById('newgame').onclick = () => { SFX.resume(); SFX.click(); newGame(); };
+const SPK_ON = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="#7a7a82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L9 10 L16 4.5 L16.4 21.5 L9 16.5 L3.2 16.2 Z"/><path d="M21 9.5 Q24 13 21 16.8"/><path d="M25 6 Q30 13 25.3 20.2"/></svg>';
+const SPK_OFF = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="#7a7a82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L9 10 L16 4.5 L16.4 21.5 L9 16.5 L3.2 16.2 Z"/><path d="M21 8.5 L30 17.5"/><path d="M30 8.2 L21.2 17.8"/></svg>';
+const muteBtn = document.getElementById('mute'); muteBtn.innerHTML = SPK_ON;
+muteBtn.onclick = () => { SFX.resume(); muteBtn.innerHTML = SFX.toggleMute() ? SPK_OFF : SPK_ON; };
+
+// ---------- simulation step (fixed 60 Hz) ----------
+function step() {
+  if (introT < INTRO_LEN) { introT++; if (introT >= 110) stage.classList.remove('intro'); }
+  if (msg && --msg.life <= 0) msg = null;
+  popups = popups.filter(p => --p.life > 0); bursts = bursts.filter(b => ++b.t < 50);
+  if (fan.t > 0) fan.t--; else fan.kind = 'idle';
+  if (play && play.phase === 'flight' && frame % 2 === 0) trail.push({ x: play.x, y: play.y - play.z * 0.5, life: 40 }); trail = trail.filter(t => --t.life > 0);
+  if (swing) swing.t++;
+  if (pitch && (state === 'batting' || state === 'pitching')) {
+    pitch.t++;
+    if (state === 'pitching' && !pitch.result && pitch.t >= pitch.T - 5) cpuSwing();
+    if (pitch.t >= pitch.T) { if (pitch.result === 'contact') { state = 'play'; launch(pitch.contact); } else resolvePitch(); }
+  }
+  for (const k in fielders) { const f = fielders[k]; const dx = f.tx - f.x, dy = f.ty - f.y, d = Math.hypot(dx, dy); if (d > 1) { const s = Math.min(FIELDER_SPD, d); f.x += dx / d * s; f.y += dy / d * s; } }
+  for (const r of runnersAnim) r.p = Math.min(1, r.p + RUNNER_SPD / (BASE_D * 1.414 * Math.max(1, r.to - r.from)));
+  if (play) {
+    play.t++;
+    if (play.phase === 'flight') {
+      play.x += play.vx; play.y += play.vy; play.vz -= GRAV; play.z += play.vz;
+      const o = play.outcome;
+      if (o.kind === 'hr' && Math.hypot(play.x - HOME.x, play.y - HOME.y) > FENCE_R + 30) { play.phase = 'done'; play.t = 0; }
+      else if (play.cut && play.t >= play.cut.t) { play.phase = 'throw'; play.t = 0; play.x = play.cut.x; play.y = play.cut.y; play.z = 0; const f = fielders[play.cut.k]; f.tx = f.x; f.ty = f.y; }
+      else if (play.z <= 0 && play.t > 2) {
+        play.z = 0;
+        if (o.kind === 'flyout' || o.kind === 'lineout' || o.kind === 'foulout') { play.phase = 'done'; play.t = 0; SFX.pop(); }
+        else if (play.ang <= 9 && play.bounce < 60) { play.bounce++; play.vx *= 0.985; play.vy *= 0.985; play.vz = 0; if (Math.hypot(play.vx, play.vy) < 0.4 || play.bounce >= 60) { play.phase = 'fielded'; play.t = 0; } }
+        else { play.vz = Math.abs(play.vz) * 0.35; play.vx *= 0.7; play.vy *= 0.7; if (play.vz < 0.6) { play.phase = 'fielded'; play.t = 0; } }
+      }
+    } else if (play.phase === 'throw') { if (play.t > 24) { play.phase = 'done'; play.t = 0; SFX.pop(); } }
+    else if (play.phase === 'fielded') { const f = play.fielder ? fielders[play.fielder] : null; if (f) { f.tx = play.x; f.ty = play.y; } if (play.t > 40 || (f && Math.hypot(f.x - play.x, f.y - play.y) < 6)) { play.phase = 'done'; play.t = 0; } }
+    else if (play.phase === 'done' && play.t > 45) { resolvePlay(); }
+  }
+}
+let lastT = 0, acc = 0;
+function tick(now = performance.now()) {
+  frame++; if (!lastT) lastT = now; acc += Math.min(200, now - lastT); lastT = now;
+  let n = 0; while (acc >= 1000 / 60 && n < 5) { step(); acc -= 1000 / 60; n++; }
+  draw(); requestAnimationFrame(tick);
+}
+
+// ---------- drawing ----------
+function drawField() {
+  const p1 = rv(0, 40), p2 = rv(30, 40), p3 = rv(60, 40);
+  // foul lines out to the fence, the fence arc, the grass line
+  const fl = (a, id, pr) => ink.longLine(HOME.x, HOME.y, HOME.x + Math.cos(a) * (FENCE_R + 10), HOME.y + Math.sin(a) * (FENCE_R + 10), id, INK, 2, 2, 1.4, pr);
+  fl(-135 * Math.PI / 180, 1, p1); fl(-45 * Math.PI / 180, 2, p1);
+  ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.globalAlpha = 0.9; ctx.beginPath();
+  const a0 = -135 * Math.PI / 180, a1 = -45 * Math.PI / 180, n = 40, stop = Math.round(n * p2);
+  for (let i = 0; i <= stop; i++) { const a = a0 + (a1 - a0) * i / n; const r = FENCE_R + ink.jit(7, i, 5); const x = HOME.x + Math.cos(a) * r, y = HOME.y + Math.sin(a) * r; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); ctx.globalAlpha = 1;
+  // distance markers on the fence
+  ink.setAlpha(p2); for (const [ang, ft] of [[-128, '330'], [-90, '400'], [-52, '330']]) { const a = ang * Math.PI / 180; ink.text(ft, HOME.x + Math.cos(a) * (FENCE_R - 22), HOME.y + Math.sin(a) * (FENCE_R - 22) + 6, { size: 15, color: PEN_LT, font: 'Patrick Hand', weight: 400 }); } ink.setAlpha(1);
+  // infield dirt: scribbled arc, base paths
+  ctx.save(); ctx.beginPath(); ctx.moveTo(HOME.x, HOME.y); ctx.arc(HOME.x, HOME.y, 280, a0, a1); ctx.closePath(); ctx.clip();
+  ctx.strokeStyle = DIRT; ctx.globalAlpha = 0.22 * p3; ctx.lineWidth = 1.2; ctx.beginPath();
+  for (let i = 0; i < 70; i++) { const a = a0 + (a1 - a0) * (i / 70); ctx.moveTo(HOME.x + Math.cos(a) * 240, HOME.y + Math.sin(a) * 240); ctx.lineTo(HOME.x + Math.cos(a + 0.03) * 282, HOME.y + Math.sin(a + 0.03) * 282); } ctx.stroke(); ctx.restore(); ctx.globalAlpha = 1;
+  for (let i = 0; i < 4; i++) { const a = BASES[i], b = BASES[(i + 1) % 4]; ink.longLine(a.x, a.y, b.x, b.y, 20 + i, INK, 1.8, 1, 1.2, p3); }
+  // bases, plate, mound
+  for (let i = 1; i < 4; i++) { const b = BASES[i]; ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.PI / 4); ink.poly([{ x: -7, y: -7 }, { x: 7, y: -7 }, { x: 7, y: 7 }, { x: -7, y: 7 }], 40 + i * 4, INK, 1.8, 1); ctx.restore(); }
+  ink.poly([{ x: HOME.x - 8, y: HOME.y - 6 }, { x: HOME.x + 8, y: HOME.y - 6 }, { x: HOME.x + 8, y: HOME.y + 2 }, { x: HOME.x, y: HOME.y + 8 }, { x: HOME.x - 8, y: HOME.y + 2 }], 60, INK, 1.8, 1);
+  ink.circle(MOUND.x, MOUND.y, 22, 70, DIRT, 1.4, 1); ink.line(MOUND.x - 8, MOUND.y - 4, MOUND.x + 8, MOUND.y - 4, 71, INK, 2, 1);
+  // batter's boxes
+  for (const s of [-1, 1]) ink.poly([{ x: HOME.x + s * 14, y: HOME.y - 18 }, { x: HOME.x + s * 34, y: HOME.y - 18 }, { x: HOME.x + s * 34, y: HOME.y + 18 }, { x: HOME.x + s * 14, y: HOME.y + 18 }], 80 + s * 3, INK, 1.2, 1);
+  // the strike zone when you're pitching
+  if (state === 'pitchpick' && !pitch) { ctx.setLineDash([4, 5]); ctx.strokeStyle = RED; ctx.globalAlpha = 0.6; ctx.lineWidth = 1.5; ctx.strokeRect(HOME.x - 30, HOME.y - 56, 60, 44); ctx.setLineDash([]); ctx.globalAlpha = 1; ink.text('the zone', HOME.x, HOME.y - 62, { size: 14, color: RED, font: 'Patrick Hand', weight: 400, alpha: 0.7 }); }
+}
+function stick(x, y, id, col = PEN_MD, glove = false, tilt = 0) { // a pencil fielder
+  ink.circle(x, y - 22, 6, id, col, 1.4, 1); ink.line(x, y - 16, x, y - 2, id + 1, col, 1.3, 1);
+  ink.line(x, y - 2, x - 6, y + 10, id + 2, col, 1.3, 1); ink.line(x, y - 2, x + 6, y + 10, id + 3, col, 1.3, 1);
+  ink.line(x, y - 12, x - 9 + tilt, y - 4, id + 4, col, 1.3, 1); ink.line(x, y - 12, x + 9, y - 6 - (glove ? 8 : 0), id + 5, col, 1.3, 1);
+  if (glove) ink.circle(x + 10, y - 16, 3.5, id + 6, col, 1.2, 1);
+}
+function drawPeople() {
+  const pf = rv(90, 30); if (pf <= 0) return;
+  ink.setAlpha(pf);
+  const youField = !batting();
+  for (const k in fielders) { const f = fielders[k]; if (k === 'C' && batting()) { stick(f.x, f.y + 4, f.id, youField ? INK : PEN_MD, true); continue; } stick(f.x, f.y, f.id, youField ? INK : PEN_MD, true, play && play.fielder === k ? 4 : 0); }
+  // batter at the plate
+  if ((state === 'batting' || state === 'pitching' || state === 'pitchpick') && !play) {
+    const bx = HOME.x + 26, by = HOME.y + 2, col = batting() ? INK : PEN_MD;
+    ink.circle(bx, by - 8, 9, 200, col, 2.2, 2); if (batting()) ink.scribble(bx, by - 8, 8, 201, INK, 10, 0.25);
+    const sw = swing ? Math.min(1, swing.t / 8) : 0; const ang = -2.6 + sw * 3.2;
+    ink.line(bx - 4, by - 2, bx - 4 + Math.cos(ang) * 30, by - 2 + Math.sin(ang) * 30, 210, col, 3, 1);
+    ink.text(batting() ? teamName : PENCIL_NAMES[pencilIdx], bx + 22, by + 4, { size: 13, color: col, font: 'Patrick Hand', weight: 400, alpha: 0.7, align: 'left' });
+  }
+  // runners on base
+  const onBase = (i) => game.bases[i - 1];
+  for (let i = 1; i <= 3; i++) if (onBase(i) && !runnersAnim.some(r => r.from === i)) { const b = BASES[i]; ink.circle(b.x + 12, b.y - 10, 8, 220 + i, batting() ? INK : PEN_MD, 2, 1); }
+  for (const r of runnersAnim) { const a = BASES[r.from], b = BASES[r.to % 4]; const legs = Math.max(1, r.to - r.from); let x, y; if (legs === 1) { x = a.x + (b.x - a.x) * r.p; y = a.y + (b.y - a.y) * r.p; } else { const seg = Math.min(legs - 1, Math.floor(r.p * legs)), lp = r.p * legs - seg; const s0 = BASES[(r.from + seg) % 4], s1 = BASES[(r.from + seg + 1) % 4]; x = s0.x + (s1.x - s0.x) * lp; y = s0.y + (s1.y - s0.y) * lp; } ink.circle(x, y - 6, 8, 240, batting() ? INK : PEN_MD, 2, 1); if (r.out && r.p > 0.95) ink.text('OUT', x, y - 20, { size: 14, color: RED, font: 'Patrick Hand', weight: 400 }); }
+  ink.setAlpha(1);
+}
+function drawBallAt(x, y, z, big = 1) { const k = (1 + z / 120) * big; ctx.save(); ctx.translate(x, y - z * 0.5); ctx.scale(k, k); ctx.fillStyle = '#fbf8ee'; ctx.strokeStyle = PEN_DK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, 7); ctx.fill(); ctx.stroke(); ctx.strokeStyle = RED; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(-1.5, 0, 3.5, -1.1, 1.1); ctx.stroke(); ctx.beginPath(); ctx.arc(1.5, 0, 3.5, Math.PI - 1.1, Math.PI + 1.1); ctx.stroke(); ctx.restore(); }
+function drawBall() {
+  if (pitch && (state === 'batting' || state === 'pitching')) { const p = pitchPos(pitch, pitch.t); ctx.fillStyle = 'rgba(0,0,0,.1)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 3, 4, 2, 0, 0, 7); ctx.fill(); drawBallAt(p.x, p.y, 4, 1.1); if (aimSpot) { ctx.setLineDash([2, 3]); ctx.strokeStyle = RED; ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(aimSpot.x, aimSpot.y, 6, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; } }
+  if (play) {
+    if (play.phase === 'throw') { const f = play.cut, u = Math.min(1, play.t / 24), x = f.x + (BASES[1].x - f.x) * u, y = f.y + (BASES[1].y - f.y) * u, z = Math.sin(u * Math.PI) * 30; drawBallAt(x, y, z); }
+    else if (play.phase !== 'done' || play.outcome.kind === 'hr') { ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.ellipse(play.x, play.y + 3, 5, 2.5, 0, 0, 7); ctx.fill(); drawBallAt(play.x, play.y, play.z); }
+    // the landing spot, so you can read the play
+    if (play.phase === 'flight' && !play.cut) { ctx.setLineDash([3, 4]); ctx.strokeStyle = GRAPHITE; ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.arc(play.land.x, play.land.y, 7, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
+  }
+}
+function drawSwingHint() { if (state !== 'batting' || !pitch || swing) return; ctx.setLineDash([3, 4]); ctx.strokeStyle = INK; ctx.globalAlpha = 0.35; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(HOME.x - 46, HOME.y - 26); ctx.lineTo(HOME.x + 46, HOME.y - 26); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
+function box(x, y, w, h, id, color, width, prog = 1) { ink.line(x, y, x + w, y, id, color, width, 2, prog * 4); ink.line(x + w, y, x + w, y + h, id + 1, color, width, 2, prog * 4 - 1); ink.line(x + w, y + h, x, y + h, id + 2, color, width, 2, prog * 4 - 2); ink.line(x, y + h, x, y, id + 3, color, width, 2, prog * 4 - 3); }
+function drawScorecard() {
+  const X = 950, Wd = 232, PH = 'Patrick Hand';
+  ink.setAlpha(rv(60, 20)); ink.text('Doodle Ballpark', X + Wd / 2, 58, { size: 40, color: INK, rot: -0.03 });
+  const bp = rv(80, 20); box(X, 80, Wd, 118, 800, PEN_LT, 1.6, bp); ink.setAlpha(rv(95, 16));
+  // line score: innings across
+  const inn = Math.max(3, game.inning), cw = Math.min(28, 150 / inn), x0 = X + 68;
+  for (let i = 0; i < inn; i++) ink.text(String(i + 1), x0 + i * cw + cw / 2, 100, { size: 13, color: PEN_LT, font: PH, weight: 400 });
+  ink.text('R', X + Wd - 16, 100, { size: 13, color: PEN_LT, font: PH, weight: 400 });
+  const rowY = [128, 160]; [['pencils', 'PENCILS', PEN_MD], ['you', teamName, PEN_MD]].forEach(([k, label, col], ri) => {
+    const y = rowY[ri]; const shown = k === 'you' && document.getElementById('rename') ? '' : label; ink.text(shown, X + 10, y, { size: label.length > 7 ? 15 : 18, color: col, font: PH, weight: 400, align: 'left' });
+    if (k === 'you') ink.text('✎', X + 14 + Math.min(80, label.length * (label.length > 7 ? 7 : 9)), y - 2, { size: 11, color: PEN_LT, font: PH, weight: 400, alpha: 0.7, align: 'left' });
+    for (let i = 0; i < inn; i++) { const v = game.line[k][i]; const cur = game.inning === i + 1 && ((k === 'pencils') === (game.half === 'top')); ink.text(v === undefined ? (cur ? '·' : '') : String(v), x0 + i * cw + cw / 2, y, { size: 16, color: cur ? PEN_DK : PEN_MD, font: PH, weight: 400 }); }
+    ink.text(String(game.score[k]), X + Wd - 16, y + 2, { size: 24, color: PEN_DK });
+  });
+  ink.line(X + 8, 142, X + Wd - 8, 142, 830, PEN_LT, 1, 1);
+  ink.text(`${game.half} ${ordinal(game.inning)}`, X + 10, 188, { size: 14, color: PEN_LT, font: PH, weight: 400, align: 'left' });
+  ink.text(`H ${game.hits.pencils}–${game.hits.you}`, X + Wd - 10, 188, { size: 14, color: PEN_LT, font: PH, weight: 400, align: 'right' });
+  // the count
+  const cp = rv(100, 20); box(X, 212, Wd, 64, 850, PEN_LT, 1.6, cp); ink.setAlpha(rv(112, 16));
+  const dots = (label, n, max, x, col) => { ink.text(label, x, 244, { size: 15, color: PEN_MD, font: PH, weight: 400, align: 'left' }); for (let i = 0; i < max; i++) { const cx = x + 14 + i * 16, cy = 256; if (i < n) { ctx.fillStyle = col; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 7); ctx.fill(); ctx.globalAlpha = 1; } else ink.circle(cx, cy, 5, 860 + i, PEN_LT, 1, 1); } };
+  dots('B', game.balls, 3, X + 10, INK); dots('S', game.strikes, 2, X + 90, INK); dots('O', game.outs, 2, X + 160, RED);
+  // little diamond showing who's on
+  const dx = X + Wd - 30, dy = 232; for (let i = 0; i < 3; i++) { const a = [[dx + 9, dy + 9], [dx, dy], [dx - 9, dy + 9]][i]; ctx.save(); ctx.translate(a[0], a[1]); ctx.rotate(Math.PI / 4); if (game.bases[i]) { ctx.fillStyle = INK; ctx.fillRect(-4, -4, 8, 8); } else { ctx.strokeStyle = PEN_LT; ctx.lineWidth = 1; ctx.strokeRect(-4, -4, 8, 8); } ctx.restore(); }
+  ink.setAlpha(1);
+}
+function drawExtras() {
+  // pitch name as it leaves his hand
+  if (pitch && pitch.t > 4 && pitch.t < 40 && (state === 'batting' || state === 'pitching')) ink.text(pitch.name, MOUND.x + 44, MOUND.y - 14, { size: 15, color: PEN_MD, font: 'Patrick Hand', weight: 400, alpha: Math.min(1, (40 - pitch.t) / 12), align: 'left', rot: -0.06 });
+  ctx.fillStyle = INK; for (const t of trail) { ctx.globalAlpha = t.life / 40 * 0.35; ctx.beginPath(); ctx.arc(t.x, t.y, 1.8, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
+  for (const p of popups) ink.text(p.text, p.x, p.y - (55 - p.life) * 0.5, { size: p.size, color: p.color, font: p.size > 22 ? 'Caveat' : 'Patrick Hand', weight: p.size > 22 ? 700 : 400, alpha: Math.min(1, p.life / 15), rot: -0.05 });
+  for (const b of bursts) { const r = 6 + b.t * 2.2, a = 1 - b.t / 50; for (let i = 0; i < 9; i++) { const ang = b.seed + i / 9 * 6.28; ctx.globalAlpha = a * 0.8; ink.line(b.x + Math.cos(ang) * r * 0.55, b.y + Math.sin(ang) * r * 0.55, b.x + Math.cos(ang) * r, b.y + Math.sin(ang) * r, 900 + i + Math.floor(b.seed), b.color, 1.6, 1); } ctx.globalAlpha = 1; }
+  drawFan();
+}
+function drawFan() { // a fan in the left margin: still, unless something just happened
+  const x = 150, baseY = 470, col = PEN_MD, w = 1.5, k = fan.kind, el = fan.len - fan.t, flip = k === 'idle' ? 0 : Math.floor(frame / 8) % 3, id = 5000 + flip * 40;
+  const PH = { size: 15, color: PEN_MD, font: 'Patrick Hand', weight: 400 };
+  const head = (hx, hy, face, rot = 0) => { ink.circle(hx, hy, 13, id, col, w + 0.5, 1); const P = (px, py) => ({ x: hx + px * Math.cos(rot) - py * Math.sin(rot), y: hy + px * Math.sin(rot) + py * Math.cos(rot) }); for (const ex of [-5, 5]) { const e = P(ex, -3); ctx.fillStyle = PEN_DK; ctx.beginPath(); ctx.arc(e.x, e.y, 1.6, 0, 7); ctx.fill(); }
+    if (face === 'smile') { const m1 = P(-5, 3), m2 = P(0, 8), m3 = P(5, 3); ink.line(m1.x, m1.y, m2.x, m2.y, id + 3, col, 1.3, 1); ink.line(m2.x, m2.y, m3.x, m3.y, id + 4, col, 1.3, 1); } else if (face === 'frown') { const m1 = P(-5, 7), m2 = P(0, 4), m3 = P(5, 7); ink.line(m1.x, m1.y, m2.x, m2.y, id + 3, col, 1.3, 1); ink.line(m2.x, m2.y, m3.x, m3.y, id + 4, col, 1.3, 1); } else { const m1 = P(-4, 5), m2 = P(4, 5); ink.line(m1.x, m1.y, m2.x, m2.y + 1, id + 3, col, 1.3, 1); } };
+  const body = (hx, hy) => { ink.line(hx, hy + 13, hx, hy + 36, id + 6, col, w, 1); const l1 = { x: hx - 9, y: hy + 52 }, l2 = { x: hx + 9, y: hy + 52 }; ink.line(hx, hy + 36, l1.x, l1.y, id + 7, col, w, 1); ink.line(hx, hy + 36, l2.x, l2.y, id + 8, col, w, 1); ink.line(l1.x, l1.y, l1.x - 5, l1.y, id + 9, col, w, 1); ink.line(l2.x, l2.y, l2.x + 5, l2.y, id + 10, col, w, 1); return { x: hx, y: hy + 19 }; };
+  const arms = (sh, a1, a2) => { ink.line(sh.x, sh.y, a1.x, a1.y, id + 11, col, w, 1); ink.line(sh.x, sh.y, a2.x, a2.y, id + 12, col, w, 1); };
+  if (k === 'cheer') { const y = baseY - Math.abs(Math.sin(frame * 0.25)) * 14; head(x, y, 'smile'); const sh = body(x, y); const a2 = { x: x + 16, y: y - 2 + Math.sin(frame * 0.5) * 3 }; arms(sh, { x: x - 16, y: y + 2 }, a2);
+    ink.line(a2.x, a2.y, a2.x + 2, a2.y - 22, id + 13, col, 1.2, 1); const f = Math.sin(frame * 0.4) * 3; ink.line(a2.x + 2, a2.y - 22, a2.x + 20, a2.y - 16 + f, id + 14, col, 1.2, 1); ink.line(a2.x + 20, a2.y - 16 + f, a2.x + 2, a2.y - 10, id + 15, col, 1.2, 1);
+    if (fan.t % 40 < 20) ink.text(el < 60 ? 'YEAH!!' : 'attaboy', x + 44, y - 8, { ...PH, rot: -0.1 }); return; }
+  if (k === 'facepalm') { head(x, baseY, 'frown', 0.15); const sh = body(x, baseY); arms(sh, { x: x - 14, y: sh.y + 14 }, { x: x + 4, y: baseY - 2 }); ink.line(x + 4, baseY - 2, x + 10, baseY - 6, id + 50, col, w, 1); ink.line(x + 4, baseY - 2, x + 9, baseY + 3, id + 51, col, w, 1); if (el % 60 < 40) ink.text(el < 60 ? 'ugh.' : 'c\'mon...', x + 30, baseY - 8, PH); return; }
+  head(x, baseY, 'flat'); const sh = body(x, baseY); arms(sh, { x: x - 14, y: baseY + 31 }, { x: x + 14, y: baseY + 29 });
+}
+function drawMsg() {
+  if (!msg) return; const a = Math.min(1, msg.life / 25), big = msg.text.length < 14 && msg.color !== GRAPHITE;
+  ink.text(msg.text, 560, 300, { size: big ? 72 : 44, color: msg.color, rot: -0.04, alpha: a });
+  if (msg.sub) ink.text(msg.sub, 560, 340, { size: 22, color: GRAPHITE, font: 'Patrick Hand', weight: 400, alpha: a });
+}
+function draw() {
+  ctx.drawImage(paper, 0, 0);
+  drawField(); drawSwingHint(); drawPeople(); drawBall(); drawExtras(); drawScorecard(); drawMsg();
+}
+newGame(); tick();
+</script>
+</body>
+</html>
