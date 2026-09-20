@@ -32,6 +32,8 @@
   #fourth { display: none; gap: 6px; }
   #fourth.on { display: flex; }
   #fourth button { color: #c0392b; border-color: #c0392b; font-size: 17px; }
+  #side.def .offonly { display: none; } #side:not(.def) .defonly { display: none; }
+  #schemes button.sel { background: rgba(31,61,158,.14); }
 </style>
 </head>
 <body>
@@ -42,11 +44,13 @@
   <div id="side">
     <button id="hike">HIKE!</button>
     <div id="fourth"><button id="fg">kick field goal</button><button id="punt">punt</button></div>
-    <div class="label">run plays</div>
-    <div id="runs" class="presets"></div>
-    <div class="label">pass plays</div>
-    <div id="passes" class="presets"></div>
-    <button id="clear">erase routes</button>
+    <div class="label offonly">run plays</div>
+    <div id="runs" class="presets offonly"></div>
+    <div class="label offonly">pass plays</div>
+    <div id="passes" class="presets offonly"></div>
+    <div class="label defonly">defense</div>
+    <div id="schemes" class="presets defonly"></div>
+    <button id="clear" class="offonly">erase routes</button>
     <div class="label" id="hint">drag from any O to draw its route</div>
   </div>
 </div></div>
@@ -274,11 +278,18 @@ const PRESETS = { ...RUNS, ...PASSES };
 
 function newGame() {
   startIntro();
-  game = { q: 1, you: 0, pencils: 0, los: 25, down: 1, fd: 35, possessions: 0 };
-  log = []; gameOverText = null; note('kickoff! your ball on the 25', INK);
-  startDrive();
+  game = { q: 1, you: 0, pencils: 0, los: 25, down: 1, fd: 35, drives: { you: 0, pencils: 0 }, possession: 'you' };
+  log = []; gameOverText = null; scheme = 'man'; note('kickoff! your ball on the 25', INK);
+  startDrive('you', 25); banner = null;
 }
-function startDrive() { game.los = 25; game.down = 1; game.fd = 35; setupPlay(); }
+function startDrive(who = 'you', spot = 25) {
+  game.possession = who; game.los = spot; game.down = 1; game.fd = Math.min(100, spot + 10);
+  const d = game.drives; game.q = Math.min(4, Math.max(1, d.you + (who === 'you' ? 1 : 0)));
+  const where = spot <= 50 ? `own ${spot}` : `${who === 'you' ? 'pencils' : 'your'} ${100 - spot}`;
+  note(`${who === 'you' ? 'your' : 'pencils'} ball on the ${where}`, who === 'you' ? INK : X_COLOR);
+  setupPlay(); banner = { text: who === 'you' ? 'YOUR BALL' : 'PENCILS BALL', life: 100, color: who === 'you' ? INK : X_COLOR };
+}
+function gameOver() { state = 'gameover'; gameOverText = game.you > game.pencils ? (teamName === 'YOU' ? 'YOU WIN!' : teamName + ' WINS!') : 'the pencils win.'; note(`final: ${teamName.toLowerCase()} ${game.you}, pencils ${game.pencils}`, game.you > game.pencils ? INK : RED); if (game.you > game.pencils) SFX.win(); else SFX.bad(); updateButtons(); }
 function note(text, color = GRAPHITE) { log.push({ text, color }); if (log.length > 9) log.shift(); }
 
 function setupPlay(keepRoutes) {
@@ -299,10 +310,42 @@ function setupPlay(keepRoutes) {
   // blockers pair with rushers
   for (const d of players.filter(p => p.job === 'rush')) d.blocker = byName(d.tgt);
   const qb = byName('QB'); qb.hasBall = true; ball = { carrier: qb, flying: null, z: 0 };
-  if (oldRoutes) for (const p of players) if (p.team === 'o' && oldRoutes[p.name]) p.route = oldRoutes[p.name].map(w => ({ ...w }));
+  if (!onOffense()) { applyScheme(scheme); ctrl = byName('LB-L'); defReady = false; presnapT = 0; noSnap = false; }   // the pencils pick their play at the snap
+  else if (oldRoutes) { for (const p of players) if (p.team === 'o' && oldRoutes[p.name]) p.route = oldRoutes[p.name].map(w => ({ ...w })); }
   else loadPreset(Object.keys(PRESETS)[Math.floor(Math.random() * Object.keys(PRESETS).length)]); // start with something runnable
   cam.target = Math.max(0, Math.min(FH - H, losY - 470)); cam.y = cam.target;
   updateButtons();
+  if (!onOffense() && game.down === 4) aiFourthDown();
+}
+// ---------- defensive schemes (what your AI teammates do) ----------
+function applyScheme(sc) {
+  const L = byName('LB-L'), Rb = byName('LB-R'), cl = byName('CB-L'), cr = byName('CB-R'), S = byName('S'), nt = byName('NT');
+  const move = (p, dx, dy) => { Body.setPosition(p.body, { x: p.home.x + dx, y: p.home.y + dy }); p.home = { ...p.body.position }; };
+  const zone = (p, dx, dy) => { p.job = 'zoneSpot'; move(p, dx, dy); p.zone = { ...p.body.position }; };
+  if (sc === 'blitz') { L.job = 'rush'; Rb.job = 'rush'; L.blocker = null; Rb.blocker = null; move(L, 0, 22); move(Rb, 0, 22); }
+  else if (sc === 'zone') { zone(L, -60, -16); zone(Rb, 60, -16); zone(cl, 40, -40); zone(cr, -40, -40); }
+  else if (sc === 'prevent') { move(cl, 0, -40); move(cr, 0, -40); move(S, 0, -60); cl.soft = cr.soft = true; zone(nt, 0, -40); zone(Rb, 70, -12); }
+}
+const SCHEME_TIP = { man: 'man: everyone covers a man, 3 rush', blitz: 'blitz: both linebackers come, risky', zone: 'zone: sit in spots, break on the ball', prevent: 'prevent: play deep, give up short stuff' };
+function aiFourthDown() {
+  const toGo = game.fd - game.los;
+  if (game.los >= 62) { noSnap = true; note('the pencils line up for a field goal...', GRAPHITE); setTimeout(() => { if (state === 'presnap') kickFG(); }, 1000); }
+  else if (toGo <= 2 && game.los >= 40 && Math.random() < 0.6) note('the pencils are going for it!', RED);
+  else { noSnap = true; note('the pencils punt.', GRAPHITE); setTimeout(() => { if (state === 'presnap') { SFX.kick(); endPossession('punt'); } }, 1000); }
+}
+function aiSnap() { // the pencils call a play and hike it
+  const long = game.fd - game.los > 5, third = game.down >= 3;
+  const isRun = Math.random() < (third && long ? 0.2 : 0.45);
+  const pool = Object.keys(isRun ? RUNS : PASSES); loadPreset(pool[Math.floor(Math.random() * pool.length)]);
+  const qb = byName('QB'); qb.plan = { isRun, throwAt: 45 + Math.random() * 75 };
+  hike();
+}
+function setReady() { if (state === 'presnap' && !onOffense() && !defReady) { defReady = true; readyAt = presnapT; SFX.click(); updateButtons(); } }
+function nearestX(f, maxD) { let best = null, bd = maxD; for (const p of players) if (p.team === 'x') { const d = Math.hypot(p.body.position.x - f.x, p.body.position.y - f.y); if (d < bd) { bd = d; best = p; } } return best; }
+function switchCtrl(f) { // take over the defender you clicked, or the one nearest the ball
+  const ref = f && nearestX(f, 60) ? f : (ball.flying ? ball.flying.to : ball.carrier ? ball.carrier.body.position : byName('QB').body.position);
+  let best = null, bd = 1e9; for (const d of players) if (d.team === 'x' && d.stumble <= 0 && !d.hasBall) { const dist = Math.hypot(d.body.position.x - ref.x, d.body.position.y - ref.y); if (dist < bd) { bd = dist; best = d; } }
+  if (best && best !== ctrl) { ctrl = best; SFX.click(); }
 }
 function byName(n) { return players.find(p => p.name === n); }
 function loadPreset(name) {
@@ -310,11 +353,15 @@ function loadPreset(name) {
   for (const p of players) if (p.team === 'o') { p.route = []; if (pr[p.name]) p.route = pr[p.name].map(([dx, dy]) => ({ x: p.home.x + dx, y: p.home.y + dy })); }
 }
 function updateButtons() {
-  const pre = state === 'presnap';
-  document.getElementById('hike').disabled = !pre; document.getElementById('clear').disabled = !pre;
+  const pre = state === 'presnap', off = onOffense();
+  document.getElementById('side').classList.toggle('def', !off);
+  const hikeB = document.getElementById('hike'); hikeB.textContent = off ? 'HIKE!' : (defReady ? 'set...' : 'SET!'); hikeB.disabled = !pre || (!off && defReady);
+  document.getElementById('clear').disabled = !pre;
   [...document.querySelectorAll('.presets button')].forEach(b => b.disabled = !pre);
-  document.getElementById('fourth').classList.toggle('on', pre && game.down === 4);
+  [...document.querySelectorAll('#schemes button')].forEach(b => b.classList.toggle('sel', b.dataset.s === scheme));
+  document.getElementById('fourth').classList.toggle('on', pre && off && game.down === 4);
   document.getElementById('fg').disabled = !(pre && game.los >= 55);
+  if (!off) { hintEl.textContent = state === 'gameover' ? 'game over. new game?' : pre ? `DEFENSE · ${SCHEME_TIP[scheme]} · click the field (or SET) when you're ready and the pencils will snap it.` : state === 'live' ? (ball.carrier && ball.carrier.team === 'x' ? 'you picked it off! run it back with the mouse' : 'move your ★ defender with the mouse (or WASD) · click or space to switch to the man nearest the ball') : ''; return; }
   hintEl.textContent = state === 'presnap' ? (game.down === 4 ? '4th down: go for it, kick, or punt' : 'drag from any O to draw its route · click the field to hike') : state === 'live' ? (ball.carrier && ball.carrier.team === 'x' ? 'picked off! your O\'s are chasing him' : ball.carrier && ball.carrier.name === 'QB' ? 'WASD / arrows: run the QB · hold to aim, release to throw · shift or right-click = lob · space = lateral' : 'runner follows your mouse (or WASD) · space or right-click = lateral') : '';
 }
 
@@ -324,10 +371,12 @@ function nearestO(f, maxD = 22) { let best = null, bd = maxD; for (const p of pl
 let aim = null;                      // where the pass is being aimed while the mouse is held
 const keys = new Set();
 function keyDir() { let x = 0, y = 0; if (keys.has('ArrowLeft') || keys.has('KeyA')) x -= 1; if (keys.has('ArrowRight') || keys.has('KeyD')) x += 1; if (keys.has('ArrowUp') || keys.has('KeyW')) y -= 1; if (keys.has('ArrowDown') || keys.has('KeyS')) y += 1; if (!x && !y) return null; const L = Math.hypot(x, y); return { x: x / L, y: y / L }; }
-function qbHasBall() { return state === 'live' && ball.carrier && ball.carrier.name === 'QB' && !ball.flying; }
+function qbHasBall() { return state === 'live' && onOffense() && ball.carrier && ball.carrier.name === 'QB' && !ball.flying; }
 function onDown(e) {
   SFX.resume(); const s = canvasPos(e), f = toField(s.x, s.y); mouse = { ...f, down: true };
   if (state !== 'live' && s.x >= NAME_BOX.x && s.x <= NAME_BOX.x + NAME_BOX.w && s.y >= NAME_BOX.y && s.y <= NAME_BOX.y + NAME_BOX.h) { renameTeam(); e.preventDefault(); return; }
+  if (state === 'presnap' && !onOffense()) { setReady(); e.preventDefault(); return; }
+  if (state === 'live' && !onOffense()) { if (e.button === undefined || e.button === 0) switchCtrl(f); e.preventDefault(); return; }
   if (state === 'presnap') {
     const p = nearestO(f);
     if (p) { drawing = p; p.route = []; SFX.scratch(true); }          // drag from an O: draw its route
@@ -353,8 +402,8 @@ window.addEventListener('keyup', e => keys.delete(e.code));
 window.addEventListener('blur', () => keys.clear());
 canvas.addEventListener('mousedown', onDown); window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
 canvas.addEventListener('touchstart', onDown, { passive: false }); window.addEventListener('touchmove', onMove, { passive: false }); window.addEventListener('touchend', onUp);
-window.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if (state === 'presnap') hike(); else if (e.code === 'Space' && canLateral()) lateral(null); } });
-document.getElementById('hike').onclick = hike;
+window.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if (state === 'presnap') { if (onOffense()) hike(); else setReady(); } else if (e.code === 'Space') { if (!onOffense()) { if (state === 'live') switchCtrl(null); } else if (canLateral()) lateral(null); } } });
+document.getElementById('hike').onclick = () => { if (onOffense()) hike(); else setReady(); };
 document.getElementById('clear').onclick = () => { SFX.click(); for (const p of players) if (p.team === 'o') p.route = []; };
 document.getElementById('newgame').onclick = () => { SFX.resume(); SFX.click(); newGame(); };
 const SPK_ON = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="#7a7a82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L9 10 L16 4.5 L16.4 21.5 L9 16.5 L3.2 16.2 Z"/><path d="M21 9.5 Q24 13 21 16.8"/><path d="M25 6 Q30 13 25.3 20.2"/></svg>';
@@ -363,6 +412,7 @@ const muteBtn = document.getElementById('mute'); muteBtn.innerHTML = SPK_ON;
 muteBtn.onclick = () => { SFX.resume(); const m = SFX.toggleMute(); muteBtn.innerHTML = m ? SPK_OFF : SPK_ON; muteBtn.setAttribute('aria-label', m ? 'sound off' : 'sound on'); };
 document.getElementById('fg').onclick = () => { if (state !== 'presnap') return; SFX.resume(); kickFG(); };
 document.getElementById('punt').onclick = () => { if (state !== 'presnap') return; SFX.resume(); SFX.kick(); note('punt.', GRAPHITE); endPossession('punt'); };
+for (const n of ['man', 'blitz', 'zone', 'prevent']) { const b = document.createElement('button'); b.textContent = n; b.dataset.s = n; b.onclick = () => { SFX.resume(); SFX.click(); scheme = n; if (state === 'presnap' && !onOffense()) setupPlay(false); else updateButtons(); }; document.getElementById('schemes').appendChild(b); }
 for (const [id, group] of [['runs', RUNS], ['passes', PASSES]]) { const el = document.getElementById(id); Object.keys(group).forEach(n => { const b = document.createElement('button'); b.textContent = n; b.onclick = () => { SFX.resume(); SFX.click(); loadPreset(n); }; el.appendChild(b); }); }
 
 // ---------- the play ----------
@@ -392,12 +442,12 @@ function throwAt(spot, lob = false) {
   note(lob ? 'lobs it up...' : pp.sp > 10 ? 'lets it fly!' : pp.sp < 7.8 ? 'touch pass' : 'fires it', GRAPHITE);
 }
 // lead a specific receiver (used by the play-test harness)
-function throwTo(p) { const T = Math.hypot(p.body.position.x - ball.carrier.body.position.x, p.body.position.y - ball.carrier.body.position.y) / 9.5; throwAt({ x: p.body.position.x + p.body.velocity.x * T * 0.85, y: p.body.position.y + p.body.velocity.y * T * 0.85 }); }
+function throwTo(p, lob = false) { const T = Math.hypot(p.body.position.x - ball.carrier.body.position.x, p.body.position.y - ball.carrier.body.position.y) / 9.5; throwAt({ x: p.body.position.x + p.body.velocity.x * T * 0.85, y: p.body.position.y + p.body.velocity.y * T * 0.85 }, lob); }
 function landBall() {
   const f = ball.flying, at = f.to; ball.flying = null;
   const rec = f.target, rd = rec ? Math.hypot(rec.body.position.x - at.x, rec.body.position.y - at.y) : 1e9;
   let dd = 1e9, dfd = null; for (const p of players) if (p.team === 'x' && p.stumble <= 0) { const d = Math.hypot(p.body.position.x - at.x, p.body.position.y - at.y); if (d < dd) { dd = d; dfd = p; } }
-  const open = rd < 36, defClose = dd < 24;
+  const open = rd < (onOffense() ? 36 : 30), defClose = dd < 24;
   if (f.lateral) { // a pitch: caught, jumped, or on the ground and live
     if (defClose && dd < rd - 4 && Math.random() < 0.6) { ball.turnoverText = 'INTERCEPTED by the pencils!'; return intercept(dfd, at, 'PICKED OFF!', 'the ' + dfd.name + ' jumps the lateral!'); }
     if (open) { giveBall(rec); SFX.catch_(); return; }
@@ -410,7 +460,7 @@ function landBall() {
   if (open) {
     if (!defClose || Math.random() < 0.72) {
       giveBall(rec); SFX.catch_();
-      for (const d of players) if (d.team === 'x' && Math.hypot(d.body.position.x - at.x, d.body.position.y - at.y) < 40) { d.stumble = Math.max(d.stumble, 16); d.touching = 0; }
+      for (const d of players) if (d.team === 'x' && Math.hypot(d.body.position.x - at.x, d.body.position.y - at.y) < 40) { d.stumble = Math.max(d.stumble, onOffense() ? 16 : 8); d.touching = 0; }
       return;
     }
     if (Math.random() < 0.35) return intercept(dfd, at);
@@ -420,14 +470,17 @@ function landBall() {
   endPlay('inc', 'incomplete', at);
 }
 let banner = null, loose = null;   // loose: a live ball on the ground after a dropped lateral
+let ctrl = null, scheme = 'man', defReady = false, readyAt = 0, presnapT = 0, noSnap = false;   // defense: the defender you control, the scheme, the snap timer
+const onOffense = () => game.possession === 'you';
+const intText = () => onOffense() ? 'INTERCEPTED by the pencils!' : 'INTERCEPTION!';
 function intercept(d, at, text = 'INTERCEPTED!', noteText) {
   for (const q of players) q.hasBall = false;
   d.hasBall = true; d.stumble = 0; d.chase = 0; ball.carrier = d; ball.z = 0; Body.setDensity(d.body, 0.005);
   for (const o of players) if (o.team === 'o') o.touching = 0;
-  banner = { text, life: 90 }; note(noteText || ('intercepted by the ' + d.name + '!'), RED); SFX.bad(); updateButtons();
+  banner = { text, life: 90 }; note(noteText || ((onOffense() ? 'intercepted by the ' : 'intercepted by your ') + d.name + '!'), onOffense() ? RED : INK); SFX.bad(); updateButtons();
 }
 // ---------- laterals ----------
-function canLateral() { return state === 'live' && ball.carrier && ball.carrier.team === 'o' && !ball.flying && !loose; }
+function canLateral() { return state === 'live' && onOffense() && ball.carrier && ball.carrier.team === 'o' && !ball.flying && !loose; }
 function lateralTarget(c, toward) { // a teammate level with or behind the carrier; nearest to the click, or to the carrier
   let best = null, bd = 1e9; const ref = toward || c.body.position;
   for (const p of players) if (p.team === 'o' && p !== c && p.body.position.y >= c.body.position.y - 6) { const d = Math.hypot(p.body.position.x - ref.x, p.body.position.y - ref.y); if (d < bd) { bd = d; best = p; } }
@@ -464,6 +517,40 @@ function followRoute(p) {
   if (p.ri < p.route.length) { const w = p.route[p.ri]; if (Math.hypot(w.x - p.body.position.x, w.y - p.body.position.y) < 10) p.ri++; steer(p, p.route[Math.min(p.ri, p.route.length - 1)]); return true; }
   return false;
 }
+function nearestDefDist(p) { let bd = 1e9; for (const d of players) if (d.team === 'x' && d.stumble <= 0) bd = Math.min(bd, Math.hypot(d.body.position.x - p.body.position.x, d.body.position.y - p.body.position.y)); return bd; }
+function bestReceiver(qb) { // the pencil QB's read: separation plus a taste for depth
+  let best = null; const losY = yardY(game.los);
+  for (const r of players) { if (r.team !== 'o' || r === qb || r.kind === 'OL') continue; const sep = nearestDefDist(r), depth = losY - r.body.position.y; if (depth < -60) continue; const score = sep + Math.max(0, depth) * 0.12 - (r.kind === 'RB' ? 5 : 0); if (!best || score > best.score) best = { r, sep, depth, score }; }
+  return best;
+}
+function runTarget(c) { // run upfield, cut away from the nearest defender in the way
+  const p = c.body.position; let tx = p.x, near = null, nd = 1e9;
+  for (const d of players) if (d.team === 'x' && d.stumble <= 0) { const dx = d.body.position.x - p.x, dy = d.body.position.y - p.y; if (dy < 30 && dy > -130) { const dist = Math.hypot(dx, dy); if (dist < nd) { nd = dist; near = d; } } }
+  if (near && nd < 95) { const side = near.body.position.x > p.x ? -1 : 1; tx = p.x + side * 75; if (tx < 30 || tx > FW - 30) tx = p.x - side * 75; }
+  return { x: Math.max(24, Math.min(FW - 24, tx)), y: p.y - 220 };
+}
+function aiCarrier(p, qb) {
+  const b = p.body.position;
+  if (p.name === 'QB' && !p.scramble) {
+    if (b.y < yardY(game.los) - 6) { p.scramble = true; }
+    else {
+      if (p.route.length) { if (followRoute(p)) return; p.scramble = true; return; }
+      if (playFrame < 45) steer(p, { x: p.home.x, y: p.home.y + 28 }, 0.9); else steer(p, b, 0);
+      if (ball.flying) return;
+      const plan = p.plan || (p.plan = { throwAt: 60 });
+      const pressure = playFrame > 30 && nearestDefDist(p) < 38;
+      if (playFrame >= plan.throwAt || pressure) {
+        const t = bestReceiver(p);
+        if (t && ((t.sep > 22 && (t.depth < 180 || t.sep > 36)) || playFrame > 150 || (pressure && t.sep > 12))) { const r = t.r, T = Math.hypot(r.body.position.x - b.x, r.body.position.y - b.y) / 9.5; throwAt({ x: r.body.position.x + r.body.velocity.x * T * 0.85 + (Math.random() - .5) * 44, y: r.body.position.y + r.body.velocity.y * T * 0.85 + (Math.random() - .5) * 36 }, t.depth > 220 && t.sep > 34); }
+        else if (pressure) { p.scramble = true; note('the pencil QB takes off!', GRAPHITE); }
+        else plan.throwAt = playFrame + 10;
+      }
+      return;
+    }
+  }
+  if (!p.aiT || playFrame - p.aiT >= 8) { p.aiT = playFrame; p.aiTarget = runTarget(p); }
+  steer(p, p.aiTarget, 1.04);
+}
 function updateOffense() {
   const qb = byName('QB'), carrier = ball.carrier;
   if (loose) { for (const p of players) if (p.team === 'o') steer(p, loose, 1.0); return; }
@@ -475,6 +562,7 @@ function updateOffense() {
   for (const p of players) {
     if (p.team !== 'o') continue;
     if (p.hasBall) {
+      if (!onOffense()) { aiCarrier(p, qb); continue; }
       const kd = keyDir(), b = p.body.position;
       if (p.name === 'QB') { // you run him: keys move, otherwise a short drop back and hold the pocket
         if (kd) { steer(p, { x: b.x + kd.x * 60, y: b.y + kd.y * 60 }, 1.0); p.moved = true; }
@@ -484,7 +572,7 @@ function updateOffense() {
       else steer(p, mouse, 1.1);
       continue;
     }
-    if (ball.flying && ball.flying.target === p) { steer(p, ball.flying.to, 1.3); continue; }
+    if (ball.flying && ball.flying.target === p) { steer(p, ball.flying.to, onOffense() ? 1.3 : 1.15); continue; }
     if (p.kind === 'OL' && !p.route.length) { // blockers
       let d = players.find(x => x.team === 'x' && x.blocker === p && x.job === 'rush');
       if (carrier && carrier.name !== 'QB' || (qb.scramble)) d = nearestDefenderTo(carrier || qb);
@@ -492,7 +580,7 @@ function updateOffense() {
       else steer(p, p.home, 0.5);
       continue;
     }
-    if (ball.flying && ball.flying.target === p) { steer(p, ball.flying.to, 1.3); continue; }
+    if (ball.flying && ball.flying.target === p) { steer(p, ball.flying.to, onOffense() ? 1.3 : 1.15); continue; }
     if (carrier && carrier !== p && trailerFor(carrier) === p) { // pitch man: shadow the runner a few yards back, on the open side
       const c = carrier.body.position, side = c.x < FW / 2 ? 1 : -1;
       steer(p, { x: c.x + side * 38, y: c.y + 36 }, 1.0); continue;
@@ -515,9 +603,10 @@ function nearestDefenderTo(p, exclude) { let best = null, bd = 1e9; for (const d
 function updateDefense() {
   const qb = byName('QB'), carrier = ball.carrier, fly = ball.flying;
   if (loose) { for (const d of players) if (d.team === 'x') { if (d.stumble > 0) { d.stumble--; continue; } if (loose.t > 8 + (d.id % 5) * 3) steer(d, loose, 1.0); } return; }
-  if (carrier && carrier.team === 'x') { // run it back toward your goal line; the rest get in the way
+  if (carrier && carrier.team === 'x') { // run it back; the rest get in the way
     const c = carrier.body.position;
-    steer(carrier, { x: c.x + (FW / 2 - c.x) * 0.25, y: c.y + 220 }, 1.0);
+    if (!onOffense()) { ctrl = carrier; const kd = keyDir(); if (kd) steer(carrier, { x: c.x + kd.x * 60, y: c.y + kd.y * 60 }, 1.05); else steer(carrier, mouse, 1.05); }
+    else steer(carrier, { x: c.x + (FW / 2 - c.x) * 0.25, y: c.y + 220 }, 1.0);
     for (const d of players) if (d.team === 'x' && d !== carrier) {
       let o = null, od = 1e9; for (const p of players) if (p.team === 'o') { const dist = Math.hypot(p.body.position.x - c.x, p.body.position.y - c.y); if (dist < od) { od = dist; o = p; } }
       if (o) { const dx = c.x - o.body.position.x, dy = c.y - o.body.position.y, L = Math.hypot(dx, dy) || 1; steer(d, { x: o.body.position.x + dx / L * 14, y: o.body.position.y + dy / L * 14 }, 0.95); }
@@ -528,14 +617,18 @@ function updateDefense() {
   for (const d of players) {
     if (d.team !== 'x') continue;
     if (d.stumble > 0) { d.stumble--; steer(d, d.body.position, 0); d.body.collisionFilter.mask = 0; if (d.stumble === 0) d.body.collisionFilter.mask = 0xFFFFFFFF; continue; }
-    if (d.reactAt === undefined) d.reactAt = 0;
+    if (!onOffense() && d === ctrl) { const kd = keyDir(), b = d.body.position; if (kd) steer(d, { x: b.x + kd.x * 60, y: b.y + kd.y * 60 }, 1.06); else steer(d, mouse, 1.06); continue; }
     // pursuit once the ball is out: everyone chases, with a beat of hesitation
-    if (live) { if (!d.chase) d.chase = playFrame + 6 + Math.random() * 14; if (playFrame >= d.chase) { const c = carrier.body; steer(d, { x: c.position.x + c.velocity.x * 6, y: c.position.y + c.velocity.y * 6 }, 1); continue; } }
+    if (live) { if (!d.chase) d.chase = playFrame + 6 + Math.random() * 14; if (playFrame >= d.chase) { const c = carrier.body; steer(d, { x: c.position.x + c.velocity.x * 6, y: c.position.y + c.velocity.y * 6 }, onOffense() ? 1 : 1.05); continue; } }
     if (fly) { const dist = Math.hypot(d.body.position.x - fly.to.x, d.body.position.y - fly.to.y); if (dist < (fly.lob ? 210 : 150) || d.job === 'zone') { steer(d, fly.to, 1.05); continue; } }
     if (d.job === 'rush') { const boost = playFrame > 200 ? 1.35 : playFrame > 130 ? 1.15 : 1; const c = carrier || qb; steer(d, c.body.position, boost); continue; }
+    if (d.job === 'zoneSpot') { // hold a spot, pick up whoever wanders into it
+      let best = null, bd = 90; for (const r of players) if (r.team === 'o' && r.kind !== 'OL' && r.kind !== 'QB') { const dist = Math.hypot(r.body.position.x - d.zone.x, r.body.position.y - d.zone.y); if (dist < bd) { bd = dist; best = r; } }
+      if (best) steer(d, { x: best.body.position.x + best.body.velocity.x * 3, y: best.body.position.y - 16 }, 0.92); else steer(d, d.zone, 0.9); continue;
+    }
     if (d.job === 'man') {
-      const r = byName(d.tgt); if (d.tgt && (playFrame % 7 === d.id % 7 || !d.aim)) d.aim = { x: r.body.position.x + r.body.velocity.x * 4, y: r.body.position.y - 18 + r.body.velocity.y * 4 };
-      steer(d, d.aim, 0.88); continue;
+      const r = byName(d.tgt); if (d.tgt && (playFrame % 7 === d.id % 7 || !d.aim)) d.aim = { x: r.body.position.x + r.body.velocity.x * 4, y: r.body.position.y - (d.soft ? 34 : 18) + r.body.velocity.y * 4 };
+      steer(d, d.aim, onOffense() ? 0.88 : 0.97); continue;
     }
     // safety: shade toward the deepest receiver, stay deep
     let deep = null; for (const p of players) if (p.team === 'o' && p.kind !== 'OL' && p.kind !== 'QB' && (!deep || p.body.position.y < deep.body.position.y)) deep = p;
@@ -551,7 +644,7 @@ function checkContact() {
       const dist = Math.hypot(o.body.position.x - c.body.position.x, o.body.position.y - c.body.position.y);
       if (dist > R * 2 + 3) { o.touching = 0; continue; }
       if (++o.touching < 4) continue;
-      SFX.thump(1); endPlay('int', ball.turnoverText || 'INTERCEPTED by the pencils!', c.body.position); return;
+      SFX.thump(1); endPlay('int', ball.turnoverText || intText(), c.body.position); return;
     }
     return;
   }
@@ -562,7 +655,7 @@ function checkContact() {
     if (dist > R * 2 + 3) { d.touching = 0; continue; }
     d.touching = (d.touching || 0) + 1;
     if (d.touching < 4) continue;
-    if (!d.attempted) { d.attempted = true; if (Math.random() < (inPocket ? 0.15 : 0.42)) { d.stumble = 55; note(c.name + ' breaks a tackle!', INK); SFX.thump(0.5); continue; } }
+    if (!d.attempted) { d.attempted = true; const brk = inPocket ? 0.15 : onOffense() ? 0.42 : (d === ctrl ? 0.18 : 0.34); if (Math.random() < brk) { d.stumble = 55; note((onOffense() ? '' : 'pencil ') + c.name + ' breaks a tackle!', onOffense() ? INK : X_COLOR); SFX.thump(0.5); continue; } }
     else continue;
     SFX.thump(1);
     if (inPocket) endPlay('sack', 'SACKED', c.body.position); else endPlay('tackle', null, c.body.position);
@@ -574,28 +667,29 @@ function endPlay(kind, text, at) {
   const losY = yardY(game.los); let spotY = at.y;
   loose = null;
   if (kind === 'inc') spotY = losY;
-  if (kind === 'oob') spotY = at.y;
   let gain = Math.round((losY - spotY) / YD);
-  if (kind === 'td') { gain = 100 - game.los; }
+  if (kind === 'td') gain = 100 - game.los;
   result = { kind, text: text || (gain > 0 ? `+${gain} yards` : gain === 0 ? 'no gain' : `${gain} yards`), gain, at: { ...at } };
-  if (kind === 'td') { result.text = 'TOUCHDOWN!'; game.you += 7; SFX.td(); note(`TOUCHDOWN! +7 (auto extra point)`, INK); cheer(240); }
-  else if (kind === 'int' || kind === 'pick6') setMood('headpunt', 260);   // any interception (or a fumbled lateral)
-  else if (kind === 'sack') setMood('squash', 130);
-  else if (gain >= 20) setMood('worm', 300);
-  else if (kind === 'int') { note('pencils ball.', RED); SFX.whistle(); }
-  else if (kind === 'pick6') { game.pencils += 7; note('PICK SIX. pencils +7.', RED); SFX.bad(); }
-  else { note(`${downText()}: ${result.text}${kind === 'sack' ? ' (sack)' : kind === 'inc' ? '' : ''}`, GRAPHITE); }
+  const mine = onOffense(), off = mine ? 'you' : 'pencils', def = mine ? 'pencils' : 'you';
+  if (kind === 'td') { result.text = 'TOUCHDOWN!'; game[off] += 7; note(mine ? 'TOUCHDOWN! +7 (auto extra point)' : 'pencils touchdown. +7', mine ? INK : RED); if (mine) { SFX.td(); cheer(240); } else { SFX.bad(); setMood('facepalm', 170); } }
+  else if (kind === 'int') { note(mine ? 'pencils ball.' : 'YOUR BALL!', mine ? RED : INK); if (mine) setMood('headpunt', 260); else { cheer(200); SFX.good(); } }
+  else if (kind === 'pick6') { result.text = 'PICK SIX'; game[def] += 7; note(mine ? 'PICK SIX. pencils +7.' : 'PICK SIX! +7', mine ? RED : INK); if (mine) { SFX.bad(); setMood('headpunt', 260); } else { SFX.td(); cheer(240); } }
+  else {
+    note(`${mine ? '' : 'pencils '}${downText()}: ${result.text}${kind === 'sack' ? ' (sack)' : ''}`, GRAPHITE);
+    if (kind === 'sack') { if (mine) setMood('squash', 130); else cheer(120); }
+    else if (gain >= 20) { if (mine) setMood('worm', 300); else setMood('facepalm', 130); }
+  }
   updateButtons();
 }
 function downText() { const s = ['1st', '2nd', '3rd', '4th'][game.down - 1]; return `${s} & ${Math.max(1, game.fd - game.los)}`; }
 function afterResult() {
-  const r = result;
+  const r = result, mine = onOffense();
   if (r.kind === 'td') { endPossession('td'); return; }
-  if (r.kind === 'int') { endPossession('turnover'); return; }
+  if (r.kind === 'int') { endPossession('turnover', Math.max(1, Math.min(99, Math.round(yardsOf(r.at.y))))); return; }
   if (r.kind === 'pick6') { endPossession('pick6'); return; }
   game.los = Math.max(1, Math.min(99, game.los + r.gain));
   if (game.los >= game.fd) { game.down = 1; game.fd = Math.min(100, game.los + 10); }
-  else { game.down++; if (game.down > 4) { note('turnover on downs.', RED); SFX.bad(); setMood('facepalm', 150); endPossession('turnover'); return; } }
+  else { game.down++; if (game.down > 4) { note(mine ? 'turnover on downs.' : 'the pencils turn it over on downs!', mine ? RED : INK); if (mine) { SFX.bad(); setMood('facepalm', 150); } else { SFX.good(); cheer(150); } endPossession('turnover', game.los); return; } }
   setupPlay(false);
 }
 function kickFG() {
@@ -604,27 +698,18 @@ function kickFG() {
   fgAnim = { t: 0, T: 80, from: { x: FW / 2, y: yardY(game.los) - 84 }, to: { x: FW / 2 + (good ? (Math.random() - .5) * 40 : (Math.random() > .5 ? 1 : -1) * (75 + Math.random() * 40)), y: 30 }, good, dist };
   hintEl.textContent = `${dist} yard attempt...`; updateButtons();
 }
-function endPossession(how) {
-  state = 'pencils'; game.possessions++; updateButtons(); banner = null;
-  if (how === 'pick6') { // they just scored on the return, so that was their possession
-    setTimeout(() => {
-      if (game.possessions >= 4 && game.you !== game.pencils) { state = 'gameover'; gameOverText = game.you > game.pencils ? (teamName === 'YOU' ? 'YOU WIN!' : teamName + ' WINS!') : 'the pencils win.'; note(`final: ${teamName.toLowerCase()} ${game.you}, pencils ${game.pencils}`, game.you > game.pencils ? INK : RED); if (game.you > game.pencils) SFX.win(); else SFX.bad(); updateButtons(); return; }
-      game.q = Math.min(game.possessions + 1, 4); note(`${game.possessions >= 4 ? 'OT' : 'Q' + game.q}: your ball on the 25`, INK); startDrive();
-    }, 1800);
-    return;
-  }
-  // the pencils' drive is played off-page; short fields help them
-  const p = how === 'turnover' ? [0.38, 0.30] : how === 'punt' ? [0.22, 0.24] : [0.28, 0.27];
-  const r = Math.random(), outcome = r < p[0] ? 'td' : r < p[0] + p[1] ? 'fg' : 'stop';
-  const spot = 20 + Math.floor(Math.random() * 60);
-  const lines = [[600, `meanwhile... the pencils drive to the ${spot}`, GRAPHITE], [1500, outcome === 'td' ? 'the pencils score. +7' : outcome === 'fg' ? 'pencils field goal is good. +3' : ['pencils punt.', 'the pencils fumble!', 'pencils turn it over on downs.', 'pencils miss the kick!'][Math.floor(Math.random() * 4)], outcome === 'stop' ? INK : RED]];
-  SFX.pencil();
-  lines.forEach(([d, t, c]) => setTimeout(() => { note(t, c); if (d > 1000) { game.pencils += outcome === 'td' ? 7 : outcome === 'fg' ? 3 : 0; if (outcome !== 'stop') SFX.bad(); else SFX.good(); } }, d));
-  setTimeout(() => {
-    if (game.possessions >= 4 && game.you !== game.pencils) { state = 'gameover'; gameOverText = game.you > game.pencils ? (teamName === 'YOU' ? 'YOU WIN!' : teamName + ' WINS!') : 'the pencils win.'; note(`final: ${teamName.toLowerCase()} ${game.you}, pencils ${game.pencils}`, game.you > game.pencils ? INK : RED); if (game.you > game.pencils) SFX.win(); else SFX.bad(); updateButtons(); return; }
-    if (game.possessions >= 4) note('overtime!', RED);
-    game.q = Math.min(game.possessions + 1, 4); note(`${game.possessions >= 4 ? 'OT' : 'Q' + game.q}: your ball on the 25`, INK); startDrive();
-  }, 3000);
+function endPossession(how, spot) { // one drive ends, the other team's begins; the ball changes hands where it makes sense
+  const was = game.possession, other = was === 'you' ? 'pencils' : 'you';
+  game.drives[was]++; banner = null; state = 'between'; updateButtons();
+  const d = game.drives;
+  if (d.you >= 4 && d.pencils >= 4 && d.you === d.pencils && game.you !== game.pencils) { setTimeout(gameOver, 900); return; }
+  let next = other, at = 25;
+  if (how === 'pick6') { next = was; at = 25; }
+  else if (how === 'turnover') at = Math.max(1, Math.min(99, 100 - (spot ?? game.los)));
+  else if (how === 'punt') at = Math.max(20, Math.min(80, 100 - game.los - 42));
+  else if (how === 'kickmiss') at = Math.max(20, Math.min(95, 100 - game.los + 7));
+  if (d.you >= 4 && d.pencils >= 4 && d.you === d.pencils) note('overtime!', RED);
+  setTimeout(() => startDrive(next, at), 1400);
 }
 
 // ---------- drawing ----------
@@ -633,8 +718,9 @@ function drawField() {
   // sidelines + end zones
   const L = toScreen(0, 0).x, Rr = toScreen(FW, 0).x;
   const ez = rv(55, 45);
-  if (ez > 0 && GOAL_TOP - cam.y > 0) ctx.drawImage(zoneTop, 0, 0, FW * ez, GOAL_TOP, L, 0 - cam.y, FW * ez, GOAL_TOP);
-  if (ez > 0 && GOAL_BOT - cam.y < H) ctx.drawImage(zoneBot, 0, 0, FW * ez, GOAL_TOP, L, GOAL_BOT - cam.y, FW * ez, GOAL_TOP);
+  const zT = onOffense() ? zoneTop : zoneBot, zB = onOffense() ? zoneBot : zoneTop;   // whoever has the ball attacks the top end zone
+  if (ez > 0 && GOAL_TOP - cam.y > 0) ctx.drawImage(zT, 0, 0, FW * ez, GOAL_TOP, L, 0 - cam.y, FW * ez, GOAL_TOP);
+  if (ez > 0 && GOAL_BOT - cam.y < H) ctx.drawImage(zB, 0, 0, FW * ez, GOAL_TOP, L, GOAL_BOT - cam.y, FW * ez, GOAL_TOP);
   // sidelines are drawn in field space (full length, then offset) so their wobble doesn't slide as the camera moves
   ctx.save(); ctx.translate(0, -cam.y);
   ink.longLine(L, FH, L, 0, 1, INK, 3.5, 2, 2.2, rv(0, 40)); ink.longLine(Rr, FH, Rr, 0, 2, INK, 3.5, 2, 2.2, rv(6, 40));
@@ -658,7 +744,7 @@ function drawField() {
 }
 function drawPosts(x, y, pr = 1) { ink.line(x, y + 26, x, y, 520, INK, 3, 2, pr * 4); ink.line(x - 50, y - 2, x + 50, y - 2, 521, INK, 3, 2, pr * 4 - 1); ink.line(x - 50, y - 2, x - 50, y - 40, 522, INK, 3, 2, pr * 4 - 2); ink.line(x + 50, y - 2, x + 50, y - 40, 523, INK, 3, 2, pr * 4 - 3); }
 function drawRoutes() {
-  if (introT < 150) return;
+  if (introT < 150 || !onOffense()) return;
   for (const p of players) {
     if (p.team !== 'o') continue;
     const s0 = toScreen(p.body.position.x, p.body.position.y);
@@ -673,7 +759,8 @@ function drawRoutes() {
 }
 function drawPlayers() {
   // hover: before the snap, the O under the cursor gets a ring and a nudge so it's obvious you can drag a route from it
-  const hover = state === 'presnap' && !drawing && introT >= 150 ? nearestO(mouse) : null;
+  const hover = state === 'presnap' && onOffense() && !drawing && introT >= 150 ? nearestO(mouse) : null;
+  const offCol = onOffense() ? INK : X_COLOR, defCol = onOffense() ? X_COLOR : INK;
   canvas.style.cursor = drawing ? 'grabbing' : hover ? 'grab' : (state === 'presnap' ? 'pointer' : 'crosshair');
   if (hover) {
     const s = toScreen(hover.body.position.x, hover.body.position.y), pulse = 1 + Math.sin(frame * 0.15) * 0.06;
@@ -689,12 +776,17 @@ function drawPlayers() {
     if (pp <= 0) continue;
     if (p.team === 'x') {
       const st = p.stumble > 0;
-      ink.line(s.x - 8, s.y - 8, s.x + 8, s.y + 8, 700 + p.id * 3, X_COLOR, st ? 2 : 3, 2, pp * 2); ink.line(s.x + 8, s.y - 8, s.x - 8, s.y + 8, 701 + p.id * 3, X_COLOR, st ? 2 : 3, 2, pp * 2 - 1);
-      if (st) ink.text('*', s.x + 12, s.y - 6, { size: 22, color: X_COLOR, alpha: 0.7 });
+      ink.line(s.x - 8, s.y - 8, s.x + 8, s.y + 8, 700 + p.id * 3, defCol, st ? 2 : 3, 2, pp * 2); ink.line(s.x + 8, s.y - 8, s.x - 8, s.y + 8, 701 + p.id * 3, defCol, st ? 2 : 3, 2, pp * 2 - 1);
+      if (st) ink.text('*', s.x + 12, s.y - 6, { size: 22, color: defCol, alpha: 0.7 });
       if (p.hasBall) { ink.circle(s.x, s.y, R + 4, 760 + p.id, RED, 1.5, 1); drawBallAt(s.x + 12, s.y - 5, 0); }
+      if (!onOffense() && state === 'presnap') ink.text(p.name, s.x, s.y + 24, { size: 13, color: GRAPHITE, font: 'Patrick Hand', weight: 400, alpha: 0.6 * rv(150, 15) });
+      if (!onOffense() && p === ctrl && (state === 'live' || state === 'presnap')) { // the one you're driving
+        ctx.fillStyle = INK; ctx.beginPath(); ctx.moveTo(s.x - 7, s.y - 26); ctx.lineTo(s.x + 7, s.y - 26); ctx.lineTo(s.x, s.y - 15); ctx.closePath(); ctx.fill();
+        if (state === 'presnap' && game.drives.pencils === 0) ink.text('this is you', s.x, s.y - 32, { size: 15, color: INK, font: 'Patrick Hand', weight: 400 });
+      }
     } else {
-      if (p.hasBall) ink.scribble(s.x, s.y, R - 1, 720 + p.id, INK, 16, 0.35);
-      ink.circle(s.x, s.y, R, 740 + p.id * 3, INK, p.hasBall ? 3.2 : 2.4, 2, pp);
+      if (p.hasBall) ink.scribble(s.x, s.y, R - 1, 720 + p.id, offCol, 16, 0.35);
+      ink.circle(s.x, s.y, R, 740 + p.id * 3, offCol, p.hasBall ? 3.2 : 2.4, 2, pp);
       if (state === 'presnap') ink.text(p.name, s.x, s.y + 24, { size: 14, color: GRAPHITE, font: 'Patrick Hand', weight: 400, alpha: 0.6 * rv(150, 15) });
       if (p.hasBall) drawBallAt(s.x + 11, s.y - 4, 0);
     }
@@ -720,17 +812,19 @@ function drawScoreboard() {
     box(X + Wd - 52, y - 16, 40, 34, id, PEN_MD, 1.3); ink.text(String(score), X + Wd - 32, y + 10, { size: 34, color: PEN_DK });
   };
   row(162, document.getElementById('rename') ? '' : teamName, game.you, 810); row(212, 'PENCILS', game.pencils, 820);
+  if (state !== 'gameover') { const py = onOffense() ? 166 : 216; ctx.save(); ctx.translate(X - 10, py); ctx.rotate(-0.5); ctx.fillStyle = '#8a5a2b'; ctx.beginPath(); ctx.ellipse(0, 0, 7, 4, 0, 0, 7); ctx.fill(); ctx.strokeStyle = '#fbf8ee'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-2.5, 0); ctx.lineTo(2.5, 0); ctx.stroke(); ctx.restore(); }
   ink.text('✎', X + 14 + Math.min(96, teamName.length * (teamName.length > 7 ? 8 : 11)) + 6, 168, { size: 12, color: PEN_LT, font: PH, weight: 400, alpha: 0.7, align: 'left' });
   ink.line(X + 8, 187, X + Wd - 8, 187, 830, PEN_LT, 1, 1, rv(136, 10));
   // quarter strip along the bottom: Q1 Q2 Q3 Q4, the current one circled
-  const qy = 252; for (let i = 1; i <= 4; i++) { const qx = X + 26 + (i - 1) * 36; const cur = game.possessions < 4 ? game.q === i : false; ink.text('Q' + i, qx, qy, { size: 14, color: cur ? PEN_DK : PEN_LT, font: PH, weight: 400, alpha: cur ? 1 : 0.7 }); if (cur) ink.circle(qx, qy - 5, 11, 840 + i, PEN_MD, 1.2, 1); }
-  if (game.possessions >= 4) { ink.text('OT', X + Wd - 22, qy, { size: 14, color: PEN_DK, font: PH, weight: 400 }); ink.circle(X + Wd - 22, qy - 5, 11, 845, PEN_DK, 1.2, 1); }
+  const ot = game.drives.you >= 4 && game.drives.pencils >= 4;
+  const qy = 252; for (let i = 1; i <= 4; i++) { const qx = X + 26 + (i - 1) * 36; const cur = !ot && game.q === i; ink.text('Q' + i, qx, qy, { size: 14, color: cur ? PEN_DK : PEN_LT, font: PH, weight: 400, alpha: cur ? 1 : 0.7 }); if (cur) ink.circle(qx, qy - 5, 11, 840 + i, PEN_MD, 1.2, 1); }
+  if (ot) { ink.text('OT', X + Wd - 22, qy, { size: 14, color: PEN_DK, font: PH, weight: 400 }); ink.circle(X + Wd - 22, qy - 5, 11, 845, PEN_DK, 1.2, 1); }
   // down & distance panel
   if (state !== 'gameover') {
     const dp = rv(128, 22); box(X, 284, Wd, 74, 850, PEN_LT, 1.6, dp);
     ink.setAlpha(rv(140, 16));
     ink.text(downText(), X + Wd / 2, 318, { size: 34, color: game.down === 4 ? RED : PEN_DK });
-    ink.text(`on the ${game.los <= 50 ? 'own ' + game.los : 'pencils ' + (100 - game.los)}`, X + Wd / 2, 344, { size: 16, color: PEN_MD, font: PH, weight: 400 });
+    ink.text(`${onOffense() ? '' : 'pencils '}on the ${game.los <= 50 ? 'own ' + game.los : (onOffense() ? 'pencils ' : 'your ') + (100 - game.los)}`, X + Wd / 2, 344, { size: 16, color: PEN_MD, font: PH, weight: 400 });
   }
   // right column: the logo, multiplied onto the paper so its own background vanishes
   if (logoCut) { const lw = 244, lh = lw * logoCut.height / logoCut.width; ctx.globalAlpha = rv(100, 30); ctx.drawImage(logoCut, 942, 32, lw, lh); ctx.globalAlpha = 1; }
@@ -743,8 +837,7 @@ function drawResult() {
     ctx.save(); ctx.translate(big ? 600 : Math.max(FX + 90, Math.min(FX + FW - 90, s.x)), big ? 300 : Math.max(60, s.y - 34)); ctx.scale(sc, sc);
     ink.text(result.text, 0, 0, { size: big ? 96 : 34, color: result.kind === 'td' ? INK : result.kind === 'int' || result.kind === 'sack' ? RED : GRAPHITE, rot: -0.04 }); ctx.restore();
   }
-  if (banner && state === 'live') { banner.life--; if (banner.life <= 0) banner = null; else ink.text(banner.text, 600, banner.small ? 200 : 300, { size: banner.small ? 30 : 80, color: banner.small ? GRAPHITE : RED, rot: -0.04, alpha: Math.min(1, banner.life / 20) }); }
-  if (state === 'pencils') { ink.text('meanwhile...', 600, 300, { size: 40, color: GRAPHITE, alpha: 0.5 + Math.sin(frame * 0.08) * 0.2 }); }
+  if (banner && state !== 'gameover') { banner.life--; if (banner.life <= 0) banner = null; else ink.text(banner.text, 600, banner.small ? 200 : 300, { size: banner.small ? 30 : 80, color: banner.small ? GRAPHITE : (banner.color || RED), rot: -0.04, alpha: Math.min(1, banner.life / 20) }); }
   if (state === 'gameover') { ink.text(gameOverText, 600, 300, { size: 92, color: game.you > game.pencils ? INK : RED, rot: -0.04 }); ink.text(`you ${game.you} — pencils ${game.pencils}`, 600, 350, { size: 30, color: GRAPHITE, font: 'Patrick Hand', weight: 400 }); }
   if (state === 'fg' && fgAnim) {
     const f = fgAnim, t = Math.min(1, f.t / f.T), x = f.from.x + (f.to.x - f.from.x) * t, y = f.from.y + (f.to.y - f.from.y) * t, z = Math.sin(Math.PI * t) * 90;
@@ -753,6 +846,11 @@ function drawResult() {
   }
 }
 function drawAimFinger() {
+  if (!onOffense()) { // defense: a little target where your defender is headed, and the pencils lining up before the snap
+    if (state === 'live' && ctrl && !(ctrl.hasBall)) { const s = toScreen(mouse.x, mouse.y); ctx.setLineDash([3, 3]); ctx.strokeStyle = INK; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(s.x, s.y, 9, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
+    if (state === 'presnap' && introT >= INTRO_LEN && !noSnap) { const ly = yardY(game.los) - cam.y; ink.text(defReady ? 'set! here it comes...' : 'the pencils are lining up · click when you\'re set', FX + FW / 2, ly + 170, { size: 18, color: PEN_DK, font: 'Patrick Hand', weight: 400, alpha: 0.6 + Math.sin(frame * 0.1) * 0.25 }); }
+    return;
+  }
   if (state !== 'live' || !ball.carrier) return;
   if (aim && qbHasBall()) { // the pass being lined up: dotted arc from the QB to the spot, ring on the man who'll go get it
     const q = ball.carrier.body.position, lob = lobHeld(), pp = passParams(q, aim, lob), to = pp.to, h = pp.h;
@@ -771,6 +869,7 @@ function drawAimFinger() {
 // ---------- loop ----------
 function step() {
   if (introT < INTRO_LEN) { introT++; if (introT >= 120 && stage.classList.contains('intro')) stage.classList.remove('intro'); if (introT >= INTRO_LEN) SFX.scratch(false); }
+  if (state === 'presnap' && !onOffense() && introT >= INTRO_LEN && !noSnap) { presnapT++; if ((defReady && presnapT >= readyAt + 40) || presnapT > 260) aiSnap(); }
   if (state === 'live') {
     playFrame++;
     updateOffense(); updateDefense();
@@ -785,7 +884,7 @@ function step() {
     else if (ball.carrier) {
       const c = ball.carrier, pos = c.body.position;
       if (c.team === 'x' && pos.y >= GOAL_BOT - 2) endPlay('pick6', 'PICK SIX', pos);
-      else if (c.team === 'x' && (pos.x < 2 || pos.x > FW - 2)) endPlay('int', 'INTERCEPTED by the pencils!', pos);
+      else if (c.team === 'x' && (pos.x < 2 || pos.x > FW - 2)) endPlay('int', intText(), pos);
       else if (c.team === 'o' && pos.y <= GOAL_TOP + 2) { endPlay('td', null, pos); }
       else if (pos.x < 2 || pos.x > FW - 2) endPlay('oob', 'out of bounds', pos);
       else checkContact();
@@ -798,8 +897,8 @@ function step() {
     if (++resultTimer > (result.kind === 'td' ? 130 : 75)) afterResult();
   } else if (state === 'fg') {
     fgAnim.t++; cam.target = Math.max(0, Math.min(FH - H, yardY(game.los) - 560));
-    if (fgAnim.t === fgAnim.T) { if (fgAnim.good) { game.you += 3; SFX.good(); note(`${fgAnim.dist} yd field goal is GOOD. +3`, INK); } else { SFX.bad(); note(`${fgAnim.dist} yd field goal: no good.`, RED); setMood('facepalm', 150); } }
-    if (fgAnim.t > fgAnim.T + 70) endPossession('kick');
+    if (fgAnim.t === fgAnim.T) { const mine = onOffense(); if (fgAnim.good) { game[mine ? 'you' : 'pencils'] += 3; note(`${mine ? '' : 'pencils '}${fgAnim.dist} yd field goal is GOOD. +3`, mine ? INK : RED); if (mine) SFX.good(); else { SFX.bad(); setMood('facepalm', 120); } } else { note(`${mine ? '' : 'pencils '}${fgAnim.dist} yd field goal: no good.`, mine ? RED : INK); if (mine) { SFX.bad(); setMood('facepalm', 150); } else { SFX.good(); cheer(120); } } }
+    if (fgAnim.t > fgAnim.T + 70) endPossession(fgAnim.good ? 'fg' : 'kickmiss');
   }
   cam.y += (cam.target - cam.y) * (state === 'presnap' ? 1 : 0.1);
 }
