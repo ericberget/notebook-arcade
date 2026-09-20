@@ -1,0 +1,43 @@
+/* Small zine accents and dark paper tucked beneath the original game cards. */
+html{overflow-x:clip}
+.next-page{border-top:0}
+.next-page:before{content:'';position:absolute;top:0;left:7px;right:5px;height:3px;background:var(--ink);opacity:.3;clip-path:polygon(0 52%,13% 5%,27% 51%,44% 8%,61% 60%,79% 1%,100% 38%,99% 77%,76% 44%,59% 100%,42% 49%,23% 96%,10% 41%,0 83%);transform:rotate(-.3deg)}
+.next-copy .eyebrow{display:inline-block;border:1px solid var(--red);color:var(--red);padding:5px 9px;transform:rotate(1.5deg)}
+@media(max-width:700px){.next-copy .eyebrow{font-size:8px;letter-spacing:.6px;padding:5px 7px}}
+
+/* Keep the lined card face above a separate, offset piece of charcoal paper. */
+.game-card,.game-card:hover,.game-card:focus-within{background:none;box-shadow:none}
+.game-card:before,.game-card:after{content:'';position:absolute;inset:0;pointer-events:none}
+.game-card:before{z-index:-3;background:#292b29 url('assets/torn-black-paper.webp') center/118% 124% no-repeat;transform:translate(10px,12px) rotate(.45deg);clip-path:polygon(0 1%,8% .4%,15% 1%,23% 0,32% .7%,41% .1%,50% .8%,59% 0,67% .6%,77% .1%,85% .8%,94% 0,99.7% .6%,99.2% 9%,100% 17%,99.3% 26%,100% 34%,99.4% 43%,100% 51%,99.2% 60%,100% 69%,99.5% 78%,100% 86%,99.2% 94%,99.7% 100%,92% 99.4%,84% 100%,76% 99.1%,68% 99.8%,60% 99.2%,51% 100%,43% 99.3%,35% 100%,26% 99.4%,18% 100%,9% 99.2%,.5% 100%,1% 92%,0 83%,.7% 74%,0 65%,.8% 56%,0 47%,.6% 38%,0 28%,.8% 18%,0 9%);transition:transform .35s}
+.game-card:nth-child(even):before{transform:translate(10px,12px) rotate(-.45deg)}
+.game-card:after{z-index:-2;border-radius:inherit;background:#fbf8ef repeating-linear-gradient(0deg,transparent,transparent 31px,rgba(92,134,184,.1) 31px,rgba(92,134,184,.1) 32px);box-shadow:1px 2px 3px #24396616}
+.game-card:hover:before,.game-card:focus-within:before{transform:translate(13px,15px) rotate(.45deg)}
+.game-card:nth-child(even):hover:before,.game-card:nth-child(even):focus-within:before{transform:translate(13px,15px) rotate(-.45deg)}
+@media(max-width:700px){.game-card:before,.game-card:hover:before,.game-card:focus-within:before{transform:translate(7px,9px) rotate(.3deg)}.game-card:nth-child(even):before,.game-card:nth-child(even):hover:before,.game-card:nth-child(even):focus-within:before{transform:translate(7px,9px) rotate(-.3deg)}}
+
+/* A compact masthead leads straight into the game library. */
+.site-header{min-height:0;padding:29px 0 18px;gap:24px;border-bottom:0;align-items:center}
+.site-header h1{font:inherit;line-height:1.1;margin:0}
+.site-header .wordmark{font-size:62px;letter-spacing:-1.5px;line-height:1.1}
+.site-header .wordmark span{font-size:36px;vertical-align:middle}
+.site-menu{position:relative;z-index:40;margin-left:auto;flex-shrink:0}
+.site-menu summary{display:flex;align-items:center;gap:12px;list-style:none;cursor:pointer;font-family:var(--hand);font-size:29px;padding:10px 0 10px 12px}
+.site-menu summary::-webkit-details-marker{display:none}
+.site-menu summary:focus-visible{outline:3px dashed var(--red);outline-offset:6px}
+.menu-lines{display:inline-block;width:23px;height:13px;border-top:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-4deg);position:relative}
+.menu-lines:after{content:'';position:absolute;left:1px;right:-1px;top:4px;border-top:2px solid currentColor;transform:rotate(5deg)}
+.site-menu[open] summary{color:var(--red)}
+.site-header .site-menu nav{position:absolute;right:0;top:100%;display:flex;flex-direction:column;gap:2px;margin:0;width:170px;padding:9px 13px;background:#fbf8ef;border:1px solid #213f9440;box-shadow:5px 6px 0 #292b29;transform:rotate(-1deg);font-size:21px}
+.site-header .site-menu nav a{display:block;padding:8px 4px}
+.games-section{padding-top:0;scroll-margin-top:18px}
+.collection-toolbar{margin:12px 0 37px}
+@media(max-width:700px){.site-header{padding:27px 0 15px;gap:12px}.site-header .wordmark{font-size:37px;letter-spacing:-1px}.site-header .wordmark span{display:none}.site-menu summary{font-size:23px;gap:7px;padding-left:6px}.menu-lines{width:19px}.collection-toolbar{display:flex;flex-wrap:wrap;gap:15px;margin:13px 0 33px}.collection-meta{margin:0}.site-header .site-menu nav{font-size:20px;width:155px}.games-section{padding-top:0}}
+@media(max-width:370px){.site-header .wordmark{font-size:30px}.site-menu summary{font-size:21px;gap:6px}.filters{gap:6px}.filter{padding-left:13px;padding-right:13px}}
+
+/* Original ballpoint logo: transparent ink sits directly on the notebook. */
+.site-header{padding:12px 0 0}
+.site-header h1{min-width:0}
+.site-header .wordmark,.site-footer .wordmark{display:block;line-height:0}
+.site-header .brand-logo{display:block;width:380px;height:auto;max-width:100%}
+.site-footer .brand-logo{display:block;width:210px;height:auto}
+@media(max-width:700px){.site-header{padding:15px 0 4px}.site-header h1{flex:1}.site-header .brand-logo{width:245px}.site-footer .brand-logo{width:215px}}
