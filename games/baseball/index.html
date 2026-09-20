@@ -122,7 +122,7 @@ function say(text, color = INK, life = 110, sub = '') { msg = { text, color, lif
 function updateUI() {
   const b = batting();
   pitchesEl.classList.toggle('on', !b && !game.over);
-  hintEl.textContent = game.over ? 'game over. new game to play again.' : state === 'howto' ? '' : b ? 'BATTING: click (or space) the moment the ball crosses the dashed line. early = left field, late = right. click above the ball to lift it, below to chop it.' : 'PITCHING: pick a pitch above, then click a spot inside the red zone at the plate. corners get weaker contact.';
+  hintEl.textContent = game.over ? 'game over. new game to play again.' : state === 'howto' ? '' : b ? 'BATTING: put the ring where the ball will cross the zone and click (or space) as it gets there. ring under the ball lifts it, over it chops it. early = left field, late = right.' : 'PITCHING: pick a pitch above, then click a spot inside the red zone at the plate. corners get weaker contact.';
   pitchLabel.textContent = b ? 'you\'re batting' : 'you\'re pitching';
   [...pitchesEl.querySelectorAll('button')].forEach(bt => bt.classList.toggle('sel', bt.dataset.p === pitchType));
 }
@@ -141,6 +141,11 @@ function cpuPickPitch() { const r = Math.random(); return r < 0.5 ? 'fast' : r <
 function throwPitch(type, targetX) { // targetX: offset from the middle of the plate. |x| <= 30 is a strike
   const p = PITCHES[type]; const err = (Math.random() - .5) * (batting() ? 14 : 22);
   pitch = { type, x: MOUND.x, y: MOUND.y + 10, t: 0, wind: 26, T: (HOME.y - MOUND.y - 10) / p.spd, tx: targetX + err, spd: p.spd, sway: p.sway * (Math.random() > .5 ? 1 : -1) };
+  if (batting()) { // the pencil pitcher picks a spot in or around the zone; the batter's-eye view shows it coming
+    const inZ = Math.random() < 0.66, side = Math.random() > .5 ? 1 : -1;
+    const fx = inZ ? (Math.random() - .5) * PV.ZW * 0.86 : side * (PV.ZW / 2 + 10 + Math.random() * 30), fy = inZ ? (Math.random() - .5) * PV.ZH * 0.86 : (Math.random() - .5) * (PV.ZH + 50);
+    Object.assign(pitch, { plate: true, fx, fy, drop: { fast: 0, change: 14, curve: 42 }[type], strike: Math.abs(fx) <= PV.ZW / 2 && Math.abs(fy) <= PV.ZH / 2, T: (HOME.y - MOUND.y - 10) / p.spd * 1.15 });
+  }
   pitch.name = p.name; state = batting() ? 'batting' : 'pitching'; SFX.pencil();
 }
 function pitchPos(pt, t) { // where the pitch is at time t: drifts to its target, curves break late
@@ -241,7 +246,7 @@ function resolvePlay() {
 }
 function recordOut() { game.outs++; game.balls = 0; game.strikes = 0; }
 function afterPlay() {
-  play = null; pitch = null; swing = null; resetFielders();
+  play = null; pitch = null; swing = null; resetFielders(); holdPlate = 0; caught = null; lastContact = null;
   if (game.half === 'bottom' && game.inning >= 3 && game.score.pencils > game.score.you) { setTimeout(endGame, 1200); return; }
   if (game.outs >= 3) { setTimeout(changeSides, 1500); return; }
   setTimeout(nextPitch, 1500);
@@ -267,8 +272,9 @@ function walkOrK(kind) {
   afterPlay();
 }
 function resolvePitch() {
-  const r = pitch.result || (Math.abs(pitchPos(pitch, pitch.T).x - HOME.x) <= 30 ? 'called-strike' : 'ball');
+  const r = pitch.result || ((pitch.plate ? pitch.strike : Math.abs(pitchPos(pitch, pitch.T).x - HOME.x) <= 30) ? 'called-strike' : 'ball');
   if (r === 'contact') { launch(pitch.contact); return; }
+  if (pitch.plate) { const p = platePitchPos(pitch, pitch.T); caught = { x: p.x, y: p.y, t: 26 }; SFX.pop(); }
   if (r === 'ball') { game.balls++; SFX.ball(); if (game.balls >= 4) return walkOrK('BB'); say('ball ' + game.balls, GRAPHITE, 50); }
   else { game.strikes++; SFX.strike(); if (game.strikes >= 3) return walkOrK('K'); say(r === 'swing-miss' ? 'swing and a miss' : 'strike ' + game.strikes, GRAPHITE, 60); }
   pitch = null; swing = null; setTimeout(nextPitch, 900);
@@ -282,14 +288,14 @@ function onDown(e) {
   if (state === 'howto') { dismissHowto(); e.preventDefault(); return; }
   if (p.x >= NAME_BOX.x && p.x <= NAME_BOX.x + NAME_BOX.w && p.y >= NAME_BOX.y && p.y <= NAME_BOX.y + NAME_BOX.h && state !== 'play') { renameTeam(); e.preventDefault(); return; }
   if (game.over) return;
-  if (state === 'batting' && pitch && !swing) { swingAt(p); e.preventDefault(); }
+  if (state === 'batting' && pitch && !swing) { swingAtPlate(aimPos()); e.preventDefault(); }
   else if (state === 'pitchpick' && !pitch) { // aim within the zone box in front of the plate
     if (Math.abs(p.x - HOME.x) < 60 && Math.abs(p.y - (HOME.y - 34)) < 44) { aimSpot = p; throwPitch(pitchType, Math.max(-44, Math.min(44, p.x - HOME.x))); e.preventDefault(); }
   }
 }
 canvas.addEventListener('mousedown', onDown); canvas.addEventListener('touchstart', onDown, { passive: false });
 window.addEventListener('mousemove', e => { mouse = canvasPos(e); });
-window.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.code === 'Space' && state === 'batting' && pitch && !swing) { e.preventDefault(); swingAt({ x: HOME.x, y: pitchPos(pitch, pitch.t).y }); } });
+window.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.code === 'Space' && state === 'batting' && pitch && !swing) { e.preventDefault(); swingAtPlate(aimPos()); } });
 pitchesEl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; SFX.click(); pitchType = b.dataset.p; updateUI(); });
 document.getElementById('newgame').onclick = () => { SFX.resume(); SFX.click(); newGame(); };
 document.getElementById('howto').onclick = () => { SFX.resume(); SFX.click(); if (!pitch && !play && !game.over) { state = 'howto'; updateUI(); } };
@@ -299,6 +305,188 @@ const SPK_OFF = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" str
 const muteBtn = document.getElementById('mute'); muteBtn.innerHTML = SPK_ON;
 muteBtn.onclick = () => { SFX.resume(); muteBtn.innerHTML = SFX.toggleMute() ? SPK_OFF : SPK_ON; };
 
+
+// ---------- the batting view: behind the plate, looking out at the whole ballpark ----------
+const PV = { x0: 190, x1: 945, hz: 262, ZX: 570, ZY: 500, ZW: 124, ZH: 140, mound: { x: 570, y: 392 }, hand: { x: 582, y: 336 } };
+const GREEN = '#6f9a5a', PAPER = 'rgb(253,251,244)';
+let view = 0, holdPlate = 0, caught = null, lastContact = null;      // view: 0 = the diamond, 1 = behind the plate (crossfades between)
+const plateBg = document.createElement('canvas'); plateBg.width = W; plateBg.height = H;
+const sceneCv = document.createElement('canvas'); sceneCv.width = W; sceneCv.height = H; const sctx = sceneCv.getContext('2d'); const sink = NotebookInk(sctx);
+// an illustrated plate can replace the drawn backdrop later: drop plate-batting.webp next to this file
+let plateCut = null; function usePlateImage(url) { const im = new Image(); im.onload = () => { plateCut = keyOut(im); }; im.src = url; }   // usePlateImage('plate-batting.webp') swaps in an illustrated backdrop
+function keyOut(img) { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; const g = c.getContext('2d'); g.drawImage(img, 0, 0); const im = g.getImageData(0, 0, c.width, c.height), d = im.data; let br = 0, bg = 0, bb = 0; for (const [px, py] of [[2, 2], [c.width - 3, 2], [2, c.height - 3], [c.width - 3, c.height - 3]]) { const i = (py * c.width + px) * 4; br += d[i] / 4; bg += d[i + 1] / 4; bb += d[i + 2] / 4; } for (let i = 0; i < d.length; i += 4) { const dist = Math.hypot(d[i] - br, d[i + 1] - bg, d[i + 2] - bb); d[i + 3] = Math.round(255 * Math.max(0, Math.min(1, (dist - 22) / 45))); } g.putImageData(im, 0, 0); return c; }
+function wallY(x) { const t = (x - PV.x0) / (PV.x1 - PV.x0); return PV.hz + 40 * Math.pow(Math.abs(t - 0.5) * 2, 2); }
+function fillScribble(g, pts, color, n, alpha, len = 6) { // colored-pencil fill: lots of short strokes clipped to a shape
+  g.save(); g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.clip();
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9; pts.forEach(p => { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); });
+  g.strokeStyle = color; g.lineWidth = 1.2; g.globalAlpha = alpha; g.beginPath();
+  for (let i = 0; i < n; i++) { const x = minX + Math.random() * (maxX - minX), y = minY + Math.random() * (maxY - minY), a = -0.4 + Math.random() * 0.5; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len); }
+  g.stroke(); g.restore(); g.globalAlpha = 1;
+}
+function ellipsePts(cx, cy, rx, ry, n = 40) { return Array.from({ length: n }, (_, i) => ({ x: cx + Math.cos(i / n * 6.283) * rx, y: cy + Math.sin(i / n * 6.283) * ry })); }
+function stickAt(k, x, y, sc, col, id) { // a small pencil fielder, feet at (x, y)
+  k.circle(x, y - 22 * sc, 6 * sc, id, col, 1.2, 1); k.line(x, y - 16 * sc, x, y - 3 * sc, id + 1, col, 1.1, 1);
+  k.line(x, y - 3 * sc, x - 6 * sc, y + 8 * sc, id + 2, col, 1.1, 1); k.line(x, y - 3 * sc, x + 6 * sc, y + 8 * sc, id + 3, col, 1.1, 1);
+  k.line(x, y - 12 * sc, x - 9 * sc, y - 4 * sc, id + 4, col, 1.1, 1); k.line(x, y - 12 * sc, x + 9 * sc, y - 14 * sc, id + 5, col, 1.1, 1); k.circle(x + 10 * sc, y - 16 * sc, 3 * sc, id + 6, col, 1, 1);
+}
+function buildPlateBg() {
+  const g = plateBg.getContext('2d'), k = NotebookInk(g); g.clearRect(0, 0, W, H);
+  const { x0, x1, hz } = PV, cx = PV.ZX;
+  const L = (a, b, c2, d, id, col = GRAPHITE, w = 1) => k.line(a, b, c2, d, id, col, w, 1);
+  // sky: a faint wash, clouds, a blimp towing a banner
+  const skyG = g.createLinearGradient(0, 80, 0, hz); skyG.addColorStop(0, 'rgba(143,178,201,.14)'); skyG.addColorStop(1, 'rgba(143,178,201,0)'); g.fillStyle = skyG; g.fillRect(x0, 80, x1 - x0, hz - 80);
+  const cloud = (x, y, w, id) => { k.smudge(ellipsePts(x, y - 2, w / 2, w * 0.14, 14), id, 0.045, -0.4, 5); g.strokeStyle = PEN_LT; g.lineWidth = 1.1; g.globalAlpha = 0.7; for (let i = 0; i < 5; i++) { const bx = x - w / 2 + (i + 0.5) * w / 5; g.beginPath(); g.arc(bx, y, w / 9, Math.PI, 0); g.stroke(); } g.globalAlpha = 1; L(x - w / 2, y + 1, x + w / 2, y + 1, id + 1, PEN_LT, 1.1); };
+  cloud(330, 130, 120, 10); cloud(760, 112, 90, 12); cloud(560, 152, 70, 14);
+  g.strokeStyle = PEN_MD; g.lineWidth = 1.3; g.globalAlpha = 0.85; g.beginPath(); g.ellipse(826, 150, 44, 14, -0.04, 0, 7); g.stroke(); g.globalAlpha = 1;
+  L(870, 150, 892, 143, 20, PEN_MD, 1.2); L(870, 150, 892, 157, 21, PEN_MD, 1.2); L(892, 143, 892, 157, 22, PEN_MD, 1.2); L(826, 164, 826, 170, 23, PEN_MD, 1);
+  k.text("EAT AT JOE'S", 826, 155, { size: 10, color: PEN_MD, font: 'Patrick Hand', weight: 400 });
+  // light towers
+  for (const tx of [318, 822]) { const wy = wallY(tx) - 58; L(tx - 2, wy, tx - 5, 140, 30 + tx, PEN_MD, 1.4); L(tx + 2, wy, tx + 5, 140, 31 + tx, PEN_MD, 1.4); for (let y = wy - 18; y > 150; y -= 22) L(tx - 4, y, tx + 4, y - 11, 32 + y + tx, PEN_LT, 0.8); const head = [{ x: tx - 22, y: 128 }, { x: tx + 22, y: 128 }, { x: tx + 18, y: 142 }, { x: tx - 18, y: 142 }]; k.poly(head, 40 + tx, PEN_MD, 1.2, 1); k.hatch(head, 41 + tx, PEN_MD, 3, 0, 0.5); }
+  // bleachers: the roof line, seat rows, sections, and a scribbled crowd that gets denser toward the front
+  const top = x => wallY(x) - 58;
+  k.smudge(Array.from({ length: 30 }, (_, i) => { const x = x0 + (x1 - x0) * i / 29; return { x, y: top(x) }; }).concat(Array.from({ length: 30 }, (_, i) => { const x = x1 - (x1 - x0) * i / 29; return { x, y: wallY(x) - 3 }; })), 50, 0.05, -0.2, 5);
+  g.strokeStyle = PEN_LT; g.lineWidth = 1; g.globalAlpha = 0.9; for (let r = 0; r <= 4; r++) { g.beginPath(); for (let x = x0; x <= x1; x += 8) { const y = wallY(x) - 6 - r * 13; x === x0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke(); } g.globalAlpha = 1;
+  for (let x = x0 + 90; x < x1 - 20; x += 95) L(x, top(x), x, wallY(x) - 5, 60 + x, PEN_LT, 0.9);
+  g.strokeStyle = PEN_MD; g.lineWidth = 1.4; g.beginPath(); for (let x = x0; x <= x1; x += 8) { const y = top(x); x === x0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
+  g.strokeStyle = GRAPHITE; g.lineWidth = 1; for (let i = 0; i < 1600; i++) { const x = x0 + 6 + Math.random() * (x1 - x0 - 12); const depth = Math.pow(Math.random(), 0.7); const y = top(x) + 6 + depth * 44; g.globalAlpha = 0.12 + depth * 0.18; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - .5) * 6, y + (Math.random() - .5) * 5); g.stroke(); } g.globalAlpha = 1;
+  for (let x = x0 + 14; x < x1 - 10; x += 22) { const y = wallY(x) - 9, j = (Math.random() - .5) * 4; k.circle(x + j, y - 7, 2.6, 70 + x, PEN_MD, 1, 1); L(x + j, y - 4, x + j, y + 1, 71 + x, PEN_MD, 1); if (Math.random() > 0.7) { L(x + j, y - 2, x + j + 4, y - 9, 72 + x, PEN_MD, 1); L(x + j, y - 2, x + j - 4, y - 9, 73 + x, PEN_MD, 1); } }
+  for (const [sx, txt] of [[420, 'GO!'], [700, '#1'], [880, 'K'], [262, 'HEY']]) { const y = wallY(sx) - 27; k.poly([{ x: sx - 12, y: y - 9 }, { x: sx + 12, y: y - 9 }, { x: sx + 12, y: y + 5 }, { x: sx - 12, y: y + 5 }], 80 + sx, PEN_MD, 1, 1); k.text(txt, sx, y + 2, { size: 10, color: PEN_DK, font: 'Patrick Hand', weight: 400 }); }
+  // the scoreboard frame in center (numbers drawn live)
+  k.poly([{ x: cx - 60, y: 176 }, { x: cx + 60, y: 176 }, { x: cx + 60, y: 240 }, { x: cx - 60, y: 240 }], 90, INK, 1.8, 2);
+  L(cx - 42, 240, cx - 42, 258, 94, INK, 1.4); L(cx + 42, 240, cx + 42, 258, 95, INK, 1.4);
+  k.text('SCOREBOARD', cx, 190, { size: 11, color: INK, font: 'Patrick Hand', weight: 400, alpha: 0.85 }); L(cx - 50, 195, cx + 50, 195, 96, INK, 0.8);
+  // the outfield wall: bold top edge, padded face shaded with vertical strokes, ads, distance markers, foul poles
+  const wallBot = x => wallY(x) + 18;
+  g.strokeStyle = INK; g.lineWidth = 2.4; g.globalAlpha = 0.9; g.beginPath(); for (let x = x0; x <= x1; x += 6) { const y = wallY(x) + k.jit(3, x, 1.5); x === x0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
+  g.lineWidth = 1.4; g.beginPath(); for (let x = x0; x <= x1; x += 6) { const y = wallBot(x); x === x0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke(); g.globalAlpha = 1;
+  g.strokeStyle = INK; g.lineWidth = 0.8; for (let x = x0 + 2; x < x1; x += 3.2) { g.globalAlpha = 0.12 + 0.2 * ((x % 9.6) / 9.6); g.beginPath(); g.moveTo(x, wallY(x) + 4); g.lineTo(x + 0.6, wallBot(x) - 1); g.stroke(); } g.globalAlpha = 1;
+  for (const [ax, txt] of [[300, 'GO TEAM'], [455, 'PENCILS 4 SALE'], [700, 'DOODLE COLA'], [850, 'HIT IT HERE']]) k.text(txt, ax, wallY(ax) + 14, { size: 11, color: INK, font: 'Patrick Hand', weight: 400, alpha: 0.9 });
+  for (const [mx, ft] of [[228, '330'], [cx, '400'], [908, '330']]) k.text(ft, mx, wallY(mx) + 14, { size: 11, color: RED, font: 'Patrick Hand', weight: 400, alpha: 0.9 });
+  for (const px of [x0 + 10, x1 - 10]) { L(px, wallBot(px), px, wallY(px) - 70, 100 + px, INK, 2); k.poly([{ x: px, y: wallY(px) - 70 }, { x: px + (px < cx ? 10 : -10), y: wallY(px) - 64 }, { x: px, y: wallY(px) - 58 }], 102 + px, RED, 1.2, 1); }
+  // grass: green pencil strokes, sparse and pale far away, dense up close, mowed in bands
+  const dirt = ellipsePts(cx, 425, 300, 82), homeDirt = ellipsePts(cx, 606, 112, 40);
+  const inside = (pts, x, y) => { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const a = pts[i], b = pts[j]; if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
+  for (let y = 302; y < 690; y += 4) { const depth = (y - 302) / 388, band = Math.floor((y - 302) / 36) % 2; const n = Math.round(24 + depth * 110); for (let i = 0; i < n; i++) { const x = x0 + 12 + Math.random() * (x1 - x0 - 24); if (y < wallBot(x) + 2 || inside(dirt, x, y) || inside(homeDirt, x, y)) continue; g.strokeStyle = GREEN; g.globalAlpha = (band ? 0.15 : 0.24) + depth * 0.12; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 3 + Math.random() * 4, y - 1 + Math.random() * 2); g.stroke(); } } g.globalAlpha = 1;
+  // foul lines out to the poles
+  k.longLine(cx - 38, 614, x0 + 10, wallBot(x0 + 10), 110, INK, 1.8, 1, 1.2); k.longLine(cx + 38, 614, x1 - 10, wallBot(x1 - 10), 111, INK, 1.8, 1, 1.2);
+  // infield dirt, the grass diamond, base paths, mound, bases, plate, batter's boxes
+  fillScribble(g, dirt, DIRT, 2600, 0.22, 7); g.strokeStyle = DIRT; g.lineWidth = 1.2; g.globalAlpha = 0.6; g.beginPath(); dirt.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.stroke(); g.globalAlpha = 1;
+  const b1 = { x: 790, y: 432 }, b2 = { x: cx, y: 342 }, b3 = { x: 350, y: 432 }, hp = { x: cx, y: 596 };
+  const inner = [{ x: hp.x, y: hp.y - 24 }, { x: b1.x - 18, y: b1.y - 2 }, { x: b2.x, y: b2.y + 8 }, { x: b3.x + 18, y: b3.y - 2 }];
+  g.save(); g.beginPath(); inner.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.clip(); g.fillStyle = PAPER; g.globalAlpha = 0.9; g.fill(); g.globalAlpha = 1; g.restore();
+  fillScribble(g, inner, GREEN, 1400, 0.22, 6);
+  for (const [a, b] of [[hp, b1], [b1, b2], [b2, b3], [b3, hp]]) { g.strokeStyle = DIRT; g.lineWidth = 8; g.globalAlpha = 0.35; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); g.globalAlpha = 1; k.longLine(a.x, a.y, b.x, b.y, 120 + a.x, INK, 1, 1, 1); }
+  fillScribble(g, homeDirt, DIRT, 900, 0.22, 6);
+  k.smudge(ellipsePts(cx, 392, 44, 12), 130, 0.1, 0, 3); fillScribble(g, ellipsePts(cx, 392, 44, 12), DIRT, 260, 0.3, 5); g.strokeStyle = DIRT; g.globalAlpha = 0.7; g.lineWidth = 1.2; g.beginPath(); g.ellipse(cx, 392, 44, 12, 0, 0, 7); g.stroke(); g.globalAlpha = 1; L(cx - 8, 388, cx + 8, 388, 131, INK, 2);
+  for (const [b, w] of [[b1, 12], [b2, 9], [b3, 12]]) { const q = [{ x: b.x - w, y: b.y }, { x: b.x + w, y: b.y }, { x: b.x + w * 0.8, y: b.y + w * 0.55 }, { x: b.x - w * 0.8, y: b.y + w * 0.55 }]; g.fillStyle = PAPER; g.beginPath(); q.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.fill(); k.poly(q, 140 + b.x, INK, 1.5, 1); }
+  const plate = [{ x: cx - 15, y: 604 }, { x: cx + 15, y: 604 }, { x: cx + 15, y: 612 }, { x: cx, y: 620 }, { x: cx - 15, y: 612 }]; g.fillStyle = PAPER; g.beginPath(); plate.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.fill(); k.poly(plate, 150, INK, 2, 2);
+  k.poly([{ x: cx - 76, y: 642 }, { x: cx - 24, y: 642 }, { x: cx - 26, y: 584 }, { x: cx - 70, y: 584 }], 152, INK, 1.4, 1); k.poly([{ x: cx + 24, y: 642 }, { x: cx + 76, y: 642 }, { x: cx + 70, y: 584 }, { x: cx + 26, y: 584 }], 156, INK, 1.4, 1);
+  // fielders, far and small, in pencil
+  for (const [fx, fy, sc, id] of [[335, 306, 0.5, 200], [575, 292, 0.45, 210], [805, 306, 0.5, 220], [380, 430, 0.75, 230], [480, 356, 0.62, 240], [660, 356, 0.62, 250], [762, 430, 0.75, 260]]) stickAt(k, fx, fy, sc, PEN_DK, id);
+  // the drawing fades into the page at its edges
+  for (const [gx0, gx1] of [[x0 - 2, x0 + 44], [x1 + 2, x1 - 44]]) { const gr = g.createLinearGradient(gx0, 0, gx1, 0); gr.addColorStop(0, PAPER); gr.addColorStop(1, 'rgba(253,251,244,0)'); g.fillStyle = gr; g.fillRect(Math.min(gx0, gx1), 60, Math.abs(gx1 - gx0), H - 60); }
+  const gt = g.createLinearGradient(0, 70, 0, 120); gt.addColorStop(0, PAPER); gt.addColorStop(1, 'rgba(253,251,244,0)'); g.fillStyle = gt; g.fillRect(x0 - 2, 70, x1 - x0 + 4, 50);
+}
+function platePitchPos(pt, t) { // the pitch in the batter's-eye view: eases toward the zone, curves and changeups fall late
+  const u = Math.min(1, t / pt.T), e = Math.pow(u, 1.45), late = Math.max(0, u - 0.5) / 0.5;
+  const hump = Math.sin(u * Math.PI) * (pt.type === 'curve' ? 30 : pt.type === 'change' ? 20 : 12);
+  const endX = PV.ZX + pt.fx - pt.sway * 0.8, endY = PV.ZY + pt.fy - pt.drop;
+  return { x: PV.hand.x + (endX - PV.hand.x) * e + pt.sway * 0.8 * late * late, y: PV.hand.y + (endY - PV.hand.y) * e - hump + pt.drop * late * late, r: 2.4 + 8 * e, u };
+}
+function aimPos() { return { x: Math.max(PV.ZX - PV.ZW / 2 - 40, Math.min(PV.ZX + PV.ZW / 2 + 40, mouse.x)), y: Math.max(PV.ZY - PV.ZH / 2 - 40, Math.min(PV.ZY + PV.ZH / 2 + 40, mouse.y)) }; }
+function swingAtPlate(aim) { // timing sets direction and power; where the ring sits on the ball sets the launch
+  if (!pitch || swing) return;
+  const dt = (pitch.T - pitch.t) + pitch.wind;
+  swing = { t: 0 }; SFX.whiff();
+  const cross = { x: PV.ZX + pitch.fx, y: PV.ZY + pitch.fy };
+  const err = Math.hypot(aim.x - cross.x, aim.y - cross.y), timing = Math.abs(dt) / 14;
+  const px = PV.ZX + 132, py = PV.ZY - 70;
+  if (timing > 1 || err > 52) { pitch.result = 'swing-miss'; popup(timing > 1 ? (dt > 0 ? 'way early' : 'way late') : Math.abs(aim.x - cross.x) > Math.abs(aim.y - cross.y) ? 'missed it' : aim.y > cross.y ? 'under it' : 'over it', px, py, GRAPHITE, 18); return; }
+  const q = (1 - timing) * (1 - err / 52);
+  const dir = -90 - (dt / 14) * 42 + (Math.random() - .5) * 10;
+  const dy = aim.y - cross.y;                                   // ring under the ball lifts it, over it chops it
+  const ang = Math.max(-8, Math.min(62, 12 + dy * 0.9 + (Math.random() - .5) * 6));
+  const v = 7.5 + q * 7 + Math.random() * 1.2;
+  pitch.result = 'contact'; pitch.contact = { dir, ang, v };
+  const label = timing < 0.15 && err < 14 ? 'PERFECT!' : ang > 50 ? 'popped it up' : ang < 0 ? 'topped it' : Math.abs(dt) <= 4 ? 'good timing' : dt > 0 ? 'early' : 'late';
+  popup(label, px, py, label === 'PERFECT!' ? RED : INK, label === 'PERFECT!' ? 28 : 18);
+}
+function ballOn(c, x, y, r) { c.fillStyle = '#fbf8ee'; c.strokeStyle = PEN_DK; c.lineWidth = Math.max(1, r * 0.22); c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); c.stroke(); if (r > 3.5) { c.strokeStyle = RED; c.lineWidth = Math.max(0.8, r * 0.16); c.beginPath(); c.arc(x - r * 0.32, y, r * 0.78, -1.1, 1.1); c.stroke(); c.beginPath(); c.arc(x + r * 0.32, y, r * 0.78, Math.PI - 1.1, Math.PI + 1.1); c.stroke(); } }
+function drawPitcher(k, c) {
+  const x = PV.mound.x, fy = PV.mound.y, col = PEN_DK, id = 600 + (pitch && pitch.plate ? Math.floor(frame / 6) % 2 * 20 : 0);
+  let pose = 'idle'; if (pitch && pitch.plate) { if (pitch.wind > 16) pose = 'set'; else if (pitch.wind > 5) pose = 'kick'; else if (pitch.wind > 0) pose = 'stride'; else if (pitch.t < 14) pose = 'release'; else pose = 'follow'; }
+  const lean = pose === 'stride' || pose === 'release' ? 4 : 0, head = { x: x + lean, y: fy - 52 }, hip = { x, y: fy - 26 }, sh = { x: head.x, y: head.y + 12 };
+  c.strokeStyle = GRAPHITE; c.globalAlpha = 0.25; c.lineWidth = 1; c.beginPath(); for (let i = -14; i <= 14; i += 3) { c.moveTo(x + i, fy + 3); c.lineTo(x + i + 3, fy + 6); } c.stroke(); c.globalAlpha = 1;
+  k.line(head.x, head.y + 6, hip.x, hip.y, id + 2, col, 1.8, 1);
+  if (pose === 'kick') { k.line(hip.x, hip.y, x - 3, fy, id + 3, col, 1.6, 1); k.line(hip.x, hip.y, x - 13, hip.y - 4, id + 4, col, 1.6, 1); k.line(x - 13, hip.y - 4, x - 11, hip.y + 8, id + 5, col, 1.6, 1); }
+  else if (pose === 'stride' || pose === 'release' || pose === 'follow') { k.line(hip.x, hip.y, x - 16, fy + 2, id + 3, col, 1.6, 1); k.line(hip.x, hip.y, x + 12, fy, id + 4, col, 1.6, 1); }
+  else { k.line(hip.x, hip.y, x - 7, fy, id + 3, col, 1.6, 1); k.line(hip.x, hip.y, x + 7, fy, id + 4, col, 1.6, 1); }
+  if (pose === 'idle') { k.line(sh.x, sh.y, x - 9, sh.y + 10, id + 6, col, 1.5, 1); k.line(sh.x, sh.y, x + 9, sh.y + 8, id + 7, col, 1.5, 1); k.circle(x - 10, sh.y + 11, 3, id + 8, col, 1.2, 1); }
+  else if (pose === 'set') { k.line(sh.x, sh.y, x - 3, sh.y + 8, id + 6, col, 1.5, 1); k.line(sh.x, sh.y, x + 3, sh.y + 8, id + 7, col, 1.5, 1); k.circle(x, sh.y + 10, 3.5, id + 8, col, 1.2, 1); }
+  else if (pose === 'kick') { k.line(sh.x, sh.y, x - 8, sh.y - 7, id + 6, col, 1.5, 1); k.line(sh.x, sh.y, x + 8, sh.y - 7, id + 7, col, 1.5, 1); k.circle(x - 9, sh.y - 9, 3.5, id + 8, col, 1.2, 1); }
+  else if (pose === 'stride') { k.line(sh.x, sh.y, x - 12, sh.y + 2, id + 6, col, 1.5, 1); k.line(sh.x, sh.y, x + 14, sh.y - 14, id + 7, col, 1.5, 1); ballOn(c, x + 16, sh.y - 16, 3); }
+  else if (pose === 'release') { k.line(sh.x, sh.y, x - 14, sh.y + 6, id + 6, col, 1.5, 1); k.line(sh.x, sh.y, x + 12, sh.y - 2, id + 7, col, 1.5, 1); }
+  else { k.line(sh.x, sh.y, x - 12, sh.y + 12, id + 6, col, 1.5, 1); k.line(sh.x, sh.y, x + 6, sh.y + 14, id + 7, col, 1.5, 1); }
+  k.circle(head.x, head.y, 6.5, id, col, 1.5, 1); k.line(head.x - 7, head.y - 2, head.x + 3, head.y - 3.5, id + 1, col, 1.3, 1);
+  if (pose === 'idle' || pose === 'set') ballOn(c, pose === 'set' ? x : x - 10, sh.y + (pose === 'set' ? 10 : 11), 2.6);
+}
+function drawBatter(k, c) {
+  const bx = 474, hipY = 548, col = INK, sw = swing ? swing.t : -1;
+  let ang = -2.1, hx = 512, hy = 452, lean = 0;                   // stance: bat cocked up over the back shoulder
+  if (sw >= 0) { if (sw < 3) { ang = -2.35; hx = 518; hy = 458; } else if (sw <= 9) { const u = (sw - 3) / 6; ang = -2.35 + u * 2.6; hx = 518 + u * 28; hy = 458 + u * 40; lean = u * 10; } else { const u = Math.min(1, (sw - 9) / 8); ang = 0.25 + u * 0.9; hx = 546 - u * 18; hy = 498 + u * 10; lean = 10 - u * 4; } }
+  const id = 800 + (sw >= 0 ? Math.floor(frame / 5) % 2 * 30 : 0);
+  c.strokeStyle = GRAPHITE; c.globalAlpha = 0.28; c.lineWidth = 1.1; c.beginPath(); for (let i = -44; i <= 44; i += 5) { const hh = Math.sqrt(Math.max(0, 1 - (i / 46) * (i / 46))) * 11; c.moveTo(bx + 14 + i, 656 - hh); c.lineTo(bx + 18 + i, 656 + hh); } c.stroke(); c.globalAlpha = 1;
+  const hip = { x: bx + lean * 0.4, y: hipY };
+  k.line(hip.x - 6, hip.y, bx - 12, 648, id + 1, col, 4, 1); k.line(hip.x + 6, hip.y, bx + 26, 616, id + 2, col, 4, 1);
+  k.poly([{ x: bx - 24, y: 646 }, { x: bx - 2, y: 646 }, { x: bx, y: 655 }, { x: bx - 26, y: 655 }], id + 3, col, 1.8, 1); k.poly([{ x: bx + 16, y: 614 }, { x: bx + 36, y: 614 }, { x: bx + 38, y: 622 }, { x: bx + 14, y: 622 }], id + 4, col, 1.8, 1);
+  const tor = [{ x: bx - 26 + lean, y: 456 }, { x: bx + 26 + lean, y: 456 }, { x: bx + 20 + lean * 0.5, y: hipY + 4 }, { x: bx - 18 + lean * 0.5, y: hipY + 4 }];
+  c.fillStyle = 'rgba(253,251,244,.92)'; c.beginPath(); tor.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.fill();
+  k.hatch([tor[0], { x: bx - 4 + lean, y: 456 }, { x: bx - 2 + lean * 0.5, y: hipY + 4 }, tor[3]], id + 5, INK, 5, 1.1, 0.22);
+  k.poly(tor, id + 6, col, 3, 2); k.text('9', bx + 5 + lean * 0.7, 514, { size: 34, color: INK, alpha: 0.8 });
+  k.line(bx - 20 + lean, 464, hx - 6, hy + 4, id + 7, col, 4, 1); k.line(bx + 20 + lean, 464, hx + 4, hy + 6, id + 8, col, 4, 1);
+  const bl = 118, ex = hx + Math.cos(ang) * bl, ey = hy + Math.sin(ang) * bl;
+  k.line(hx, hy, ex, ey, id + 9, col, 6, 1); k.line(hx + Math.cos(ang) * bl * 0.55, hy + Math.sin(ang) * bl * 0.55, ex, ey, id + 10, col, 9, 1);
+  c.fillStyle = INK; c.beginPath(); c.arc(hx - Math.cos(ang) * 6, hy - Math.sin(ang) * 6, 5, 0, 7); c.fill(); k.circle(hx, hy, 7, id + 11, col, 2, 1);
+  if (sw >= 3 && sw <= 12) { c.strokeStyle = INK; c.globalAlpha = 0.35 * (1 - (sw - 3) / 10); c.lineWidth = 2; c.setLineDash([6, 5]); c.beginPath(); c.arc(hx, hy, bl * 0.92, -2.3, ang, false); c.stroke(); c.setLineDash([]); c.globalAlpha = 1; }
+  const hd = { x: bx + 2 + lean * 0.8, y: 428 };
+  c.fillStyle = 'rgba(253,251,244,.95)'; c.beginPath(); c.arc(hd.x, hd.y, 21, 0, 7); c.fill();
+  k.circle(hd.x, hd.y, 22, id + 12, col, 3, 2); k.scribble(hd.x, hd.y - 5, 19, id + 13, INK, 30, 0.45);
+  k.line(hd.x - 22, hd.y + 5, hd.x + 22, hd.y + 5, id + 14, col, 2.5, 1); k.line(hd.x + 14, hd.y + 7, hd.x + 28, hd.y + 3, id + 15, col, 2.5, 1);
+}
+function renderPlateScene() {
+  const c = sctx, k = sink, cx = PV.ZX; c.clearRect(0, 0, W, H);
+  if (plateCut) c.drawImage(plateCut, PV.x0, 70, PV.x1 - PV.x0, (PV.x1 - PV.x0) * plateCut.height / plateCut.width); else c.drawImage(plateBg, 0, 0);
+  // live outfield scoreboard
+  k.text(teamName.slice(0, 7), cx - 52, 211, { size: 11, color: INK, font: 'Patrick Hand', weight: 400, align: 'left' }); k.text(String(game.score.you), cx + 50, 212, { size: 14, color: INK, align: 'right' });
+  k.text('PENCILS', cx - 52, 229, { size: 11, color: INK, font: 'Patrick Hand', weight: 400, align: 'left' }); k.text(String(game.score.pencils), cx + 50, 230, { size: 14, color: INK, align: 'right' });
+  drawPitcher(k, c);
+  const inFlight = pitch && pitch.plate && pitch.wind === 0 && !pitch.done;
+  const hot = inFlight && !swing && Math.abs(pitch.T - pitch.t) <= 14;
+  // catcher, crouched behind the zone; the mitt drifts toward where the pitch is headed
+  let mx = cx + 4, my = PV.ZY + 46; if (inFlight) { const u = Math.min(1, pitch.t / pitch.T); mx += pitch.fx * u; my += pitch.fy * 0.5 * u; } if (caught) { mx = caught.x; my = caught.y; }
+  k.line(cx - 22, PV.ZY + 190, cx - 30, PV.ZY + 228, 700, PEN_DK, 3, 1); k.line(cx + 40, PV.ZY + 190, cx + 52, PV.ZY + 226, 701, PEN_DK, 3, 1);
+  c.fillStyle = 'rgba(253,251,244,.92)'; c.beginPath(); c.ellipse(cx + 8, PV.ZY + 168, 42, 34, 0, 0, 7); c.fill(); k.circle(cx + 8, PV.ZY + 168, 42, 702, PEN_DK, 2.4, 1); k.hatch(ellipsePts(cx + 8, PV.ZY + 168, 42, 34, 20), 703, PEN_DK, 6, 1.0, 0.18);
+  c.fillStyle = 'rgba(253,251,244,.92)'; c.beginPath(); c.arc(cx + 8, PV.ZY + 122, 19, 0, 7); c.fill(); k.circle(cx + 8, PV.ZY + 122, 19, 704, PEN_DK, 2.4, 1); for (let i = -1; i <= 1; i++) k.line(cx - 4, PV.ZY + 114 + i * 7, cx + 20, PV.ZY + 113 + i * 7, 705 + i, PEN_DK, 1.2, 1); k.line(cx - 6, PV.ZY + 106, cx - 4, PV.ZY + 138, 708, PEN_DK, 1.2, 1); k.line(cx + 22, PV.ZY + 106, cx + 20, PV.ZY + 138, 709, PEN_DK, 1.2, 1);
+  k.line(cx - 30, PV.ZY + 150, mx - 8, my + 10, 710, PEN_DK, 3, 1);
+  c.fillStyle = 'rgba(253,251,244,.8)'; c.beginPath(); c.arc(mx, my, 15, 0, 7); c.fill(); k.circle(mx, my, 15, 711, PEN_DK, 2.2, 1); k.circle(mx, my, 9, 712, PEN_DK, 1.1, 1);
+  // umpire looming behind, mostly out of frame
+  k.circle(cx + 96, PV.ZY + 196, 21, 720, PEN_MD, 2.2, 1); k.line(cx + 74, PV.ZY + 192, cx + 118, PV.ZY + 190, 721, PEN_MD, 1.6, 1); k.line(cx + 60, PV.ZY + 224, cx + 132, PV.ZY + 222, 722, PEN_MD, 2.6, 1); k.line(cx + 60, PV.ZY + 224, cx + 54, H, 723, PEN_MD, 2.4, 1); k.line(cx + 132, PV.ZY + 222, cx + 140, H, 724, PEN_MD, 2.4, 1);
+  // the zone
+  c.setLineDash(hot ? [] : [5, 5]); c.strokeStyle = hot ? RED : INK; c.globalAlpha = hot ? 0.95 : 0.55; c.lineWidth = hot ? 3 : 1.5; c.strokeRect(cx - PV.ZW / 2, PV.ZY - PV.ZH / 2, PV.ZW, PV.ZH); c.setLineDash([]); c.globalAlpha = 1;
+  if (state === 'batting' && game.abs <= 2 && !swing) { if (hot) k.text('SWING!', cx, PV.ZY - PV.ZH / 2 - 14, { size: 30, color: RED, rot: -0.04 }); else if (!inFlight) ['put the ring where', 'the ball will cross,', 'click as it arrives'].forEach((t, i) => k.text(t, cx + PV.ZW / 2 + 16, PV.ZY - 44 + i * 20, { size: 15, color: PEN_DK, font: 'Patrick Hand', weight: 400, align: 'left' })); }
+  // the ball: a shadow on the dirt, a faint trail, then the ball growing as it comes
+  if (inFlight) { const p = platePitchPos(pitch, pitch.t); if (!pitch.trail) pitch.trail = []; if (frame % 2 === 0) pitch.trail.push({ x: p.x, y: p.y, r: p.r }); pitch.trail = pitch.trail.slice(-8);
+    c.fillStyle = 'rgba(0,0,0,.12)'; c.beginPath(); c.ellipse(p.x, 392 + (612 - 392) * Math.pow(p.u, 1.4), p.r * 1.1, p.r * 0.5, 0, 0, 7); c.fill();
+    pitch.trail.forEach((t, i) => { c.globalAlpha = 0.08 + i / pitch.trail.length * 0.2; c.strokeStyle = PEN_DK; c.lineWidth = 1; c.beginPath(); c.arc(t.x, t.y, t.r * 0.9, 0, 7); c.stroke(); }); c.globalAlpha = 1;
+    ballOn(c, p.x, p.y, p.r); }
+  if (caught) ballOn(c, caught.x, caught.y, 8.5);
+  // the ball leaving the bat, until the cut to the field
+  if (play && holdPlate > 0 && lastContact) { const u = 1 - holdPlate / 22, cr = lastContact.cross, dir = lastContact.dir, tx = PV.x0 + 60 + (PV.x1 - PV.x0 - 120) * Math.max(-0.2, Math.min(1.2, (dir + 135) / 90)), ty = wallY(Math.max(PV.x0, Math.min(PV.x1, tx))) - 6; const x = cr.x + (tx - cr.x) * u, y = cr.y + (ty - cr.y) * u - Math.sin(u * Math.PI) * Math.max(0, lastContact.ang) * 2.6; ballOn(c, x, y, 10 * (1 - u) + 2.5); }
+  // aiming ring
+  if (state === 'batting' && !swing && !play) { const a = aimPos(); c.strokeStyle = INK; c.lineWidth = 2; c.globalAlpha = 0.85; c.beginPath(); c.arc(a.x, a.y, 16, 0, 7); c.stroke(); c.lineWidth = 1.2; c.beginPath(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { c.moveTo(a.x + dx * 10, a.y + dy * 10); c.lineTo(a.x + dx * 22, a.y + dy * 22); } c.stroke(); c.globalAlpha = 1; }
+  drawBatter(k, c);
+}
+
 // ---------- simulation step (fixed 60 Hz) ----------
 function step() {
   if (introT < INTRO_LEN) { introT++; if (introT >= 110) stage.classList.remove('intro'); }
@@ -307,11 +495,15 @@ function step() {
   if (fan.t > 0) fan.t--; else fan.kind = 'idle';
   if (play && play.phase === 'flight' && frame % 2 === 0) trail.push({ x: play.x, y: play.y - play.z * 0.5, life: 40 }); trail = trail.filter(t => --t.life > 0);
   if (swing) swing.t++;
+  if (caught && --caught.t <= 0) caught = null;
+  if (play && holdPlate > 0) holdPlate--;
+  const wantPlate = batting() && !game.over && state !== 'howto' && introT >= INTRO_LEN && (!play || holdPlate > 0) ? 1 : 0;
+  view += (wantPlate - view) * 0.2; if (Math.abs(view - wantPlate) < 0.01) view = wantPlate;
   if (pitch && (state === 'batting' || state === 'pitching')) {
     if (pitch.wind > 0) { pitch.wind--; if (pitch.wind === 0) SFX.pencil(); }
     else pitch.t++;
     if (state === 'pitching' && !pitch.result && pitch.t >= pitch.T - 5) cpuSwing();
-    if (pitch.t >= pitch.T) { if (pitch.result === 'contact') { state = 'play'; launch(pitch.contact); } else resolvePitch(); }
+    if (pitch.t >= pitch.T) { if (pitch.result === 'contact') { if (pitch.plate) { lastContact = { cross: { x: PV.ZX + pitch.fx, y: PV.ZY + pitch.fy }, dir: pitch.contact.dir, ang: pitch.contact.ang }; holdPlate = 22; popup('CRACK!', PV.ZX + 60, PV.ZY - 30, RED, 30); } state = 'play'; launch(pitch.contact); } else resolvePitch(); }
   }
   for (const k in fielders) { const f = fielders[k]; const dx = f.tx - f.x, dy = f.ty - f.y, d = Math.hypot(dx, dy); if (d > 1) { const s = Math.min(FIELDER_SPD, d); f.x += dx / d * s; f.y += dy / d * s; } }
   for (const r of runnersAnim) r.p = Math.min(1, r.p + RUNNER_SPD / (BASE_D * 1.414 * Math.max(1, r.to - r.from)));
@@ -392,7 +584,7 @@ function drawPeople() {
 }
 function drawBallAt(x, y, z, big = 1) { const k = (1 + z / 120) * big; ctx.save(); ctx.translate(x, y - z * 0.5); ctx.scale(k, k); ctx.fillStyle = '#fbf8ee'; ctx.strokeStyle = PEN_DK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, 7); ctx.fill(); ctx.stroke(); ctx.strokeStyle = RED; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(-1.5, 0, 3.5, -1.1, 1.1); ctx.stroke(); ctx.beginPath(); ctx.arc(1.5, 0, 3.5, Math.PI - 1.1, Math.PI + 1.1); ctx.stroke(); ctx.restore(); }
 function drawBall() {
-  if (pitch && pitch.wind === 0 && (state === 'batting' || state === 'pitching')) { const p = pitchPos(pitch, pitch.t); ctx.fillStyle = 'rgba(0,0,0,.1)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 3, 4, 2, 0, 0, 7); ctx.fill(); drawBallAt(p.x, p.y, 4, 1.1); if (aimSpot) { ctx.setLineDash([2, 3]); ctx.strokeStyle = RED; ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(aimSpot.x, aimSpot.y, 6, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; } }
+  if (pitch && !pitch.plate && pitch.wind === 0 && (state === 'batting' || state === 'pitching')) { const p = pitchPos(pitch, pitch.t); ctx.fillStyle = 'rgba(0,0,0,.1)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 3, 4, 2, 0, 0, 7); ctx.fill(); drawBallAt(p.x, p.y, 4, 1.1); if (aimSpot) { ctx.setLineDash([2, 3]); ctx.strokeStyle = RED; ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(aimSpot.x, aimSpot.y, 6, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; } }
   if (play) {
     if (play.phase === 'throw') { const f = play.cut, u = Math.min(1, play.t / 24), x = f.x + (BASES[1].x - f.x) * u, y = f.y + (BASES[1].y - f.y) * u, z = Math.sin(u * Math.PI) * 30; drawBallAt(x, y, z); }
     else if (play.phase !== 'done' || play.outcome.kind === 'hr') { ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.ellipse(play.x, play.y + 3, 5, 2.5, 0, 0, 7); ctx.fill(); drawBallAt(play.x, play.y, play.z); }
@@ -401,7 +593,7 @@ function drawBall() {
   }
 }
 function drawSwingHint() {
-  if (state !== 'batting' || play) return;
+  if (state !== 'batting' || play || view > 0.5) return;
   const hot = pitch && !swing && pitch.wind === 0 && Math.abs(pitch.T - pitch.t) <= 14;   // the ball is in the hittable window
   ctx.setLineDash(hot ? [] : [3, 4]); ctx.strokeStyle = hot ? RED : INK; ctx.globalAlpha = hot ? 0.9 : 0.4; ctx.lineWidth = hot ? 3 : 1.2;
   ctx.beginPath(); ctx.moveTo(HOME.x - 50, HOME.y - 26); ctx.lineTo(HOME.x + 50, HOME.y - 26); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
@@ -429,10 +621,10 @@ function drawHowto() {
   ink.text('how to play', X + Wd / 2, Y + 50, { size: 44, color: INK, rot: -0.03 });
   const PH = { font: 'Patrick Hand', weight: 400, color: PEN_DK, align: 'left' };
   ink.text('BATTING', X + 40, Y + 105, { size: 24, color: INK, align: 'left' });
-  ink.text('the pencil pitcher throws. click (or press space) the moment', X + 40, Y + 132, { ...PH, size: 18 });
-  ink.text('the ball crosses the dashed line in front of the plate.', X + 40, Y + 154, { ...PH, size: 18 });
+  ink.text('you see the pitch coming from behind the plate. move the ring to', X + 40, Y + 132, { ...PH, size: 18 });
+  ink.text('where the ball will cross the zone, click (or space) as it gets there.', X + 40, Y + 154, { ...PH, size: 18 });
   ink.text('early = left field · perfect = up the middle, hardest · late = right field', X + 40, Y + 178, { ...PH, size: 16, color: PEN_MD });
-  ink.text('click above the ball to lift a fly ball, below it to chop a grounder.', X + 40, Y + 200, { ...PH, size: 16, color: PEN_MD });
+  ink.text('ring under the ball lifts a fly ball · ring over the ball chops a grounder', X + 40, Y + 200, { ...PH, size: 16, color: PEN_MD });
   // little doodle: ball and the line
   ctx.setLineDash([3, 4]); ctx.strokeStyle = INK; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X + 500, Y + 150); ctx.lineTo(X + 580, Y + 150); ctx.stroke(); ctx.setLineDash([]);
   drawBallAt(X + 540, Y + 118, 0, 1.3); ink.line(X + 540, Y + 128, X + 540, Y + 142, 710, PEN_MD, 1, 1); ink.text('click!', X + 552, Y + 172, { size: 16, color: RED, font: 'Caveat', weight: 700, align: 'left', rot: -0.1 });
@@ -471,7 +663,7 @@ function drawScorecard() {
 }
 function drawExtras() {
   // pitch name as it leaves his hand
-  if (pitch && pitch.t < 36 && (state === 'batting' || state === 'pitching')) ink.text(pitch.name, MOUND.x + 44, MOUND.y - 14, { size: 15, color: PEN_MD, font: 'Patrick Hand', weight: 400, alpha: Math.min(1, (36 - pitch.t) / 12), align: 'left', rot: -0.06 });
+  if (pitch && pitch.t < 36 && (state === 'batting' || state === 'pitching')) ink.text(pitch.name, pitch.plate ? PV.mound.x + 30 : MOUND.x + 44, pitch.plate ? PV.mound.y - 66 : MOUND.y - 14, { size: 15, color: PEN_MD, font: 'Patrick Hand', weight: 400, alpha: Math.min(1, (36 - pitch.t) / 12), align: 'left', rot: -0.06 });
   ctx.fillStyle = INK; for (const t of trail) { ctx.globalAlpha = t.life / 40 * 0.35; ctx.beginPath(); ctx.arc(t.x, t.y, 1.8, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
   for (const p of popups) ink.text(p.text, p.x, p.y - (55 - p.life) * 0.5, { size: p.size, color: p.color, font: p.size > 22 ? 'Caveat' : 'Patrick Hand', weight: p.size > 22 ? 700 : 400, alpha: Math.min(1, p.life / 15), rot: -0.05 });
   for (const b of bursts) { const r = 6 + b.t * 2.2, a = 1 - b.t / 50; for (let i = 0; i < 9; i++) { const ang = b.seed + i / 9 * 6.28; ctx.globalAlpha = a * 0.8; ink.line(b.x + Math.cos(ang) * r * 0.55, b.y + Math.sin(ang) * r * 0.55, b.x + Math.cos(ang) * r, b.y + Math.sin(ang) * r, 900 + i + Math.floor(b.seed), b.color, 1.6, 1); } ctx.globalAlpha = 1; }
@@ -497,9 +689,11 @@ function drawMsg() {
 }
 function draw() {
   ctx.drawImage(paper, 0, 0);
-  drawField(); drawSwingHint(); drawPitchHint(); drawPeople(); drawBall(); drawExtras(); drawScorecard(); drawMsg(); drawHowto();
+  if (view < 0.995) { drawField(); drawSwingHint(); drawPitchHint(); drawPeople(); drawBall(); }
+  if (view > 0.005) { renderPlateScene(); ctx.globalAlpha = view; ctx.drawImage(sceneCv, 0, 0); ctx.globalAlpha = 1; }
+  drawExtras(); drawScorecard(); drawMsg(); drawHowto();
 }
-newGame(); tick();
+buildPlateBg(); newGame(); tick();
 </script>
 </body>
 </html>
