@@ -4,17 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f8f5eb">
-  <meta name="description" content="A growing collection of hand-drawn browser games. Sling doodles, draw football plays, rally on the tennis court, step up to the ballpark, and lob erasers at the pencils.">
+  <meta name="description" content="A growing collection of hand-drawn browser games. Sling doodles, draw football plays, rally on the tennis court, step up to the ballpark, lob erasers at the pencils, and draw bridges that really bend.">
   <title>Notebook Arcade — Small games. Big notebook energy.</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='2' width='26' height='28' rx='2' fill='%23f8f5eb' stroke='%23213f94' stroke-width='2'/%3E%3Cpath d='M9 3v26' stroke='%23c33e36'/%3E%3Cpath d='M12 10h13M12 16h13M12 22h9' stroke='%23213f94' stroke-width='2'/%3E%3C/svg%3E">
   <link rel="preload" href="assets/fonts/caveat-bold.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="motion.css">
   <link rel="stylesheet" href="zine.css?v=charcoal-cut-1">
-  <link rel="stylesheet" href="doodles.css?v=kraft-2">
-  <script src="app.js?v=tennis-swap-1" defer></script>
+  <link rel="stylesheet" href="doodles.css?v=github-sync-1">
+  <script src="app.js?v=bridge-2" defer></script>
   <script src="shared/ink.js" defer></script>
-  <script src="doodles.js?v=tennis-swap-1" defer></script>
+  <script src="doodles.js?v=github-sync-1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#games">Skip to the games</a>
@@ -34,7 +34,7 @@
       <section class="games-section" id="games" aria-label="Browser games">
         <canvas class="margin-fan" width="200" height="360" aria-hidden="true"></canvas>
         <span class="filter-scribble" aria-hidden="true">pick one. lose an hour. ↙</span>
-        <div class="collection-toolbar"><div class="filters" role="group" aria-label="Filter games"><button class="filter active" type="button" data-filter="all" aria-pressed="true">All games <span>05</span></button><button class="filter" type="button" data-filter="action" aria-pressed="false">Action</button><button class="filter" type="button" data-filter="sports" aria-pressed="false">Sports</button></div><p class="collection-meta" id="game-count" aria-live="polite">5 games · 100% doodled</p></div>
+        <div class="collection-toolbar"><div class="filters" role="group" aria-label="Filter games"><button class="filter active" type="button" data-filter="all" aria-pressed="true">All games <span>06</span></button><button class="filter" type="button" data-filter="action" aria-pressed="false">Action</button><button class="filter" type="button" data-filter="sports" aria-pressed="false">Sports</button><button class="filter" type="button" data-filter="drawing" aria-pressed="false">Drawing</button></div><p class="collection-meta" id="game-count" aria-live="polite">6 games · 100% doodled</p></div>
         <div class="game-grid">
           <article class="game-card reveal" data-preview="slingshot" data-category="action" style="--tilt:-.55deg">
             <span class="card-scribble" aria-hidden="true">start here ↴</span><span class="tape" aria-hidden="true"></span><div class="card-meta"><span class="page-number">page 01</span><div class="card-notes"><span class="category">Aim. Fling. Repeat.</span><button class="preview-toggle" type="button" aria-pressed="false">watch it play ↻</button></div></div>
@@ -64,6 +64,12 @@
             <span class="card-scribble" aria-hidden="true">new! rub the pencil out ↘</span><span class="tape" aria-hidden="true"></span><div class="card-meta"><span class="page-number">page 05</span><div class="card-notes"><span class="category">Aim. Lob. Erase.</span><button class="preview-toggle" type="button" aria-pressed="false">watch it play ↻</button></div></div>
             <a class="game-image-link" href="games/eraser-war/index.html" tabindex="-1" aria-hidden="true"><div class="game-art eraser-art"></div></a>
             <div class="card-body"><h3><a href="games/eraser-war/index.html">Eraser War</a></h3><p>Lob erasers over scribbled hills.<br>Every hit rubs the ground out.</p><div class="card-bottom"><span class="game-tag">Artillery / mind the wind</span><a class="play-button" href="games/eraser-war/index.html" aria-label="Play Eraser War">Play <span aria-hidden="true">↗</span></a></div></div>
+            <svg class="card-outline" viewBox="0 0 560 500" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 10Q210 1 551 7L555 488Q293 500 7 492L4 10"/></svg>
+          </article>
+          <article class="game-card reveal" data-preview="bridge" data-category="drawing" style="--tilt:-.7deg">
+            <span class="card-scribble" aria-hidden="true">new! your doodles do the work.</span><span class="tape" aria-hidden="true"></span><div class="card-meta"><span class="page-number">page 06</span><div class="card-notes"><span class="category">Draw. Test. Panic.</span><button class="preview-toggle" type="button" aria-pressed="false">watch it play ↻</button></div></div>
+            <a class="game-image-link" href="games/bridge/index.html" tabindex="-1" aria-hidden="true"><div class="game-art bridge-art"></div></a>
+            <div class="card-body"><h3><a href="games/bridge/index.html">Will It Hold?</a></h3><p>Your pencil strokes become a bridge.<br>The egg truck would like a second opinion.</p><div class="card-bottom"><span class="game-tag">Drawing / questionable engineering</span><a class="play-button" href="games/bridge/index.html" aria-label="Play Will It Hold">Play <span aria-hidden="true">↗</span></a></div></div>
             <svg class="card-outline" viewBox="0 0 560 500" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 10Q210 1 551 7L555 488Q293 500 7 492L4 10"/></svg>
           </article>
         </div>

@@ -3,9 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <title>Doodle Slingshot</title>
-<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Caveat:wght@700&display=swap" rel="stylesheet">
+<link href="../../shared/fonts.css" rel="stylesheet">
 <style>
   html, body { margin: 0; height: 100%; background: #e9e4d6; overflow: hidden; font-family: 'Patrick Hand', cursive; }
   #wrap { position: relative; width: 100vw; height: 100vh; }
@@ -36,7 +35,7 @@
   <div id="dev"><span>dev:</span></div>
   <div id="buttons"><a href="../../index.html" id="back">← arcade</a><button id="mute">sound: on</button><button id="retry">retry</button><button id="next" style="display:none">next page →</button></div>
 </div></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script src="../../shared/matter.min.js"></script>
 <script src="../../shared/paper.js"></script>
 <script>
 const { Engine, World, Bodies, Body, Events, Composite } = Matter;

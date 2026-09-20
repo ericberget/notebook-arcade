@@ -1,0 +1,12 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const html=fs.readFileSync('games/xo-football/index.html','utf8');
+const check=html.slice(html.indexOf('function checkContact()'),html.indexOf('function endPlay('));
+const runner={name:'RB',kind:'RB',team:'o',body:{position:{x:0,y:0}}};
+const defender={team:'x',stumble:0,touching:3,attempted:false,body:{position:{x:1,y:0}}};
+let ended=null;const context={ball:{carrier:runner},players:[defender],R:10,ctrl:null,onOffense:()=>true,SFX:{thump:()=>{}},note:()=>{},INK:'',X_COLOR:'',endPlay:kind=>ended=kind,Math:Object.create(Math)};
+context.Math.random=()=>.1;vm.runInNewContext(check,context);context.checkContact();assert.equal(ended,null);assert.equal(defender.stumble,32);
+defender.stumble=0;defender.touching=3;context.checkContact();assert.equal(ended,'tackle','recovered defender can tackle again');
+ended=null;defender.attempted=false;defender.touching=3;context.Math.random=()=>.21;context.checkContact();assert.equal(ended,'tackle','RB no longer breaks a 21% roll');
+const speed=html.match(/const SPEED = (.*);/)[1];const stats=vm.runInNewContext('('+speed+')');assert(stats.RB<stats.CB&&stats.RB<stats.S);
+for(const m of html.matchAll(/<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/g))new vm.Script(m[1]);
+console.log('PASS: repeat tackle, RB tackle odds, recovery duration, pursuit speed, script syntax');

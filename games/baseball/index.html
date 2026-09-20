@@ -3,14 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <title>Doodle Ballpark</title>
-<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Caveat:wght@700&display=swap" rel="stylesheet">
+<link href="../../shared/fonts.css" rel="stylesheet">
 <style>
-  html, body { margin: 0; height: 100%; background: #e9e4d6; overflow: hidden; font-family: 'Patrick Hand', cursive; }
+  html, body { margin: 0; height: 100%; background: #37251b; overflow: hidden; font-family: 'Patrick Hand', cursive; }
+  body { background: linear-gradient(#160c0630,#160c0645), url('../../assets/student-desk-v1.webp') center / cover no-repeat; }
   #wrap { position: relative; width: 100vw; height: 100vh; }
   #stage { position: relative; width: 1200px; height: 720px; transform-origin: top left; }
-  canvas { display: block; box-shadow: 0 10px 30px rgba(0,0,0,.25); cursor: crosshair; touch-action: none; }
+  #stage { isolation:isolate; box-shadow: 3px 5px 4px #100905a6, 10px 20px 18px #1009058c, 20px 35px 48px #10090599; }
+  #stage:before { content:""; position:absolute; inset:3px -2px -5px 2px; z-index:-1; background:repeating-linear-gradient(0deg,#b5aa92 0 1px,#e9dfca 1px 3px); border-radius:1px 2px 3px 2px; }
+  #binding { position:absolute; left:-48px; top:14px; width:82px; height:692px; display:flex; flex-direction:column; justify-content:space-around; pointer-events:none; z-index:3; }
+  #binding span { display:block; width:82px; height:40px; flex-shrink:0; transform:scaleX(.72); transform-origin:right center; background:url('../../assets/notebook-wire-v1.png') -18px -24px / 120px 80px no-repeat; filter:drop-shadow(1px 2px 1px #10090555); }
+  #stage:after { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:linear-gradient(90deg,#72634b66,#fff9e688); pointer-events:none; }
+  canvas { display: block; cursor: crosshair; touch-action: none; }
+
   button, #back { font-family: 'Patrick Hand', cursive; font-size: 18px; background: transparent; border: 2px solid #9a9aa0; color: #7a7a82; padding: 3px 12px; border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; cursor: pointer; transform: rotate(1deg); }
   button:hover { background: rgba(80,80,90,.07); }
   button:disabled { opacity: .35; cursor: default; }
@@ -24,6 +30,8 @@
   #pitches.on { display: flex; }
   #pitches button { color: #1f3d9e; border-color: #1f3d9e; font-size: 17px; }
   #pitches button.sel { background: rgba(31,61,158,.12); }
+  #swing-button { color:#c0392b; border-color:#c0392b; font-size:32px; margin:10px 0; padding:6px; }
+  #swing-button[hidden] { display:none; }
   #hint { font-size: 16px; color: #4a4a4f; opacity: .7; line-height: 1.25; }
   #side, #sys, #top { transition: opacity .7s; }
   #stage.intro #side, #stage.intro #sys, #stage.intro #top { opacity: 0; }
@@ -32,16 +40,18 @@
 <body>
 <div id="wrap"><div id="stage">
   <canvas id="c" width="1200" height="720"></canvas>
+  <div id="binding" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
   <div id="top"><a href="../../index.html" id="back">← arcade</a></div>
   <div id="sys"><button id="mute" title="sound" aria-label="sound on"></button><button id="newgame">new game</button></div>
   <div id="side">
     <div class="label" id="pitchLabel">pick a pitch, then click a spot in the zone</div>
     <div id="pitches"><button data-p="fast">fastball</button><button data-p="curve">curve</button><button data-p="change">changeup</button></div>
+    <button id="swing-button" aria-label="Swing bat">SWING!</button>
     <div id="hint"></div>
     <button id="howto">how to play</button>
   </div>
 </div></div>
-<script src="../../shared/paper.js"></script>
+<script src="../../shared/paper.js?v=binding-2"></script>
 <script src="../../shared/ink.js"></script>
 <script>
 const W = 1200, H = 720;
@@ -49,10 +59,10 @@ const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
 const ink = NotebookInk(ctx); const { INK, RED, GRAPHITE } = ink;
 const PEN_LT = '#9a9aa0', PEN_MD = '#7a7a82', PEN_DK = '#4a4a50', DIRT = '#b58a5a';
 const stage = document.getElementById('stage');
-function fit() { const s = Math.min(window.innerWidth / W, window.innerHeight / H); stage.style.transform = `scale(${s})`; stage.style.marginLeft = ((window.innerWidth - W * s) / 2) + 'px'; stage.style.marginTop = ((window.innerHeight - H * s) / 2) + 'px'; }
+function fit() { const rim = window.innerWidth < 700 ? 10 : 40; const s = Math.min((window.innerWidth - rim * 2) / (W + 52), (window.innerHeight - rim * 2) / H); stage.style.transform = `scale(${s})`; stage.style.marginLeft = ((window.innerWidth - (W + 52) * s) / 2 + 52 * s) + 'px'; stage.style.marginTop = ((window.innerHeight - H * s) / 2) + 'px'; }
 window.addEventListener('resize', fit); fit();
 const paper = document.createElement('canvas'); paper.width = W; paper.height = H;
-NotebookPaper.draw(paper.getContext('2d'), W, H, 'dots');
+NotebookPaper.draw(paper.getContext('2d'), W, H, 'plain');
 
 // ---------- the diamond ----------
 const HOME = { x: 560, y: 612 }, BASE_D = 118;
@@ -75,7 +85,7 @@ const SFX = (() => {
     resume() { init(); if (ac.state === 'suspended') ac.resume(); },
     toggleMute() { muted = !muted; if (master) master.gain.value = muted ? 0 : 0.7; return muted; },
     crowd(l) { if (!ac) return; crowdGain.gain.setTargetAtTime(0.025 + l * 0.12, now(), 0.25); },
-    crack(p = 1) { if (!ac || muted) return; const t = now(); noise(0.04, 0.6, t, { type: 'highpass', f0: 2500 }); tone('square', 1400, 500, 0.05, 0.25 * p, t, 3000); tone('sine', 220, 90, 0.12, 0.35 * p, t); },
+    crack(p = 1) { if (!ac || muted) return; const t = now(), strength = Math.max(.2, Math.min(1.5,p)); noise(0.026, .22 + strength*.17, t, { type:'highpass', f0:1800 }); tone('triangle', 410, 390, .035, .13*strength, t, 2100); tone('sine', 165, 145, .065, .24*strength, t); },
     pop() { if (!ac || muted) return; const t = now(); noise(0.05, 0.45, t, { f0: 700, f1: 250, q: 1 }); tone('sine', 180, 70, 0.08, 0.3, t); },
     whiff() { if (!ac || muted) return; noise(0.2, 0.25, now(), { f0: 900, f1: 2600, q: 1, attack: 0.05 }); },
     strike() { if (!ac || muted) return; const t = now(); tone('sawtooth', 300, 220, 0.16, 0.18, t, 900); },
@@ -113,7 +123,7 @@ function renameTeam() {
 
 function newGame() {
   game = { inning: 1, half: 'top', outs: 0, balls: 0, strikes: 0, bases: [null, null, null], score: { you: 0, pencils: 0 }, line: { you: [], pencils: [] }, hits: { you: 0, pencils: 0 }, over: false };
-  introT = 0; stage.classList.add('intro'); msg = null; play = null; pitch = null; runnersAnim = []; popups = []; bursts = []; trail = []; fan = { kind: 'idle', t: 0, len: 0 };
+  introT = 0; stage.classList.add('intro'); msg = null; play = null; pitch = null; swing = null; holdPlate = 0; lastContact = null; caught = null; impactPause = 0; runnersAnim = []; popups = []; bursts = []; trail = []; fan = { kind: 'idle', t: 0, len: 0 };
   resetFielders(); game.abs = 0; game.pabs = 0;
   setTimeout(() => { state = 'howto'; updateUI(); }, 2400); updateUI();
 }
@@ -123,7 +133,8 @@ function say(text, color = INK, life = 110, sub = '') { msg = { text, color, lif
 function updateUI() {
   const b = batting();
   pitchesEl.classList.toggle('on', !b && !game.over);
-  hintEl.textContent = game.over ? 'game over. new game to play again.' : state === 'howto' ? '' : b ? 'BATTING: put the ring where the ball will cross the zone and click (or space) as it gets there. ring under the ball lifts it, over it chops it. early = left field, late = right.' : 'PITCHING: pick a pitch above, then click a spot inside the red zone at the plate. corners get weaker contact.';
+  hintEl.textContent = game.over ? 'game over. new game to play again.' : state === 'howto' ? '' : b ? 'Click or press SPACE when the ball reaches the red stripe. We line up the bat for you. Let high and low pitches go.' : 'PITCHING: pick a pitch above, then click a spot inside the red zone at the plate. corners get weaker contact.';
+  document.getElementById('swing-button').hidden = !b || game.over || state === 'howto';
   pitchLabel.textContent = b ? 'you\'re batting' : 'you\'re pitching';
   [...pitchesEl.querySelectorAll('button')].forEach(bt => bt.classList.toggle('sel', bt.dataset.p === pitchType));
 }
@@ -143,9 +154,9 @@ function throwPitch(type, targetX) { // targetX: offset from the middle of the p
   const p = PITCHES[type]; const err = (Math.random() - .5) * (batting() ? 14 : 22);
   pitch = { type, x: MOUND.x, y: MOUND.y + 10, t: 0, wind: 26, T: (HOME.y - MOUND.y - 10) / p.spd, tx: targetX + err, spd: p.spd, sway: p.sway * (Math.random() > .5 ? 1 : -1) };
   if (batting()) { // the pencil pitcher picks a spot in or around the zone; the batter's-eye view shows it coming
-    const inZ = Math.random() < 0.66, side = Math.random() > .5 ? 1 : -1;
-    const fx = inZ ? (Math.random() - .5) * PV.ZW * 0.86 : side * (PV.ZW / 2 + 10 + Math.random() * 30), fy = inZ ? (Math.random() - .5) * PV.ZH * 0.86 : (Math.random() - .5) * (PV.ZH + 50);
-    Object.assign(pitch, { plate: true, fx, fy, drop: { fast: 0, change: 14, curve: 42 }[type], strike: Math.abs(fx) <= PV.ZW / 2 && Math.abs(fy) <= PV.ZH / 2, T: (HOME.y - MOUND.y - 10) / p.spd * 1.15 });
+    const inZ = Math.random() < 0.8, side = Math.random() > .5 ? 1 : -1;
+    const fx = 0, fy = inZ ? (Math.random() - .5) * 48 : side * (70 + Math.random() * 18);
+    Object.assign(pitch, { plate: true, fx, fy, drop: { fast: 0, change: 14, curve: 42 }[type], strike: Math.abs(fx) <= PV.ZW / 2 && Math.abs(fy) <= PV.ZH / 2, T: { fast: 100, curve: 115, change: 130 }[type] });
   }
   pitch.name = p.name; state = batting() ? 'batting' : 'pitching'; SFX.pencil();
 }
@@ -155,21 +166,6 @@ function pitchPos(pt, t) { // where the pitch is at time t: drifts to its target
 }
 
 // ---------- contact ----------
-function swingAt(clickPos) { // you swing: timing -> direction & power, click height -> launch angle
-  if (!pitch || swing) return;
-  const dt = (pitch.T - pitch.t) + pitch.wind;                 // frames until it reaches the plate; + = early
-  const pos = pitchPos(pitch, pitch.t);
-  swing = { t: 0 }; SFX.whiff();
-  const early = dt / 11, inReach = Math.abs(pos.x - HOME.x) < 46;
-  if (Math.abs(early) > 1.4 || !inReach) { pitch.result = 'swing-miss'; popup(!inReach ? 'out of reach' : early > 0 ? 'way early' : 'way late', HOME.x + 70, HOME.y - 40, GRAPHITE, 18); return; }
-  popup(Math.abs(early) < 0.22 ? 'PERFECT!' : Math.abs(early) < 0.6 ? (early > 0 ? 'a bit early' : 'a bit late') : (early > 0 ? 'early' : 'late'), HOME.x + 70, HOME.y - 40, Math.abs(early) < 0.22 ? RED : INK, Math.abs(early) < 0.22 ? 26 : 18);
-  const dir = -90 - early * 40 + (Math.random() - .5) * 8;      // early = pulled to left (screen up-left), late = right field
-  const q = 1 - Math.abs(early) / 1.4;
-  const lift = 14 + (pos.y - clickPos.y) * 0.45 + (Math.random() - .5) * 6;
-  const ang = Math.max(-6, Math.min(58, lift));
-  const v = 7.5 + q * 6.5 + Math.random() * 1.2;
-  pitch.result = 'contact'; pitch.contact = { dir, ang, v };
-}
 function cpuSwing() { // the pencils' batter decides on your pitch
   const off = Math.abs(pitch.tx + (pitch.sway || 0) * 0.9), inZone = off <= 30;
   const swings = Math.random() < (inZone ? 0.85 : off < 55 ? 0.4 : 0.1);
@@ -188,34 +184,37 @@ function launch(c) {
   SFX.crack(0.6 + (c.v - 7) / 7);
   const rad = c.dir * Math.PI / 180, a = c.ang * Math.PI / 180;
   const vz = c.v * Math.sin(a), vh = c.v * Math.cos(a);
-  const T = Math.max(6, 2 * vz / GRAV);
+  const z0 = 8, T = (vz + Math.sqrt(vz * vz + 2 * GRAV * z0)) / GRAV;
   const land = { x: HOME.x + Math.cos(rad) * vh * T, y: HOME.y + Math.sin(rad) * vh * T };
   const foul = c.dir > -44 || c.dir < -136;
-  play = { t: 0, T, x: HOME.x, y: HOME.y, z: 0, vx: Math.cos(rad) * vh, vy: Math.sin(rad) * vh, vz, land, dist: Math.hypot(land.x - HOME.x, land.y - HOME.y), foul, ang: c.ang, phase: 'flight', fielder: null, outcome: null, bounce: 0 };
+  play = { t: 0, T, x: HOME.x, y: HOME.y, z: z0, z0, vx: Math.cos(rad) * vh, vy: Math.sin(rad) * vh, vz, land, dist: Math.hypot(land.x - HOME.x, land.y - HOME.y), foul, ang: c.ang, phase: 'flight', fielder: null, outcome: null, bounce: 0 };
   state = 'play';
   // who goes after it
   const zAtFence = fenceHeightAt(play);
   if (!foul && play.dist >= FENCE_R && zAtFence > 8) { play.outcome = { kind: 'hr' }; }
   else {
-    let best = null, bd = 1e9; for (const k in fielders) { const f = fielders[k]; const d = Math.hypot(f.x - land.x, f.y - land.y); if (d < bd) { bd = d; best = k; } }
-    play.fielder = best; const f = fielders[best]; f.tx = land.x; f.ty = land.y;
-    const canReach = bd / FIELDER_SPD <= T - 4;
+    const catchT = c.ang > 9 && vz * vz >= 2 * GRAV * (12 - z0) ? (vz + Math.sqrt(vz * vz - 2 * GRAV * (12 - z0))) / GRAV : T;
+    const target = { x: HOME.x + play.vx * catchT, y: HOME.y + play.vy * catchT };
+    let best = null, bd = 1e9; for (const k in fielders) { const f = fielders[k]; const d = Math.hypot(f.x - target.x, f.y - target.y); if (d < bd) { bd = d; best = k; } }
+    play.fielder = best; const f = fielders[best]; f.tx = target.x; f.ty = target.y;
+    const canReach = bd / FIELDER_SPD <= catchT - 4;
     if (foul) play.outcome = { kind: canReach && c.ang > 22 ? 'foulout' : 'foul' };
     else if (c.ang > 22) play.outcome = { kind: canReach ? 'flyout' : 'hit', bases: hitBases(play.dist, c.ang) };
     else if (c.ang > 9) play.outcome = { kind: bd < 46 && canReach ? 'lineout' : 'hit', bases: hitBases(play.dist, c.ang) };
     else { // grounder: an infielder tries to cut it off and beat the runner to first
       const infield = ['1B', '2B', 'SS', '3B', 'P'].map(k => ({ k, f: fielders[k] }));
       let cut = null;
-      for (let t = 4; t < 90; t += 3) { const bx = HOME.x + play.vx * t * Math.pow(0.985, t), by = HOME.y + play.vy * t * Math.pow(0.985, t); if (Math.hypot(bx - HOME.x, by - HOME.y) > 300) break; for (const { k, f } of infield) { if (Math.hypot(f.x - bx, f.y - by) / FIELDER_SPD <= t) { cut = { k, t, x: bx, y: by }; break; } } if (cut) break; }
-      if (cut) { const f = fielders[cut.k]; f.tx = cut.x; f.ty = cut.y; play.fielder = cut.k; const throwT = Math.hypot(cut.x - BASES[1].x, cut.y - BASES[1].y) / 9; const runnerT = 170 / RUNNER_SPD + 8; play.outcome = { kind: cut.t + 12 + throwT < runnerT ? 'groundout' : 'hit', bases: 1 }; play.cut = cut; }
+      for (let t = 4; t < 90; t += 3) { const travel = Math.min(t, Math.ceil(T)) + (t > Math.ceil(T) ? .985 * (1 - Math.pow(.985, t - Math.ceil(T))) / .015 : 0); const bx = HOME.x + play.vx * travel, by = HOME.y + play.vy * travel; if (t < T) continue; if (Math.hypot(bx - HOME.x, by - HOME.y) > 300) break; for (const { k, f } of infield) { if (Math.hypot(f.x - bx, f.y - by) / FIELDER_SPD <= t) { cut = { k, t, x: bx, y: by }; break; } } if (cut) break; }
+      if (cut) { const f = fielders[cut.k]; f.tx = cut.x; f.ty = cut.y; play.fielder = cut.k; const throwT = Math.hypot(cut.x - BASES[1].x, cut.y - BASES[1].y) / 9; const runnerT = 170 / RUNNER_SPD + 8; play.outcome = { kind: cut.t + 12 + throwT < runnerT ? 'groundout' : 'hit', bases: 1 }; play.cut = cut; play.throwDuration = 12 + throwT; }
       else play.outcome = { kind: 'hit', bases: play.dist > 330 ? 2 : 1 };
     }
   }
+  if (['flyout', 'lineout', 'foulout'].includes(play.outcome.kind)) play.catchHeight = 12;
   // runners start moving on contact (they hold on fly balls until it drops)
   const o = play.outcome; const goes = o.kind === 'hit' || o.kind === 'hr' || o.kind === 'groundout';
   runnersAnim = []; if (goes) startRunners(o.kind === 'hr' ? 4 : o.bases || 1, o.kind === 'groundout');
 }
-function fenceHeightAt(p) { const th = FENCE_R / Math.hypot(p.vx, p.vy); return p.vz * th - 0.5 * GRAV * th * th; }
+function fenceHeightAt(p) { const th = FENCE_R / Math.hypot(p.vx, p.vy); return p.z0 + p.vz * th - 0.5 * GRAV * th * th; }
 function hitBases(dist, ang) { if (dist > 400) return 3; if (dist > 300) return 2; return 1; }
 function startRunners(n, batterOut) {
   const runners = [];
@@ -234,7 +233,7 @@ function resolvePlay() {
     game.bases = nb; if (runs) { game.score[scoreFor] += runs; game.line[scoreFor][game.inning - 1] = (game.line[scoreFor][game.inning - 1] || 0) + runs; }
     return runs;
   };
-  if (o.kind === 'hr') { const r = applyRunners(4, false); game.hits[scoreFor]++; text = 'HOME RUN!!'; const ft = Math.round(play.dist * 0.92 + Math.random() * 12); sub = `${ft} feet` + (r > 1 ? ` · ${r} runs score!` : '!'); color = batting() ? INK : RED; SFX.hit(true);
+  if (o.kind === 'hr') { const r = applyRunners(4, false); game.hits[scoreFor]++; text = 'HOME RUN!!'; const ft = Math.round(play.dist * 0.92); sub = `${ft} feet` + (r > 1 ? ` · ${r} runs score!` : '!'); color = batting() ? INK : RED; SFX.hit(true);
     for (let i = 0; i < 5; i++) setTimeout(() => burst(HOME.x - 200 + Math.random() * 400, 120 + Math.random() * 150, i % 2 ? RED : INK), i * 180);
     if (batting()) fanDo('cheer', 260); else fanDo('facepalm', 160); }
   else if (o.kind === 'hit') { const r = applyRunners(o.bases, false); game.hits[scoreFor]++; text = ['', 'single!', 'DOUBLE!', 'TRIPLE!'][o.bases]; sub = r ? `${r} run${r > 1 ? 's' : ''} score${r > 1 ? '' : 's'}` : ''; color = batting() ? INK : RED; SFX.hit(o.bases > 1); if (batting()) fanDo('cheer', o.bases > 1 ? 200 : 120); }
@@ -247,7 +246,7 @@ function resolvePlay() {
 }
 function recordOut() { game.outs++; game.balls = 0; game.strikes = 0; }
 function afterPlay() {
-  play = null; pitch = null; swing = null; resetFielders(); holdPlate = 0; caught = null; lastContact = null;
+  play = null; pitch = null; swing = null; impactPause = 0; resetFielders(); holdPlate = 0; caught = null; lastContact = null;
   if (game.half === 'bottom' && game.inning >= 3 && game.score.pencils > game.score.you) { setTimeout(endGame, 1200); return; }
   if (game.outs >= 3) { setTimeout(changeSides, 1500); return; }
   setTimeout(nextPitch, 1500);
@@ -289,14 +288,15 @@ function onDown(e) {
   if (state === 'howto') { dismissHowto(); e.preventDefault(); return; }
   if (p.x >= NAME_BOX.x && p.x <= NAME_BOX.x + NAME_BOX.w && p.y >= NAME_BOX.y && p.y <= NAME_BOX.y + NAME_BOX.h && state !== 'play') { renameTeam(); e.preventDefault(); return; }
   if (game.over) return;
-  if (state === 'batting' && pitch && !swing) { swingAtPlate(aimPos()); e.preventDefault(); }
+  if (state === 'batting' && pitch && !swing) { swingAtPlate(); e.preventDefault(); }
   else if (state === 'pitchpick' && !pitch) { // aim within the zone box in front of the plate
     if (Math.abs(p.x - HOME.x) < 60 && Math.abs(p.y - (HOME.y - 34)) < 44) { aimSpot = p; throwPitch(pitchType, Math.max(-44, Math.min(44, p.x - HOME.x))); e.preventDefault(); }
   }
 }
 canvas.addEventListener('mousedown', onDown); canvas.addEventListener('touchstart', onDown, { passive: false });
 window.addEventListener('mousemove', e => { mouse = canvasPos(e); });
-window.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.code === 'Space' && state === 'batting' && pitch && !swing) { e.preventDefault(); swingAtPlate(aimPos()); } });
+window.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.code === 'Space' && !e.repeat && state === 'batting' && pitch && !swing) { e.preventDefault(); swingAtPlate(); } });
+document.getElementById('swing-button').onclick = () => { SFX.resume(); if (state === 'batting') swingAtPlate(); };
 pitchesEl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; SFX.click(); pitchType = b.dataset.p; updateUI(); });
 document.getElementById('newgame').onclick = () => { SFX.resume(); SFX.click(); newGame(); };
 document.getElementById('howto').onclick = () => { SFX.resume(); SFX.click(); if (!pitch && !play && !game.over) { state = 'howto'; updateUI(); } };
@@ -307,189 +307,149 @@ const muteBtn = document.getElementById('mute'); muteBtn.innerHTML = SPK_ON;
 muteBtn.onclick = () => { SFX.resume(); muteBtn.innerHTML = SFX.toggleMute() ? SPK_OFF : SPK_ON; };
 
 
-// ---------- the batting view: behind the plate, looking out at the whole ballpark ----------
-const PV = { x0: 190, x1: 945, hz: 262, ZX: 570, ZY: 500, ZW: 124, ZH: 140, mound: { x: 570, y: 392 }, hand: { x: 582, y: 336 } };
-const GREEN = '#6f9a5a', PAPER = 'rgb(253,251,244)';
-let view = 0, holdPlate = 0, caught = null, lastContact = null;      // view: 0 = the diamond, 1 = behind the plate (crossfades between)
-const plateBg = document.createElement('canvas'); plateBg.width = W; plateBg.height = H;
-const sceneCv = document.createElement('canvas'); sceneCv.width = W; sceneCv.height = H; const sctx = sceneCv.getContext('2d'); const sink = NotebookInk(sctx);
-// an illustrated plate can replace the drawn backdrop later: drop plate-batting.webp next to this file
-let plateCut = null; function usePlateImage(url) { const im = new Image(); im.onload = () => { plateCut = keyOut(im); }; im.src = url; }   // usePlateImage('plate-batting.webp') swaps in an illustrated backdrop
-function keyOut(img) { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; const g = c.getContext('2d'); g.drawImage(img, 0, 0); const im = g.getImageData(0, 0, c.width, c.height), d = im.data; let br = 0, bg = 0, bb = 0; for (const [px, py] of [[2, 2], [c.width - 3, 2], [2, c.height - 3], [c.width - 3, c.height - 3]]) { const i = (py * c.width + px) * 4; br += d[i] / 4; bg += d[i + 1] / 4; bb += d[i + 2] / 4; } for (let i = 0; i < d.length; i += 4) { const dist = Math.hypot(d[i] - br, d[i + 1] - bg, d[i + 2] - bb); d[i + 3] = Math.round(255 * Math.max(0, Math.min(1, (dist - 22) / 45))); } g.putImageData(im, 0, 0); return c; }
-function wallY(x) { const t = (x - PV.x0) / (PV.x1 - PV.x0); return PV.hz + 40 * Math.pow(Math.abs(t - 0.5) * 2, 2); }
-function fillScribble(g, pts, color, n, alpha, len = 6) { // colored-pencil fill: lots of short strokes clipped to a shape
-  g.save(); g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.clip();
-  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9; pts.forEach(p => { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); });
-  g.strokeStyle = color; g.lineWidth = 1.2; g.globalAlpha = alpha; g.beginPath();
-  for (let i = 0; i < n; i++) { const x = minX + Math.random() * (maxX - minX), y = minY + Math.random() * (maxY - minY), a = -0.4 + Math.random() * 0.5; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len); }
-  g.stroke(); g.restore(); g.globalAlpha = 1;
+// ---------- side-on batting: one button, readable ball, automatic alignment ----------
+const PV = { ZX: 400, ZY: 460, ZW: 48, ZH: 100, mound: { x: 835, y: 560 }, hand: { x: 803, y: 428 } };
+let view = 0, holdPlate = 0, caught = null, lastContact = null, impactPause = 0;
+const sceneCv = document.createElement('canvas'); sceneCv.width = W; sceneCv.height = H;
+const sctx = sceneCv.getContext('2d'), sink = NotebookInk(sctx);
+const SWING_CONTACT = 6, CONTACT_WINDOW = 20, PLATE_HOLD = 38;
+function platePitchPos(pt, t) {
+  const u = Math.max(0, t / pt.T), arc = Math.sin(Math.min(1,u) * Math.PI) * (pt.type === 'curve' ? 30 : 12);
+  return { x: PV.hand.x + (PV.ZX - PV.hand.x) * (u > 1 ? 1 + (u - 1) * .35 : u),
+    y: PV.hand.y + (PV.ZY + pt.fy - PV.hand.y) * u - arc, r: 8, u };
 }
-function ellipsePts(cx, cy, rx, ry, n = 40) { return Array.from({ length: n }, (_, i) => ({ x: cx + Math.cos(i / n * 6.283) * rx, y: cy + Math.sin(i / n * 6.283) * ry })); }
-function stickAt(k, x, y, sc, col, id) { // a small pencil fielder, feet at (x, y)
-  k.circle(x, y - 22 * sc, 6 * sc, id, col, 1.2, 1); k.line(x, y - 16 * sc, x, y - 3 * sc, id + 1, col, 1.1, 1);
-  k.line(x, y - 3 * sc, x - 6 * sc, y + 8 * sc, id + 2, col, 1.1, 1); k.line(x, y - 3 * sc, x + 6 * sc, y + 8 * sc, id + 3, col, 1.1, 1);
-  k.line(x, y - 12 * sc, x - 9 * sc, y - 4 * sc, id + 4, col, 1.1, 1); k.line(x, y - 12 * sc, x + 9 * sc, y - 14 * sc, id + 5, col, 1.1, 1); k.circle(x + 10 * sc, y - 16 * sc, 3 * sc, id + 6, col, 1, 1);
+function timingContact(dt, strike) {
+  if (!strike || Math.abs(dt) > CONTACT_WINDOW) return null;
+  const q = Math.max(0, 1 - Math.pow(Math.abs(dt) / CONTACT_WINDOW, 1.5));
+  return { dir: -90 - dt * 2.1, ang: 12 + q * 17, v: 8 + q * 6.5, q };
 }
-function buildPlateBg() {
-  const g = plateBg.getContext('2d'), k = NotebookInk(g); g.clearRect(0, 0, W, H);
-  const { x0, x1, hz } = PV, cx = PV.ZX;
-  const L = (a, b, c2, d, id, col = GRAPHITE, w = 1) => k.line(a, b, c2, d, id, col, w, 1);
-  // sky: a faint wash, clouds, a blimp towing a banner
-  const skyG = g.createLinearGradient(0, 80, 0, hz); skyG.addColorStop(0, 'rgba(143,178,201,.14)'); skyG.addColorStop(1, 'rgba(143,178,201,0)'); g.fillStyle = skyG; g.fillRect(x0, 80, x1 - x0, hz - 80);
-  const cloud = (x, y, w, id) => { k.smudge(ellipsePts(x, y - 2, w / 2, w * 0.14, 14), id, 0.045, -0.4, 5); g.strokeStyle = PEN_LT; g.lineWidth = 1.1; g.globalAlpha = 0.7; for (let i = 0; i < 5; i++) { const bx = x - w / 2 + (i + 0.5) * w / 5; g.beginPath(); g.arc(bx, y, w / 9, Math.PI, 0); g.stroke(); } g.globalAlpha = 1; L(x - w / 2, y + 1, x + w / 2, y + 1, id + 1, PEN_LT, 1.1); };
-  cloud(330, 130, 120, 10); cloud(760, 112, 90, 12); cloud(560, 152, 70, 14);
-  g.strokeStyle = PEN_MD; g.lineWidth = 1.3; g.globalAlpha = 0.85; g.beginPath(); g.ellipse(826, 150, 44, 14, -0.04, 0, 7); g.stroke(); g.globalAlpha = 1;
-  L(870, 150, 892, 143, 20, PEN_MD, 1.2); L(870, 150, 892, 157, 21, PEN_MD, 1.2); L(892, 143, 892, 157, 22, PEN_MD, 1.2); L(826, 164, 826, 170, 23, PEN_MD, 1);
-  k.text("EAT AT JOE'S", 826, 155, { size: 10, color: PEN_MD, font: 'Patrick Hand', weight: 400 });
-  // light towers
-  for (const tx of [318, 822]) { const wy = wallY(tx) - 58; L(tx - 2, wy, tx - 5, 140, 30 + tx, PEN_MD, 1.4); L(tx + 2, wy, tx + 5, 140, 31 + tx, PEN_MD, 1.4); for (let y = wy - 18; y > 150; y -= 22) L(tx - 4, y, tx + 4, y - 11, 32 + y + tx, PEN_LT, 0.8); const head = [{ x: tx - 22, y: 128 }, { x: tx + 22, y: 128 }, { x: tx + 18, y: 142 }, { x: tx - 18, y: 142 }]; k.poly(head, 40 + tx, PEN_MD, 1.2, 1); k.hatch(head, 41 + tx, PEN_MD, 3, 0, 0.5); }
-  // bleachers: the roof line, seat rows, sections, and a scribbled crowd that gets denser toward the front
-  const top = x => wallY(x) - 58;
-  k.smudge(Array.from({ length: 30 }, (_, i) => { const x = x0 + (x1 - x0) * i / 29; return { x, y: top(x) }; }).concat(Array.from({ length: 30 }, (_, i) => { const x = x1 - (x1 - x0) * i / 29; return { x, y: wallY(x) - 3 }; })), 50, 0.05, -0.2, 5);
-  g.strokeStyle = PEN_LT; g.lineWidth = 1; g.globalAlpha = 0.9; for (let r = 0; r <= 4; r++) { g.beginPath(); for (let x = x0; x <= x1; x += 8) { const y = wallY(x) - 6 - r * 13; x === x0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke(); } g.globalAlpha = 1;
-  for (let x = x0 + 90; x < x1 - 20; x += 95) L(x, top(x), x, wallY(x) - 5, 60 + x, PEN_LT, 0.9);
-  g.strokeStyle = PEN_MD; g.lineWidth = 1.4; g.beginPath(); for (let x = x0; x <= x1; x += 8) { const y = top(x); x === x0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
-  g.strokeStyle = GRAPHITE; g.lineWidth = 1; for (let i = 0; i < 1600; i++) { const x = x0 + 6 + Math.random() * (x1 - x0 - 12); const depth = Math.pow(Math.random(), 0.7); const y = top(x) + 6 + depth * 44; g.globalAlpha = 0.12 + depth * 0.18; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - .5) * 6, y + (Math.random() - .5) * 5); g.stroke(); } g.globalAlpha = 1;
-  for (let x = x0 + 14; x < x1 - 10; x += 22) { const y = wallY(x) - 9, j = (Math.random() - .5) * 4; k.circle(x + j, y - 7, 2.6, 70 + x, PEN_MD, 1, 1); L(x + j, y - 4, x + j, y + 1, 71 + x, PEN_MD, 1); if (Math.random() > 0.7) { L(x + j, y - 2, x + j + 4, y - 9, 72 + x, PEN_MD, 1); L(x + j, y - 2, x + j - 4, y - 9, 73 + x, PEN_MD, 1); } }
-  for (const [sx, txt] of [[420, 'GO!'], [700, '#1'], [880, 'K'], [262, 'HEY']]) { const y = wallY(sx) - 27; k.poly([{ x: sx - 12, y: y - 9 }, { x: sx + 12, y: y - 9 }, { x: sx + 12, y: y + 5 }, { x: sx - 12, y: y + 5 }], 80 + sx, PEN_MD, 1, 1); k.text(txt, sx, y + 2, { size: 10, color: PEN_DK, font: 'Patrick Hand', weight: 400 }); }
-  // the scoreboard frame in center (numbers drawn live)
-  k.poly([{ x: cx - 60, y: 176 }, { x: cx + 60, y: 176 }, { x: cx + 60, y: 240 }, { x: cx - 60, y: 240 }], 90, INK, 1.8, 2);
-  L(cx - 42, 240, cx - 42, 258, 94, INK, 1.4); L(cx + 42, 240, cx + 42, 258, 95, INK, 1.4);
-  k.text('SCOREBOARD', cx, 190, { size: 11, color: INK, font: 'Patrick Hand', weight: 400, alpha: 0.85 }); L(cx - 50, 195, cx + 50, 195, 96, INK, 0.8);
-  // the outfield wall: bold top edge, padded face shaded with vertical strokes, ads, distance markers, foul poles
-  const wallBot = x => wallY(x) + 18;
-  g.strokeStyle = INK; g.lineWidth = 2.4; g.globalAlpha = 0.9; g.beginPath(); for (let x = x0; x <= x1; x += 6) { const y = wallY(x) + k.jit(3, x, 1.5); x === x0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
-  g.lineWidth = 1.4; g.beginPath(); for (let x = x0; x <= x1; x += 6) { const y = wallBot(x); x === x0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke(); g.globalAlpha = 1;
-  g.strokeStyle = INK; g.lineWidth = 0.8; for (let x = x0 + 2; x < x1; x += 3.2) { g.globalAlpha = 0.12 + 0.2 * ((x % 9.6) / 9.6); g.beginPath(); g.moveTo(x, wallY(x) + 4); g.lineTo(x + 0.6, wallBot(x) - 1); g.stroke(); } g.globalAlpha = 1;
-  for (const [ax, txt] of [[300, 'GO TEAM'], [455, 'PENCILS 4 SALE'], [700, 'DOODLE COLA'], [850, 'HIT IT HERE']]) k.text(txt, ax, wallY(ax) + 14, { size: 11, color: INK, font: 'Patrick Hand', weight: 400, alpha: 0.9 });
-  for (const [mx, ft] of [[228, '330'], [cx, '400'], [908, '330']]) k.text(ft, mx, wallY(mx) + 14, { size: 11, color: RED, font: 'Patrick Hand', weight: 400, alpha: 0.9 });
-  for (const px of [x0 + 10, x1 - 10]) { L(px, wallBot(px), px, wallY(px) - 70, 100 + px, INK, 2); k.poly([{ x: px, y: wallY(px) - 70 }, { x: px + (px < cx ? 10 : -10), y: wallY(px) - 64 }, { x: px, y: wallY(px) - 58 }], 102 + px, RED, 1.2, 1); }
-  // grass: green pencil strokes, sparse and pale far away, dense up close, mowed in bands
-  const dirt = ellipsePts(cx, 425, 300, 82), homeDirt = ellipsePts(cx, 606, 112, 40);
-  const inside = (pts, x, y) => { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const a = pts[i], b = pts[j]; if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
-  for (let y = 302; y < 690; y += 4) { const depth = (y - 302) / 388, band = Math.floor((y - 302) / 36) % 2; const n = Math.round(24 + depth * 110); for (let i = 0; i < n; i++) { const x = x0 + 12 + Math.random() * (x1 - x0 - 24); if (y < wallBot(x) + 2 || inside(dirt, x, y) || inside(homeDirt, x, y)) continue; g.strokeStyle = GREEN; g.globalAlpha = (band ? 0.15 : 0.24) + depth * 0.12; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 3 + Math.random() * 4, y - 1 + Math.random() * 2); g.stroke(); } } g.globalAlpha = 1;
-  // foul lines out to the poles
-  k.longLine(cx - 38, 614, x0 + 10, wallBot(x0 + 10), 110, INK, 1.8, 1, 1.2); k.longLine(cx + 38, 614, x1 - 10, wallBot(x1 - 10), 111, INK, 1.8, 1, 1.2);
-  // infield dirt, the grass diamond, base paths, mound, bases, plate, batter's boxes
-  fillScribble(g, dirt, DIRT, 2600, 0.22, 7); g.strokeStyle = DIRT; g.lineWidth = 1.2; g.globalAlpha = 0.6; g.beginPath(); dirt.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.stroke(); g.globalAlpha = 1;
-  const b1 = { x: 790, y: 432 }, b2 = { x: cx, y: 342 }, b3 = { x: 350, y: 432 }, hp = { x: cx, y: 596 };
-  const inner = [{ x: hp.x, y: hp.y - 24 }, { x: b1.x - 18, y: b1.y - 2 }, { x: b2.x, y: b2.y + 8 }, { x: b3.x + 18, y: b3.y - 2 }];
-  g.save(); g.beginPath(); inner.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.clip(); g.fillStyle = PAPER; g.globalAlpha = 0.9; g.fill(); g.globalAlpha = 1; g.restore();
-  fillScribble(g, inner, GREEN, 1400, 0.22, 6);
-  for (const [a, b] of [[hp, b1], [b1, b2], [b2, b3], [b3, hp]]) { g.strokeStyle = DIRT; g.lineWidth = 8; g.globalAlpha = 0.35; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); g.globalAlpha = 1; k.longLine(a.x, a.y, b.x, b.y, 120 + a.x, INK, 1, 1, 1); }
-  fillScribble(g, homeDirt, DIRT, 900, 0.22, 6);
-  k.smudge(ellipsePts(cx, 392, 44, 12), 130, 0.1, 0, 3); fillScribble(g, ellipsePts(cx, 392, 44, 12), DIRT, 260, 0.3, 5); g.strokeStyle = DIRT; g.globalAlpha = 0.7; g.lineWidth = 1.2; g.beginPath(); g.ellipse(cx, 392, 44, 12, 0, 0, 7); g.stroke(); g.globalAlpha = 1; L(cx - 8, 388, cx + 8, 388, 131, INK, 2);
-  for (const [b, w] of [[b1, 12], [b2, 9], [b3, 12]]) { const q = [{ x: b.x - w, y: b.y }, { x: b.x + w, y: b.y }, { x: b.x + w * 0.8, y: b.y + w * 0.55 }, { x: b.x - w * 0.8, y: b.y + w * 0.55 }]; g.fillStyle = PAPER; g.beginPath(); q.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.fill(); k.poly(q, 140 + b.x, INK, 1.5, 1); }
-  const plate = [{ x: cx - 15, y: 604 }, { x: cx + 15, y: 604 }, { x: cx + 15, y: 612 }, { x: cx, y: 620 }, { x: cx - 15, y: 612 }]; g.fillStyle = PAPER; g.beginPath(); plate.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.fill(); k.poly(plate, 150, INK, 2, 2);
-  k.poly([{ x: cx - 76, y: 642 }, { x: cx - 24, y: 642 }, { x: cx - 26, y: 584 }, { x: cx - 70, y: 584 }], 152, INK, 1.4, 1); k.poly([{ x: cx + 24, y: 642 }, { x: cx + 76, y: 642 }, { x: cx + 70, y: 584 }, { x: cx + 26, y: 584 }], 156, INK, 1.4, 1);
-  // fielders, far and small, in pencil
-  for (const [fx, fy, sc, id] of [[335, 306, 0.5, 200], [575, 292, 0.45, 210], [805, 306, 0.5, 220], [380, 430, 0.75, 230], [480, 356, 0.62, 240], [660, 356, 0.62, 250], [762, 430, 0.75, 260]]) stickAt(k, fx, fy, sc, PEN_DK, id);
-  // the drawing fades into the page at its edges
-  for (const [gx0, gx1] of [[x0 - 2, x0 + 44], [x1 + 2, x1 - 44]]) { const gr = g.createLinearGradient(gx0, 0, gx1, 0); gr.addColorStop(0, PAPER); gr.addColorStop(1, 'rgba(253,251,244,0)'); g.fillStyle = gr; g.fillRect(Math.min(gx0, gx1), 60, Math.abs(gx1 - gx0), H - 60); }
-  const gt = g.createLinearGradient(0, 70, 0, 120); gt.addColorStop(0, PAPER); gt.addColorStop(1, 'rgba(253,251,244,0)'); g.fillStyle = gt; g.fillRect(x0 - 2, 70, x1 - x0 + 4, 50);
+function batPose(t, aim) {
+  const h = aim.y, x = aim.x - 82;
+  const keys = [[-1,315,428,-37,-98,0],[0,311,431,-46,-94,-3],
+    [2,316,439,-50,-75,1],[4,x-7,h-2,43,-37,9],
+    [6,x,h,109,0,15],[12,x+10,h-2,104,-7,21],
+    [22,320,435,28,-55,19],[38,300,418,-85,-55,12]];
+  const time = Math.max(-1,Math.min(38,t)); let i=0;
+  while(i<keys.length-2 && time>keys[i+1][0])i++;
+  const a=keys[i],b=keys[i+1],u=(time-a[0])/(b[0]-a[0]);
+  return Object.fromEntries(['hx','hy','dx','dy','lean'].map((key,j)=>[key,a[j+1]+(b[j+1]-a[j+1])*u]));
 }
-function platePitchPos(pt, t) { // the pitch in the batter's-eye view: eases toward the zone, curves and changeups fall late
-  const u = Math.min(1, t / pt.T), e = Math.pow(u, 1.45), late = Math.max(0, u - 0.5) / 0.5;
-  const hump = Math.sin(u * Math.PI) * (pt.type === 'curve' ? 30 : pt.type === 'change' ? 20 : 12);
-  const endX = PV.ZX + pt.fx - pt.sway * 0.8, endY = PV.ZY + pt.fy - pt.drop;
-  return { x: PV.hand.x + (endX - PV.hand.x) * e + pt.sway * 0.8 * late * late, y: PV.hand.y + (endY - PV.hand.y) * e - hump + pt.drop * late * late, r: 2.4 + 8 * e, u };
+function swingAtPlate() {
+  if (!pitch || swing || state !== 'batting') return;
+  const dt = pitch.T - pitch.t + pitch.wind;
+  // Judge the player's actual button press, not the animation's later contact frame.
+  const contact = timingContact(dt, pitch.strike), from = platePitchPos(pitch,pitch.t);
+  swing = { t:0, pending:true, dt, contact, from,
+    aim:{ x:Math.min(PV.ZX,from.x), y:PV.ZY + Math.max(-25,Math.min(25,pitch.fy)) } };
+  SFX.whiff();
 }
-function aimPos() { return { x: Math.max(PV.ZX - PV.ZW / 2 - 40, Math.min(PV.ZX + PV.ZW / 2 + 40, mouse.x)), y: Math.max(PV.ZY - PV.ZH / 2 - 40, Math.min(PV.ZY + PV.ZH / 2 + 40, mouse.y)) }; }
-function swingAtPlate(aim) { // timing sets direction and power; where the ring sits on the ball sets the launch
-  if (!pitch || swing) return;
-  const dt = (pitch.T - pitch.t) + pitch.wind;
-  swing = { t: 0 }; SFX.whiff();
-  const cross = { x: PV.ZX + pitch.fx, y: PV.ZY + pitch.fy };
-  const err = Math.hypot(aim.x - cross.x, aim.y - cross.y), timing = Math.abs(dt) / 14;
-  const px = PV.ZX + 132, py = PV.ZY - 70;
-  if (timing > 1 || err > 52) { pitch.result = 'swing-miss'; popup(timing > 1 ? (dt > 0 ? 'way early' : 'way late') : Math.abs(aim.x - cross.x) > Math.abs(aim.y - cross.y) ? 'missed it' : aim.y > cross.y ? 'under it' : 'over it', px, py, GRAPHITE, 18); return; }
-  const q = (1 - timing) * (1 - err / 52);
-  const dir = -90 - (dt / 14) * 42 + (Math.random() - .5) * 10;
-  const dy = aim.y - cross.y;                                   // ring under the ball lifts it, over it chops it
-  const ang = Math.max(-8, Math.min(62, 12 + dy * 0.9 + (Math.random() - .5) * 6));
-  const v = 7.5 + q * 7 + Math.random() * 1.2;
-  pitch.result = 'contact'; pitch.contact = { dir, ang, v };
-  const label = timing < 0.15 && err < 14 ? 'PERFECT!' : ang > 50 ? 'popped it up' : ang < 0 ? 'topped it' : Math.abs(dt) <= 4 ? 'good timing' : dt > 0 ? 'early' : 'late';
-  popup(label, px, py, label === 'PERFECT!' ? RED : INK, label === 'PERFECT!' ? 28 : 18);
+function meetPitch() {
+  swing.pending = false;
+  if (!swing.contact) {
+    pitch.result = 'swing-miss';
+    popup(!pitch.strike ? 'let that one go' : swing.dt > 0 ? 'a little early' : 'a little late',550,350,GRAPHITE,24);
+    return;
+  }
+  pitch.done = true; impactPause = 3;
+  lastContact = { cross:{...swing.aim}, dir:swing.contact.dir, ang:swing.contact.ang };
+  holdPlate = PLATE_HOLD;
+  popup(swing.contact.q>.88?'RIGHT ON!':swing.dt>6?'pulled it!':swing.dt < -6?'other way!':'nice contact!',550,350,RED,30);
+  launch(swing.contact);
 }
-function ballOn(c, x, y, r) { c.fillStyle = '#fbf8ee'; c.strokeStyle = PEN_DK; c.lineWidth = Math.max(1, r * 0.22); c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); c.stroke(); if (r > 3.5) { c.strokeStyle = RED; c.lineWidth = Math.max(0.8, r * 0.16); c.beginPath(); c.arc(x - r * 0.32, y, r * 0.78, -1.1, 1.1); c.stroke(); c.beginPath(); c.arc(x + r * 0.32, y, r * 0.78, Math.PI - 1.1, Math.PI + 1.1); c.stroke(); } }
-function drawPitcher(k, c) {
-  const x = PV.mound.x, fy = PV.mound.y, col = PEN_DK, id = 600 + (pitch && pitch.plate ? Math.floor(frame / 6) % 2 * 20 : 0);
-  let pose = 'idle'; if (pitch && pitch.plate) { if (pitch.wind > 16) pose = 'set'; else if (pitch.wind > 5) pose = 'kick'; else if (pitch.wind > 0) pose = 'stride'; else if (pitch.t < 14) pose = 'release'; else pose = 'follow'; }
-  const lean = pose === 'stride' || pose === 'release' ? 4 : 0, head = { x: x + lean, y: fy - 52 }, hip = { x, y: fy - 26 }, sh = { x: head.x, y: head.y + 12 };
-  c.strokeStyle = GRAPHITE; c.globalAlpha = 0.25; c.lineWidth = 1; c.beginPath(); for (let i = -14; i <= 14; i += 3) { c.moveTo(x + i, fy + 3); c.lineTo(x + i + 3, fy + 6); } c.stroke(); c.globalAlpha = 1;
-  k.line(head.x, head.y + 6, hip.x, hip.y, id + 2, col, 1.8, 1);
-  if (pose === 'kick') { k.line(hip.x, hip.y, x - 3, fy, id + 3, col, 1.6, 1); k.line(hip.x, hip.y, x - 13, hip.y - 4, id + 4, col, 1.6, 1); k.line(x - 13, hip.y - 4, x - 11, hip.y + 8, id + 5, col, 1.6, 1); }
-  else if (pose === 'stride' || pose === 'release' || pose === 'follow') { k.line(hip.x, hip.y, x - 16, fy + 2, id + 3, col, 1.6, 1); k.line(hip.x, hip.y, x + 12, fy, id + 4, col, 1.6, 1); }
-  else { k.line(hip.x, hip.y, x - 7, fy, id + 3, col, 1.6, 1); k.line(hip.x, hip.y, x + 7, fy, id + 4, col, 1.6, 1); }
-  if (pose === 'idle') { k.line(sh.x, sh.y, x - 9, sh.y + 10, id + 6, col, 1.5, 1); k.line(sh.x, sh.y, x + 9, sh.y + 8, id + 7, col, 1.5, 1); k.circle(x - 10, sh.y + 11, 3, id + 8, col, 1.2, 1); }
-  else if (pose === 'set') { k.line(sh.x, sh.y, x - 3, sh.y + 8, id + 6, col, 1.5, 1); k.line(sh.x, sh.y, x + 3, sh.y + 8, id + 7, col, 1.5, 1); k.circle(x, sh.y + 10, 3.5, id + 8, col, 1.2, 1); }
-  else if (pose === 'kick') { k.line(sh.x, sh.y, x - 8, sh.y - 7, id + 6, col, 1.5, 1); k.line(sh.x, sh.y, x + 8, sh.y - 7, id + 7, col, 1.5, 1); k.circle(x - 9, sh.y - 9, 3.5, id + 8, col, 1.2, 1); }
-  else if (pose === 'stride') { k.line(sh.x, sh.y, x - 12, sh.y + 2, id + 6, col, 1.5, 1); k.line(sh.x, sh.y, x + 14, sh.y - 14, id + 7, col, 1.5, 1); ballOn(c, x + 16, sh.y - 16, 3); }
-  else if (pose === 'release') { k.line(sh.x, sh.y, x - 14, sh.y + 6, id + 6, col, 1.5, 1); k.line(sh.x, sh.y, x + 12, sh.y - 2, id + 7, col, 1.5, 1); }
-  else { k.line(sh.x, sh.y, x - 12, sh.y + 12, id + 6, col, 1.5, 1); k.line(sh.x, sh.y, x + 6, sh.y + 14, id + 7, col, 1.5, 1); }
-  k.circle(head.x, head.y, 6.5, id, col, 1.5, 1); k.line(head.x - 7, head.y - 2, head.x + 3, head.y - 3.5, id + 1, col, 1.3, 1);
-  if (pose === 'idle' || pose === 'set') ballOn(c, pose === 'set' ? x : x - 10, sh.y + (pose === 'set' ? 10 : 11), 2.6);
+function ballOn(c,x,y,r) {
+  c.save(); c.fillStyle='#fffdf4';c.strokeStyle=INK;c.lineWidth=1.8;
+  c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fill();c.stroke();
+  c.strokeStyle=RED;c.lineWidth=1.2;
+  for(const side of [-1,1]){c.beginPath();c.arc(x+side*r*.35,y,r*.72,side<0?-1.1:Math.PI-1.1,side<0?1.1:Math.PI+1.1);c.stroke();}
+  c.restore();
 }
-function drawBatter(k, c) {
-  const bx = 474, hipY = 548, col = INK, sw = swing ? swing.t : -1;
-  let ang = -2.1, hx = 512, hy = 452, lean = 0;                   // stance: bat cocked up over the back shoulder
-  if (sw >= 0) { if (sw < 3) { ang = -2.35; hx = 518; hy = 458; } else if (sw <= 9) { const u = (sw - 3) / 6; ang = -2.35 + u * 2.6; hx = 518 + u * 28; hy = 458 + u * 40; lean = u * 10; } else { const u = Math.min(1, (sw - 9) / 8); ang = 0.25 + u * 0.9; hx = 546 - u * 18; hy = 498 + u * 10; lean = 10 - u * 4; } }
-  const id = 800 + (sw >= 0 ? Math.floor(frame / 5) % 2 * 30 : 0);
-  c.strokeStyle = GRAPHITE; c.globalAlpha = 0.28; c.lineWidth = 1.1; c.beginPath(); for (let i = -44; i <= 44; i += 5) { const hh = Math.sqrt(Math.max(0, 1 - (i / 46) * (i / 46))) * 11; c.moveTo(bx + 14 + i, 656 - hh); c.lineTo(bx + 18 + i, 656 + hh); } c.stroke(); c.globalAlpha = 1;
-  const hip = { x: bx + lean * 0.4, y: hipY };
-  k.line(hip.x - 6, hip.y, bx - 12, 648, id + 1, col, 4, 1); k.line(hip.x + 6, hip.y, bx + 26, 616, id + 2, col, 4, 1);
-  k.poly([{ x: bx - 24, y: 646 }, { x: bx - 2, y: 646 }, { x: bx, y: 655 }, { x: bx - 26, y: 655 }], id + 3, col, 1.8, 1); k.poly([{ x: bx + 16, y: 614 }, { x: bx + 36, y: 614 }, { x: bx + 38, y: 622 }, { x: bx + 14, y: 622 }], id + 4, col, 1.8, 1);
-  const tor = [{ x: bx - 26 + lean, y: 456 }, { x: bx + 26 + lean, y: 456 }, { x: bx + 20 + lean * 0.5, y: hipY + 4 }, { x: bx - 18 + lean * 0.5, y: hipY + 4 }];
-  c.fillStyle = 'rgba(253,251,244,.92)'; c.beginPath(); tor.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.fill();
-  k.hatch([tor[0], { x: bx - 4 + lean, y: 456 }, { x: bx - 2 + lean * 0.5, y: hipY + 4 }, tor[3]], id + 5, INK, 5, 1.1, 0.22);
-  k.poly(tor, id + 6, col, 3, 2); k.text('9', bx + 5 + lean * 0.7, 514, { size: 34, color: INK, alpha: 0.8 });
-  k.line(bx - 20 + lean, 464, hx - 6, hy + 4, id + 7, col, 4, 1); k.line(bx + 20 + lean, 464, hx + 4, hy + 6, id + 8, col, 4, 1);
-  const bl = 118, ex = hx + Math.cos(ang) * bl, ey = hy + Math.sin(ang) * bl;
-  k.line(hx, hy, ex, ey, id + 9, col, 6, 1); k.line(hx + Math.cos(ang) * bl * 0.55, hy + Math.sin(ang) * bl * 0.55, ex, ey, id + 10, col, 9, 1);
-  c.fillStyle = INK; c.beginPath(); c.arc(hx - Math.cos(ang) * 6, hy - Math.sin(ang) * 6, 5, 0, 7); c.fill(); k.circle(hx, hy, 7, id + 11, col, 2, 1);
-  if (sw >= 3 && sw <= 12) { c.strokeStyle = INK; c.globalAlpha = 0.35 * (1 - (sw - 3) / 10); c.lineWidth = 2; c.setLineDash([6, 5]); c.beginPath(); c.arc(hx, hy, bl * 0.92, -2.3, ang, false); c.stroke(); c.setLineDash([]); c.globalAlpha = 1; }
-  const hd = { x: bx + 2 + lean * 0.8, y: 428 };
-  c.fillStyle = 'rgba(253,251,244,.95)'; c.beginPath(); c.arc(hd.x, hd.y, 21, 0, 7); c.fill();
-  k.circle(hd.x, hd.y, 22, id + 12, col, 3, 2); k.scribble(hd.x, hd.y - 5, 19, id + 13, INK, 30, 0.45);
-  k.line(hd.x - 22, hd.y + 5, hd.x + 22, hd.y + 5, id + 14, col, 2.5, 1); k.line(hd.x + 14, hd.y + 7, hd.x + 28, hd.y + 3, id + 15, col, 2.5, 1);
+function drawSideHitter(k,c) {
+  const aim=swing?.aim || {x:PV.ZX,y:PV.ZY},t=swing?swing.t:-1;
+  const pose=batPose(t,aim),{hx,hy,dx,dy,lean}=pose;
+  const turn=Math.max(0,Math.min(1,t/14)),shift=lean*.45;
+  const shape=(points,id,fill='#fdfbf4',hatch=false)=>{
+    const pts=points.map(([x,y])=>({x,y}));c.fillStyle=fill;c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y));c.closePath();c.fill();
+    if(hatch)k.hatch(pts,id+20,INK,5,-.6,.24);k.poly(pts,id,INK,1.8,2);
+  };
+  // Short, baggy uniform with bent knees; rear heel lifts as weight shifts forward.
+  shape([[281+shift,493],[302+shift,499],[283+shift,528],[268+turn*12,562-turn*8],[255+turn*12,560-turn*8],[260+shift,524]],810,'#fdfbf4',true);
+  shape([[297+shift,493],[319+shift,493],[340+shift*.3,521],[342,562],[328,562],[324,529],[302+shift,514]],840,'#fdfbf4',true);
+  shape([[254+turn*12,552-turn*8],[270+turn*12,552-turn*8],[275+turn*12,566-turn*8],[249+turn*12,566-turn*8]],865,INK);
+  shape([[327,553],[342,553],[350,562],[350,568],[325,568]],880,INK);
+  const shoulder=294+lean;
+  shape([[shoulder-15,417],[shoulder+13,419],[shoulder+25,438],[312+shift,494],[278+shift,495],[275+shift,451]],900,'#fdfbf4',true);
+  k.line(281+shift,488,311+shift,488,908,INK,2,2);
+  k.text('9',shoulder-1,467,{size:24,color:INK,alpha:1-turn*.5});
+  // Bent forearms and two joined hands on the handle.
+  const arm=(x,y,ex,ey,id)=>{k.line(x,y,ex,ey,id,INK,6,1);k.line(ex,ey,hx,hy,id+1,INK,5,1);};
+  arm(shoulder-6,430,shoulder-13,452,930);arm(shoulder+17,432,shoulder+26,453,934);
+  k.line(hx-4,hy,hx+dx,hy+dy,950,INK,3,2);
+  k.line(hx+dx*.53,hy+dy*.53,hx+dx,hy+dy,951,INK,7,2);
+  k.circle(hx,hy,4.5,952,INK,1.7,1);
+  // A simple side profile under a helmet; no facial crosshatching.
+  const headX=295+lean*.25;
+  shape([[headX-11,382],[headX+13,382],[headX+16,396],[headX+21,401],[headX+15,405],[headX+12,418],[headX-5,415],[headX-13,402]],970);
+  c.fillStyle=INK;c.beginPath();c.ellipse(headX-1,386,21,19,-.1,Math.PI,Math.PI*2);c.lineTo(headX+20,390);c.lineTo(headX-22,390);c.closePath();c.fill();
+  k.line(headX-21,390,headX+30,388,980,INK,3,2);
+  c.fillStyle=INK;c.beginPath();c.arc(headX+11,397,1.6,0,7);c.fill();
+  k.line(headX-3,391,headX-3,402,982,INK,3,1);
+  if(t>=6&&t<16){c.strokeStyle='rgba(31,61,158,.2)';c.lineWidth=2;c.beginPath();c.ellipse(hx,hy,105,19,0,Math.PI,Math.PI*2);c.stroke();}
+}
+function drawSidePitcher(k,c) {
+  const x=835,y=552,wind=pitch?.wind||0,throwing=pitch && pitch.t<14 && !wind;
+  const kick=wind>8&&wind<22,lean=throwing?-12:0;
+  const l=(a,b,d,e,id,w=3)=>k.line(a,b,d,e,id,PEN_DK,w,2);
+  k.circle(x+lean,y-122,13,610,PEN_DK,1.8,2);l(x-14+lean,y-126,x+12+lean,y-126,611,4);
+  l(x+lean,y-107,x,y-53,612,9);
+  l(x,y-53,x+13,y,613,4);l(x,y-53,x-19,kick?y-71:y-5,614,4);
+  if(kick)l(x-19,y-71,x-29,y-48,615,3);
+  l(x+lean,y-92,x-22,y-76,616);k.circle(x-24,y-75,8,617,DIRT,2,2);
+  l(x+lean,y-96,throwing?803:x+21,throwing?428:y-112,618);
+  if(wind)ballOn(c,x+21,y-112,6);
+  k.line(811,556,859,556,620,DIRT,2,2);
 }
 function renderPlateScene() {
-  const c = sctx, k = sink, cx = PV.ZX; c.clearRect(0, 0, W, H);
-  if (plateCut) c.drawImage(plateCut, PV.x0, 70, PV.x1 - PV.x0, (PV.x1 - PV.x0) * plateCut.height / plateCut.width); else c.drawImage(plateBg, 0, 0);
-  // live outfield scoreboard
-  k.text(teamName.slice(0, 7), cx - 52, 211, { size: 11, color: INK, font: 'Patrick Hand', weight: 400, align: 'left' }); k.text(String(game.score.you), cx + 50, 212, { size: 14, color: INK, align: 'right' });
-  k.text('PENCILS', cx - 52, 229, { size: 11, color: INK, font: 'Patrick Hand', weight: 400, align: 'left' }); k.text(String(game.score.pencils), cx + 50, 230, { size: 14, color: INK, align: 'right' });
-  drawPitcher(k, c);
-  const inFlight = pitch && pitch.plate && pitch.wind === 0 && !pitch.done;
-  const hot = inFlight && !swing && Math.abs(pitch.T - pitch.t) <= 14;
-  // catcher, crouched behind the zone; the mitt drifts toward where the pitch is headed
-  let mx = cx + 4, my = PV.ZY + 46; if (inFlight) { const u = Math.min(1, pitch.t / pitch.T); mx += pitch.fx * u; my += pitch.fy * 0.5 * u; } if (caught) { mx = caught.x; my = caught.y; }
-  k.line(cx - 22, PV.ZY + 190, cx - 30, PV.ZY + 228, 700, PEN_DK, 3, 1); k.line(cx + 40, PV.ZY + 190, cx + 52, PV.ZY + 226, 701, PEN_DK, 3, 1);
-  c.fillStyle = 'rgba(253,251,244,.92)'; c.beginPath(); c.ellipse(cx + 8, PV.ZY + 168, 42, 34, 0, 0, 7); c.fill(); k.circle(cx + 8, PV.ZY + 168, 42, 702, PEN_DK, 2.4, 1); k.hatch(ellipsePts(cx + 8, PV.ZY + 168, 42, 34, 20), 703, PEN_DK, 6, 1.0, 0.18);
-  c.fillStyle = 'rgba(253,251,244,.92)'; c.beginPath(); c.arc(cx + 8, PV.ZY + 122, 19, 0, 7); c.fill(); k.circle(cx + 8, PV.ZY + 122, 19, 704, PEN_DK, 2.4, 1); for (let i = -1; i <= 1; i++) k.line(cx - 4, PV.ZY + 114 + i * 7, cx + 20, PV.ZY + 113 + i * 7, 705 + i, PEN_DK, 1.2, 1); k.line(cx - 6, PV.ZY + 106, cx - 4, PV.ZY + 138, 708, PEN_DK, 1.2, 1); k.line(cx + 22, PV.ZY + 106, cx + 20, PV.ZY + 138, 709, PEN_DK, 1.2, 1);
-  k.line(cx - 30, PV.ZY + 150, mx - 8, my + 10, 710, PEN_DK, 3, 1);
-  c.fillStyle = 'rgba(253,251,244,.8)'; c.beginPath(); c.arc(mx, my, 15, 0, 7); c.fill(); k.circle(mx, my, 15, 711, PEN_DK, 2.2, 1); k.circle(mx, my, 9, 712, PEN_DK, 1.1, 1);
-  // umpire looming behind, mostly out of frame
-  k.circle(cx + 96, PV.ZY + 196, 21, 720, PEN_MD, 2.2, 1); k.line(cx + 74, PV.ZY + 192, cx + 118, PV.ZY + 190, 721, PEN_MD, 1.6, 1); k.line(cx + 60, PV.ZY + 224, cx + 132, PV.ZY + 222, 722, PEN_MD, 2.6, 1); k.line(cx + 60, PV.ZY + 224, cx + 54, H, 723, PEN_MD, 2.4, 1); k.line(cx + 132, PV.ZY + 222, cx + 140, H, 724, PEN_MD, 2.4, 1);
-  // the zone
-  c.setLineDash(hot ? [] : [5, 5]); c.strokeStyle = hot ? RED : INK; c.globalAlpha = hot ? 0.95 : 0.55; c.lineWidth = hot ? 3 : 1.5; c.strokeRect(cx - PV.ZW / 2, PV.ZY - PV.ZH / 2, PV.ZW, PV.ZH); c.setLineDash([]); c.globalAlpha = 1;
-  if (state === 'batting' && game.abs <= 2 && !swing) { if (hot) k.text('SWING!', cx, PV.ZY - PV.ZH / 2 - 14, { size: 30, color: RED, rot: -0.04 }); else if (!inFlight) ['put the ring where', 'the ball will cross,', 'click as it arrives'].forEach((t, i) => k.text(t, cx + PV.ZW / 2 + 16, PV.ZY - 44 + i * 20, { size: 15, color: PEN_DK, font: 'Patrick Hand', weight: 400, align: 'left' })); }
-  // the ball: a shadow on the dirt, a faint trail, then the ball growing as it comes
-  if (inFlight) { const p = platePitchPos(pitch, pitch.t); if (!pitch.trail) pitch.trail = []; if (frame % 2 === 0) pitch.trail.push({ x: p.x, y: p.y, r: p.r }); pitch.trail = pitch.trail.slice(-8);
-    c.fillStyle = 'rgba(0,0,0,.12)'; c.beginPath(); c.ellipse(p.x, 392 + (612 - 392) * Math.pow(p.u, 1.4), p.r * 1.1, p.r * 0.5, 0, 0, 7); c.fill();
-    pitch.trail.forEach((t, i) => { c.globalAlpha = 0.08 + i / pitch.trail.length * 0.2; c.strokeStyle = PEN_DK; c.lineWidth = 1; c.beginPath(); c.arc(t.x, t.y, t.r * 0.9, 0, 7); c.stroke(); }); c.globalAlpha = 1;
-    ballOn(c, p.x, p.y, p.r); }
-  if (caught) ballOn(c, caught.x, caught.y, 8.5);
-  // the ball leaving the bat, until the cut to the field
-  if (play && holdPlate > 0 && lastContact) { const u = 1 - holdPlate / 22, cr = lastContact.cross, dir = lastContact.dir, tx = PV.x0 + 60 + (PV.x1 - PV.x0 - 120) * Math.max(-0.2, Math.min(1.2, (dir + 135) / 90)), ty = wallY(Math.max(PV.x0, Math.min(PV.x1, tx))) - 6; const x = cr.x + (tx - cr.x) * u, y = cr.y + (ty - cr.y) * u - Math.sin(u * Math.PI) * Math.max(0, lastContact.ang) * 2.6; ballOn(c, x, y, 10 * (1 - u) + 2.5); }
-  // aiming ring
-  if (state === 'batting' && !swing && !play) { const a = aimPos(); c.strokeStyle = INK; c.lineWidth = 2; c.globalAlpha = 0.85; c.beginPath(); c.arc(a.x, a.y, 16, 0, 7); c.stroke(); c.lineWidth = 1.2; c.beginPath(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { c.moveTo(a.x + dx * 10, a.y + dy * 10); c.lineTo(a.x + dx * 22, a.y + dy * 22); } c.stroke(); c.globalAlpha = 1; }
-  drawBatter(k, c);
+  const c=sctx,k=sink;c.clearRect(0,0,W,H);
+  // Quiet notebook scenery leaves the pitch and swing easy to read.
+  k.text('watch it in.',560,157,{size:48,color:INK,rot:-.035});
+  k.text('click or SPACE to swing',560,193,{size:21,color:PEN_MD,font:'Patrick Hand',weight:400});
+  k.line(205,572,914,572,501,DIRT,1.6,2);
+  for(let i=0;i<24;i++)k.line(222+i*28,582+(i%3)*3,230+i*28,580+(i%3)*3,510+i,DIRT,.7,1);
+  c.strokeStyle='rgba(74,74,79,.13)';c.lineWidth=1;
+  c.beginPath();c.moveTo(220,305);c.quadraticCurveTo(540,270,916,301);c.stroke();
+  for(let i=0;i<15;i++){const x=225+i*48;c.beginPath();c.moveTo(x,301);c.lineTo(x,322);c.stroke();}
+  // Red contact stripe and a generous landing zone, visible without an aiming cursor.
+  c.fillStyle='rgba(192,57,43,.06)';c.fillRect(PV.ZX-25,PV.ZY-50,50,100);
+  k.line(PV.ZX,PV.ZY-50,PV.ZX,PV.ZY+50,560,RED,1.8,2);
+  k.line(PV.ZX-11,PV.ZY-50,PV.ZX+11,PV.ZY-50,561,RED,1.5,1);
+  k.line(PV.ZX-11,PV.ZY+50,PV.ZX+11,PV.ZY+50,562,RED,1.5,1);
+  k.poly([{x:PV.ZX-18,y:567},{x:PV.ZX+17,y:567},{x:PV.ZX+24,y:578},{x:PV.ZX,y:584},{x:PV.ZX-23,y:578}],565,INK,1.5,2);
+  drawSidePitcher(k,c);drawSideHitter(k,c);
+  const inFlight=pitch?.plate && pitch.wind===0 && !pitch.done;
+  if(inFlight){
+    let p=platePitchPos(pitch,pitch.t);
+    if(swing?.pending&&swing.contact){const u=Math.min(1,swing.t/SWING_CONTACT);p={x:swing.from.x+(swing.aim.x-swing.from.x)*u,y:swing.from.y+(swing.aim.y-swing.from.y)*u,r:8};}
+    c.fillStyle='rgba(0,0,0,.1)';c.beginPath();c.ellipse(p.x,573,7,2,0,0,7);c.fill();
+    c.strokeStyle='rgba(31,61,158,.18)';c.lineWidth=2;c.beginPath();c.moveTo(p.x+12,p.y-1);c.lineTo(p.x+32,p.y-3);c.stroke();ballOn(c,p.x,p.y,8);
+  }
+  if(caught)ballOn(c,PV.ZX-45,caught.y,7);
+  if(play&&holdPlate>0&&lastContact){const u=1-holdPlate/PLATE_HOLD,p=lastContact.cross;
+    ballOn(c,p.x+u*440,p.y-u*175-Math.sin(u*Math.PI)*90,8-u*3);
+    if(holdPlate>PLATE_HOLD-7){for(let i=0;i<7;i++){const a=i*Math.PI*2/7,r=15+(PLATE_HOLD-holdPlate)*3;k.line(p.x+Math.cos(a)*r,p.y+Math.sin(a)*r,p.x+Math.cos(a)*(r+9),p.y+Math.sin(a)*(r+9),580+i,RED,2,1);}}
+  }
+  // Timing meter follows the real pitch; the wide shaded band is hittable.
+  const gx=450,gy=635,gw=340;
+  c.fillStyle='rgba(192,57,43,.1)';c.fillRect(gx+gw*.36,gy-9,gw*.28,18);
+  k.line(gx,gy,gx+gw,gy,590,PEN_LT,1.5,1);k.line(gx+gw*.5,gy-13,gx+gw*.5,gy+13,591,RED,2,2);
+  if(inFlight){const dt=pitch.T-pitch.t,position=Math.max(0,Math.min(1,.5-dt/140));ballOn(c,gx+gw*position,gy,6);}
+  k.text('early',gx,gy+31,{size:15,color:PEN_MD,font:'Patrick Hand',weight:400});k.text('sweet spot',gx+gw*.5,gy+31,{size:17,color:RED,font:'Patrick Hand',weight:400});k.text('late',gx+gw,gy+31,{size:15,color:PEN_MD,font:'Patrick Hand',weight:400});
+  const ready=inFlight&&!swing&&pitch.strike&&Math.abs(pitch.T-pitch.t)<=CONTACT_WINDOW;
+  k.text(ready?'SWING!':pitch&&!pitch.strike&&pitch.t>pitch.T*.65?'let it go':!pitch?'next pitch...':'watch the ball',560,235,{size:28,color:ready?RED:PEN_MD});
 }
 
 // ---------- simulation step (fixed 60 Hz) ----------
 function step() {
+  if (impactPause > 0) { impactPause--; return; }
   if (introT < INTRO_LEN) { introT++; if (introT >= 110) stage.classList.remove('intro'); }
   if (msg && --msg.life <= 0) msg = null;
   popups = popups.filter(p => --p.life > 0); bursts = bursts.filter(b => ++b.t < 50);
@@ -502,18 +462,22 @@ function step() {
   view += (wantPlate - view) * 0.2; if (Math.abs(view - wantPlate) < 0.01) view = wantPlate;
   if (pitch && (state === 'batting' || state === 'pitching')) {
     if (pitch.wind > 0) { pitch.wind--; if (pitch.wind === 0) SFX.pencil(); }
-    else pitch.t++;
+    else if (!(pitch.plate && swing?.pending && swing.contact)) pitch.t++;
     if (state === 'pitching' && !pitch.result && pitch.t >= pitch.T - 5) cpuSwing();
-    if (pitch.t >= pitch.T) { if (pitch.result === 'contact') { if (pitch.plate) { lastContact = { cross: { x: PV.ZX + pitch.fx, y: PV.ZY + pitch.fy }, dir: pitch.contact.dir, ang: pitch.contact.ang }; holdPlate = 22; popup('CRACK!', PV.ZX + 60, PV.ZY - 30, RED, 30); } state = 'play'; launch(pitch.contact); } else resolvePitch(); }
+    if (pitch.plate && swing?.pending && swing.t >= SWING_CONTACT) meetPitch();
+    if (state !== 'play' && pitch.t >= pitch.T + (pitch.plate ? CONTACT_WINDOW + SWING_CONTACT : 0)) {
+      if (pitch.result === 'contact') launch(pitch.contact); else resolvePitch();
+    }
   }
   for (const k in fielders) { const f = fielders[k]; const dx = f.tx - f.x, dy = f.ty - f.y, d = Math.hypot(dx, dy); if (d > 1) { const s = Math.min(FIELDER_SPD, d); f.x += dx / d * s; f.y += dy / d * s; } }
   for (const r of runnersAnim) r.p = Math.min(1, r.p + RUNNER_SPD / (BASE_D * 1.414 * Math.max(1, r.to - r.from)));
   if (play) {
     play.t++;
     if (play.phase === 'flight') {
-      play.x += play.vx; play.y += play.vy; play.vz -= GRAV; play.z += play.vz;
+      play.x += play.vx; play.y += play.vy; play.z += play.vz - GRAV * .5; play.vz -= GRAV;
       const o = play.outcome;
       if (o.kind === 'hr' && Math.hypot(play.x - HOME.x, play.y - HOME.y) > FENCE_R + 30) { play.phase = 'done'; play.t = 0; }
+      else if (play.catchHeight && play.vz < 0 && play.z <= play.catchHeight) { play.phase = 'done'; play.t = 0; SFX.pop(); }
       else if (play.cut && play.t >= play.cut.t) { play.phase = 'throw'; play.t = 0; play.x = play.cut.x; play.y = play.cut.y; play.z = 0; const f = fielders[play.cut.k]; f.tx = f.x; f.ty = f.y; }
       else if (play.z <= 0 && play.t > 2) {
         play.z = 0;
@@ -521,7 +485,7 @@ function step() {
         else if (play.ang <= 9 && play.bounce < 60) { play.bounce++; play.vx *= 0.985; play.vy *= 0.985; play.vz = 0; if (Math.hypot(play.vx, play.vy) < 0.4 || play.bounce >= 60) { play.phase = 'fielded'; play.t = 0; } }
         else { play.vz = Math.abs(play.vz) * 0.35; play.vx *= 0.7; play.vy *= 0.7; if (play.vz < 0.6) { play.phase = 'fielded'; play.t = 0; } }
       }
-    } else if (play.phase === 'throw') { if (play.t > 24) { play.phase = 'done'; play.t = 0; SFX.pop(); } }
+    } else if (play.phase === 'throw') { if (play.t > play.throwDuration) { play.phase = 'done'; play.t = 0; SFX.pop(); } }
     else if (play.phase === 'fielded') { const f = play.fielder ? fielders[play.fielder] : null; if (f) { f.tx = play.x; f.ty = play.y; } if (play.t > 40 || (f && Math.hypot(f.x - play.x, f.y - play.y) < 6)) { play.phase = 'done'; play.t = 0; } }
     else if (play.phase === 'done' && play.t > 45) { resolvePlay(); }
   }
@@ -587,7 +551,7 @@ function drawBallAt(x, y, z, big = 1) { const k = (1 + z / 120) * big; ctx.save(
 function drawBall() {
   if (pitch && !pitch.plate && pitch.wind === 0 && (state === 'batting' || state === 'pitching')) { const p = pitchPos(pitch, pitch.t); ctx.fillStyle = 'rgba(0,0,0,.1)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 3, 4, 2, 0, 0, 7); ctx.fill(); drawBallAt(p.x, p.y, 4, 1.1); if (aimSpot) { ctx.setLineDash([2, 3]); ctx.strokeStyle = RED; ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(aimSpot.x, aimSpot.y, 6, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; } }
   if (play) {
-    if (play.phase === 'throw') { const f = play.cut, u = Math.min(1, play.t / 24), x = f.x + (BASES[1].x - f.x) * u, y = f.y + (BASES[1].y - f.y) * u, z = Math.sin(u * Math.PI) * 30; drawBallAt(x, y, z); }
+    if (play.phase === 'throw') { const f = play.cut, u = Math.min(1, Math.max(0, play.t - 12) / (play.throwDuration - 12)), x = f.x + (BASES[1].x - f.x) * u, y = f.y + (BASES[1].y - f.y) * u, z = Math.sin(u * Math.PI) * 30; drawBallAt(x, y, z); }
     else if (play.phase !== 'done' || play.outcome.kind === 'hr') { ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.ellipse(play.x, play.y + 3, 5, 2.5, 0, 0, 7); ctx.fill(); drawBallAt(play.x, play.y, play.z); }
     // the landing spot, so you can read the play
     if (play.phase === 'flight' && !play.cut) { ctx.setLineDash([3, 4]); ctx.strokeStyle = GRAPHITE; ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.arc(play.land.x, play.land.y, 7, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
@@ -595,7 +559,7 @@ function drawBall() {
 }
 function drawSwingHint() {
   if (state !== 'batting' || play || view > 0.5) return;
-  const hot = pitch && !swing && pitch.wind === 0 && Math.abs(pitch.T - pitch.t) <= 14;   // the ball is in the hittable window
+  const hot = pitch && !swing && pitch.wind === 0 && Math.abs(pitch.T - pitch.t - SWING_CONTACT) <= 6;   // the ball is in the hittable window
   ctx.setLineDash(hot ? [] : [3, 4]); ctx.strokeStyle = hot ? RED : INK; ctx.globalAlpha = hot ? 0.9 : 0.4; ctx.lineWidth = hot ? 3 : 1.2;
   ctx.beginPath(); ctx.moveTo(HOME.x - 50, HOME.y - 26); ctx.lineTo(HOME.x + 50, HOME.y - 26); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
   if (game.abs <= 2 && !swing) { // first couple of at-bats: spell it out
@@ -622,10 +586,10 @@ function drawHowto() {
   ink.text('how to play', X + Wd / 2, Y + 50, { size: 44, color: INK, rot: -0.03 });
   const PH = { font: 'Patrick Hand', weight: 400, color: PEN_DK, align: 'left' };
   ink.text('BATTING', X + 40, Y + 105, { size: 24, color: INK, align: 'left' });
-  ink.text('you see the pitch coming from behind the plate. move the ring to', X + 40, Y + 132, { ...PH, size: 18 });
-  ink.text('where the ball will cross the zone, click (or space) as it gets there.', X + 40, Y + 154, { ...PH, size: 18 });
-  ink.text('early = left field · perfect = up the middle, hardest · late = right field', X + 40, Y + 178, { ...PH, size: 16, color: PEN_MD });
-  ink.text('ring under the ball lifts a fly ball · ring over the ball chops a grounder', X + 40, Y + 200, { ...PH, size: 16, color: PEN_MD });
+  ink.text('click or press SPACE as the ball reaches the red stripe.', X + 40, Y + 132, { ...PH, size: 18 });
+  ink.text('the bat lines up for you. just find the timing.', X + 40, Y + 154, { ...PH, size: 18 });
+  ink.text('the shaded sweet spot is forgiving. the middle hits hardest.', X + 40, Y + 178, { ...PH, size: 16, color: PEN_MD });
+  ink.text('80% of pitches are strikes. let high and low balls go.', X + 40, Y + 200, { ...PH, size: 16, color: PEN_MD });
   // little doodle: ball and the line
   ctx.setLineDash([3, 4]); ctx.strokeStyle = INK; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X + 500, Y + 150); ctx.lineTo(X + 580, Y + 150); ctx.stroke(); ctx.setLineDash([]);
   drawBallAt(X + 540, Y + 118, 0, 1.3); ink.line(X + 540, Y + 128, X + 540, Y + 142, 710, PEN_MD, 1, 1); ink.text('click!', X + 552, Y + 172, { size: 16, color: RED, font: 'Caveat', weight: 700, align: 'left', rot: -0.1 });
@@ -694,7 +658,7 @@ function draw() {
   if (view > 0.005) { renderPlateScene(); ctx.globalAlpha = view; ctx.drawImage(sceneCv, 0, 0); ctx.globalAlpha = 1; }
   drawExtras(); drawScorecard(); drawMsg(); drawHowto();
 }
-buildPlateBg(); newGame(); tick();
+newGame(); tick();
 </script>
 </body>
 </html>

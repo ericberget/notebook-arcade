@@ -21,7 +21,7 @@ motionButton.addEventListener('click', () => setMotion(!motionOff, true));
 reducedMotion.addEventListener('change', event => setMotion(event.matches));
 
 function filterGames(category) {
-  if (!['all', 'action', 'sports'].includes(category)) throw new Error('Choose all, action, or sports.');
+  if (!['all', 'action', 'sports', 'drawing'].includes(category)) throw new Error('Choose all, action, sports, or drawing.');
   currentCategory = category;
   const before = new Map(cards.filter(card => !card.hidden).map(card => [card, card.getBoundingClientRect()]));
   document.querySelectorAll('.filter').forEach(filter => {
@@ -138,8 +138,8 @@ if (document.modelContext?.registerTool) {
   try {
     Promise.resolve(document.modelContext.registerTool({
       name:'filter_notebook_games', title:'Filter Notebook Arcade games',
-      description:'Show all, action, or sports games in the visible collection.',
-      inputSchema:{type:'object',properties:{category:{type:'string',enum:['all','action','sports']}},required:['category'],additionalProperties:false},
+      description:'Show all, action, sports, or drawing games in the visible collection.',
+      inputSchema:{type:'object',properties:{category:{type:'string',enum:['all','action','sports','drawing']}},required:['category'],additionalProperties:false},
       annotations:{readOnlyHint:false,untrustedContentHint:false},
       execute(input) {
         if (!input || typeof input !== 'object' || Object.keys(input).some(key => key !== 'category')) throw new Error('Provide only a category.');

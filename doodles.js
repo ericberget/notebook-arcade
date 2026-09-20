@@ -83,6 +83,16 @@ function previewPaperFootball(w, h, hov) {
       ink.scribble(bx,by-12,5,990,RED,15,.7);ink.circle(bx,by-12,5,991,RED,1.4,1);
       ink.text('tok!',bx+22,by-20,{size:20,color:RED,rot:-.15});
     }
+    function previewBridge(w,h) {
+      const t=(frame%340)/340,road=90,sag=Math.sin(t*Math.PI)*5;
+      for(const [a,b] of [[12,78],[265,328]]){ink.line(a,road,b,road,1100+a,INK,2.5,2);for(let x=a;x<b;x+=10)ink.line(x,road+3,x+5,150,1101+x,PEN_MD,.7,1);}
+      const roadPts=[{x:78,y:road},{x:172,y:road+sag},{x:265,y:road}];ink.path(roadPts,1130,INK,3,2);
+      ink.path([{x:68,y:145},roadPts[1],{x:277,y:145}],1150,PEN_DK,2,2);
+      for(const p of [{x:78,y:road},{x:265,y:road},{x:68,y:145},{x:277,y:145}])ink.circle(p.x,p.y,4,1180+p.x,RED,1.5,2);
+      const x=28+t*273,y=road+(x>78&&x<265?sag*Math.sin((x-78)/187*Math.PI):0);
+      ctx.save();ctx.translate(x,y-10);const shape=[{x:-19,y:0},{x:-19,y:-19},{x:4,y:-19},{x:6,y:-27},{x:16,y:-25},{x:23,y:-11},{x:25,y:0}];ctx.fillStyle='#e7c84f';ctx.beginPath();shape.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();ink.poly(shape,1200,INK,1.6,2);ink.circle(-12,4,6,1201,INK,2,1);ink.circle(17,4,6,1202,INK,2,1);ink.text('EGGS',-5,-6,{size:9,color:INK,font:'Patrick Hand',weight:400});ctx.restore();
+      ink.text(t>.78?'IT HELD!':'probably fine.',175,42,{size:27,color:RED,rot:-.08});
+    }
     function previewEraser(w, h, hov) {
       const speed = hov ? 1.6 : 1, t = ((frame * speed) % 240) / 240;
       const gy = x => h - 40 + Math.sin(x / 50) * 8 - Math.exp(-Math.pow((x - w / 2) / 40, 2)) * 22;
@@ -106,7 +116,7 @@ function previewPaperFootball(w, h, hov) {
       // a windsock on the middle hill
       ink.line(w / 2, gy(w / 2), w / 2, gy(w / 2) - 26, 420, PEN_DK, 1.2, 1); ink.poly([{ x: w / 2, y: gy(w / 2) - 26 }, { x: w / 2 + 16, y: gy(w / 2) - 20 + Math.sin(frame * 0.2) }, { x: w / 2, y: gy(w / 2) - 18 }], 421, RED, 1.2, 1);
     }
-    const previews = {eraser:previewEraser, tennis:previewTennis,slingshot:previewSlingshot, football:previewFootball, baseball:previewBaseball, paperFootball:previewPaperFootball};
+    const previews = {eraser:previewEraser,bridge:previewBridge,tennis:previewTennis,slingshot:previewSlingshot, football:previewFootball, baseball:previewBaseball, paperFootball:previewPaperFootball};
     return elapsed => {
       frame = elapsed * .06;
       ink.tick();
@@ -145,10 +155,10 @@ function previewPaperFootball(w, h, hov) {
     card.querySelector('.game-art').append(canvas);
     const button = card.querySelector('.preview-toggle');
     const state = {card, button, title:card.querySelector('h3').textContent, draw:createPreview(canvas, card.dataset.preview), hovered:false, pinned:false, suppressed:false, active:false, visible:false, elapsed:0};
-    if (card.dataset.preview === 'tennis') {
+    if (['tennis','bridge'].includes(card.dataset.preview)) {
       const still = document.createElement('canvas'); still.width=1000; still.height=500;
       still.className='tennis-still'; still.setAttribute('aria-hidden','true');
-      createPreview(still, 'tennis')(1800); card.querySelector('.game-art').prepend(still);
+      createPreview(still, card.dataset.preview)(1800); card.querySelector('.game-art').prepend(still);
     }
     states.push(state);
     card.addEventListener('pointerenter', event => {
