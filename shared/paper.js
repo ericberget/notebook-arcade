@@ -49,7 +49,7 @@ const NotebookPaper = (() => {
     },
     function sketchbook(p) { // plain cream sketchbook with a coffee ring and test scribbles
       p.fillStyle = '#f4efe2'; p.fillRect(0, 0, W, H); grain(p, 9000, '120,100,60', 0.07);
-      coffeeRing(p, 1010, 210, 70); coffeeRing(p, 330, 620, 40);
+      coffeeRing(p, 1010, 668, 70); coffeeRing(p, 330, 620, 40);   // kept low on the page: a ring up in the sky reads as a second sun
       p.strokeStyle = 'rgba(31,61,158,.35)'; p.lineWidth = 2; p.beginPath();
       for (let i = 0; i < 40; i++) { const x = 1000 + i * 4, y = 520 + Math.sin(i * 1.3) * 10 + (Math.random() - .5) * 4; i ? p.lineTo(x, y) : p.moveTo(x, y); } p.stroke();
       p.strokeStyle = 'rgba(74,74,79,.35)'; p.beginPath(); for (let i = 0; i < 30; i++) { p.moveTo(1000 + i * 5, 545 + (Math.random() - .5) * 10); p.lineTo(1006 + i * 5, 560 + (Math.random() - .5) * 10); } p.stroke();
