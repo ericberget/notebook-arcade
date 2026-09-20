@@ -37,6 +37,10 @@ window.addEventListener('resize', fit); fit();
 const paper = document.createElement('canvas'); paper.width = W; paper.height = H;
 NotebookPaper.draw(paper.getContext('2d'), W, H, PAPER_STYLE);
 
+// the hand-drawn wordmark, shipped already keyed to transparent so it sits on this game's sheet
+const logo = new Image(); logo.src = 'logo.png'; let logoCut = null;
+logo.onload = () => { logoCut = logo; };
+
 // ---------- sound ----------
 const SFX = (() => {
   let ac, master, noiseBuf, muted = false, windGain;
@@ -456,11 +460,12 @@ function drawBubble(b) {
 }
 function drawHUD() {
   const a = rv(150, 30); if (a <= 0) return; ink.setAlpha(a);
-  ink.text('Eraser War', 600, 62, { size: 44, color: INK, rot: -0.02 });
-  ink.text(`turn ${turn} · wind ${Math.abs(wind * 10).toFixed(0)} ${wind === 0 ? '' : wind > 0 ? '→' : '←'} · you ${you.hp} · pencil ${pen.hp}`, 600, 90, { size: 18, color: INK, font: 'Patrick Hand', weight: 400, alpha: 0.85 });
+  if (logoCut) { const lw = 330, lh = lw * logoCut.naturalHeight / logoCut.naturalWidth; ctx.globalAlpha = a; ctx.drawImage(logoCut, 600 - lw / 2, 12, lw, lh); ctx.globalAlpha = 1; }
+  else ink.text('Eraser War', 600, 62, { size: 44, color: INK, rot: -0.02 });
+  ink.text(`turn ${turn} · wind ${Math.abs(wind * 10).toFixed(0)} ${wind === 0 ? '' : wind > 0 ? '→' : '←'} · you ${you.hp} · pencil ${pen.hp}`, 600, 108, { size: 18, color: INK, font: 'Patrick Hand', weight: 400, alpha: 0.85 });
   const msg = state === 'aim' ? 'YOUR TURN · aim with the mouse · click to throw' : state === 'aiturn' ? 'the pencil is thinking...' : state === 'over' ? (winner === 'you' ? 'YOU WIN! new game?' : 'the pencil wins. new game?') : '';
-  if (state === 'aim' && turn === 1) ink.text('the farther the crosshair, the harder the throw', 600, 146, { size: 16, color: PEN_MD, font: 'Patrick Hand', weight: 400 });
-  if (msg) ink.text(msg, 600, 122, { size: 22, color: state === 'aim' ? INK : state === 'over' ? (winner === 'you' ? INK : RED) : PEN_MD, rot: -0.01, alpha: 0.75 + Math.sin(frame * 0.1) * 0.2 });
+  if (state === 'aim' && turn === 1) ink.text('the farther the crosshair, the harder the throw', 600, 162, { size: 16, color: PEN_MD, font: 'Patrick Hand', weight: 400 });
+  if (msg) ink.text(msg, 600, 138, { size: 22, color: state === 'aim' ? INK : state === 'over' ? (winner === 'you' ? INK : RED) : PEN_MD, rot: -0.01, alpha: 0.75 + Math.sin(frame * 0.1) * 0.2 });
   // a windsock planted on the middle hill
   const wx = 600, gy = groundAt(600), top = gy - 60; ink.line(wx, gy, wx + 1, top, 5000, PEN_DK, 1.6, 1); const dir = wind >= 0 ? 1 : -1, len = 8 + Math.abs(wind) * 30, sag = 14 - Math.abs(wind) * 10;
   ink.poly([{ x: wx, y: top }, { x: wx + dir * len, y: top + sag + Math.sin(frame * 0.2) * 2 }, { x: wx + dir * len, y: top + sag + 8 + Math.sin(frame * 0.2) * 2 }, { x: wx, y: top + 10 }], 5001, RED, 1.4, 1);

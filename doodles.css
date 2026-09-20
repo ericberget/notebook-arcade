@@ -35,5 +35,5 @@
 @media(max-width:900px){.header-doodle{right:100px;width:130px}.filter-scribble{display:none}.game-grid{gap:88px 56px}.card-scribble{font-size:21px}}
 @media(max-width:700px){.brand-block{flex:1}.site-header h1{flex:initial}.site-header{padding-bottom:13px}.header-doodle{display:none}.owner-note{font-size:12px;margin:-3px 0 0 9px}.owner-note span{font-size:17px;margin-left:3px}.collection-toolbar{margin-top:12px;margin-bottom:43px}.game-grid{gap:82px}.game-card:nth-child(even){top:0}.game-card:nth-child(n){--tilt:-.35deg!important}.game-card:nth-child(even){--tilt:.35deg!important}.card-scribble{font-size:21px;top:-29px}.preview-toggle{padding:7px 0;min-height:30px;font-size:18px}.after-games{padding-top:36px}}
 
-.eraser-art{background:none}.eraser-still{display:block;width:100%;height:100%}.previewing .eraser-still{opacity:0}
+.eraser-art{background-image:url('games/eraser-war/logo.png');background-size:116% auto;background-position:50% 50%}
 .tennis-art{background:none}.tennis-still{display:block;width:100%;height:100%}.previewing .tennis-still{opacity:0}

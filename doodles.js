@@ -145,10 +145,10 @@ function previewPaperFootball(w, h, hov) {
     card.querySelector('.game-art').append(canvas);
     const button = card.querySelector('.preview-toggle');
     const state = {card, button, title:card.querySelector('h3').textContent, draw:createPreview(canvas, card.dataset.preview), hovered:false, pinned:false, suppressed:false, active:false, visible:false, elapsed:0};
-    if (card.dataset.preview === 'tennis' || card.dataset.preview === 'eraser') {
+    if (card.dataset.preview === 'tennis') {
       const still = document.createElement('canvas'); still.width=1000; still.height=500;
-      still.className=card.dataset.preview + '-still'; still.setAttribute('aria-hidden','true');
-      createPreview(still, card.dataset.preview)(1800); card.querySelector('.game-art').prepend(still);
+      still.className='tennis-still'; still.setAttribute('aria-hidden','true');
+      createPreview(still, 'tennis')(1800); card.querySelector('.game-art').prepend(still);
     }
     states.push(state);
     card.addEventListener('pointerenter', event => {
