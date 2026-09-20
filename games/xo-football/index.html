@@ -549,7 +549,7 @@ function aiCarrier(p, qb) {
     }
   }
   if (!p.aiT || playFrame - p.aiT >= 8) { p.aiT = playFrame; p.aiTarget = runTarget(p); }
-  steer(p, p.aiTarget, 1.04);
+  steer(p, p.aiTarget, 0.98);
 }
 function updateOffense() {
   const qb = byName('QB'), carrier = ball.carrier;
@@ -655,7 +655,7 @@ function checkContact() {
     if (dist > R * 2 + 3) { d.touching = 0; continue; }
     d.touching = (d.touching || 0) + 1;
     if (d.touching < 4) continue;
-    if (!d.attempted) { d.attempted = true; const brk = inPocket ? 0.15 : onOffense() ? 0.42 : (d === ctrl ? 0.18 : 0.34); if (Math.random() < brk) { d.stumble = 55; note((onOffense() ? '' : 'pencil ') + c.name + ' breaks a tackle!', onOffense() ? INK : X_COLOR); SFX.thump(0.5); continue; } }
+    if (!d.attempted) { d.attempted = true; const brk = inPocket ? 0.15 : onOffense() ? 0.42 : (d === ctrl ? 0.18 : 0.25); if (Math.random() < brk) { d.stumble = 55; note((onOffense() ? '' : 'pencil ') + c.name + ' breaks a tackle!', onOffense() ? INK : X_COLOR); SFX.thump(0.5); continue; } }
     else continue;
     SFX.thump(1);
     if (inPocket) endPlay('sack', 'SACKED', c.body.position); else endPlay('tackle', null, c.body.position);
