@@ -101,12 +101,12 @@ function buildGround() {
 // depth: 0 = far (faint, thin), 1 = near (darker, thicker)
 function pline(g, x1, y1, x2, y2, depth = 1, passes = 2) {
   g.strokeStyle = GRAPHITE; g.lineCap = 'round';
-  for (let i = 0; i < passes; i++) { g.globalAlpha = 0.18 + depth * 0.32; g.lineWidth = 0.8 + depth * 0.9; const mx = (x1 + x2) / 2 + rj(3), my = (y1 + y2) / 2 + rj(3); g.beginPath(); g.moveTo(x1 + rj(2), y1 + rj(2)); g.quadraticCurveTo(mx, my, x2 + rj(2), y2 + rj(2)); g.stroke(); }
+  for (let i = 0; i < passes; i++) { g.globalAlpha = 0.2 + depth * 0.42; g.lineWidth = 0.8 + depth * 0.9; const mx = (x1 + x2) / 2 + rj(3), my = (y1 + y2) / 2 + rj(3); g.beginPath(); g.moveTo(x1 + rj(2), y1 + rj(2)); g.quadraticCurveTo(mx, my, x2 + rj(2), y2 + rj(2)); g.stroke(); }
   g.globalAlpha = 1;
 }
 function penPath(g, pts, depth = 1, close = false) { for (let i = 0; i < pts.length - (close ? 0 : 1); i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; pline(g, a.x, a.y, b.x, b.y, depth); } }
 function penCircle(g, cx, cy, r, depth = 1, passes = 2) {
-  g.strokeStyle = GRAPHITE; g.globalAlpha = 0.18 + depth * 0.32; g.lineWidth = 0.8 + depth * 0.9;
+  g.strokeStyle = GRAPHITE; g.globalAlpha = 0.2 + depth * 0.42; g.lineWidth = 0.8 + depth * 0.9;
   for (let p = 0; p < passes; p++) { g.beginPath(); const st = rnd() * 6.28; for (let i = 0; i <= 26; i++) { const t = st + i / 25 * Math.PI * 2, rr = r + rj(2.5); const x = cx + Math.cos(t) * rr, y = cy + Math.sin(t) * rr; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
   g.globalAlpha = 1;
 }
@@ -120,88 +120,144 @@ function smudge(g, pts, strength = 0.08, angle = -0.6, gap = 4) {
   g.restore(); g.globalAlpha = 1;
 }
 function penText(g, str, x, y, size, depth = 0.6, rot = 0, align = 'center') { g.save(); g.translate(x, y); g.rotate(rot); g.font = `400 ${size}px 'Patrick Hand', cursive`; g.textAlign = align; g.fillStyle = GRAPHITE; g.globalAlpha = 0.25 + depth * 0.5; g.fillText(str, 0, 0); g.restore(); g.globalAlpha = 1; }
+// --- occlusion: whatever is nearer gets filled with the page itself, so it covers what's behind it
+// (a pencil drawing hides what's behind an object; see-through outlines read as a wireframe, not a drawing)
+function paperPat(g) { return g._pp || (g._pp = g.createPattern(paper, 'repeat')); }
+function mask(g, pts) { g.save(); g.beginPath(); pts.forEach((v, i) => i ? g.lineTo(v.x, v.y) : g.moveTo(v.x, v.y)); g.closePath(); g.fillStyle = paperPat(g); g.fill(); g.restore(); }
+function maskCircle(g, cx, cy, r) { g.save(); g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fillStyle = paperPat(g); g.fill(); g.restore(); }
 function cloud(g, x, y, w, depth) {
-  const bumps = 5, pts = []; for (let i = 0; i <= bumps; i++) pts.push({ x: x + (i / bumps) * w, y: y - Math.sin((i / bumps) * Math.PI) * w * 0.35 + rj(4) }); pts.push({ x: x + w, y: y + 4 }); pts.push({ x, y: y + 4 });
-  for (let i = 0; i < bumps; i++) { const a = pts[i], b = pts[i + 1]; const r = Math.hypot(b.x - a.x, b.y - a.y) / 2 + 4; g.strokeStyle = GRAPHITE; g.globalAlpha = 0.18 + depth * 0.3; g.lineWidth = 1 + depth * 0.6; g.beginPath(); g.arc((a.x + b.x) / 2, (a.y + b.y) / 2, r, Math.PI, 0); g.stroke(); }
-  pline(g, x - 4, y + 4, x + w + 4, y + 4, depth); smudge(g, pts, 0.05, -0.5, 5); g.globalAlpha = 1;
+  const bumps = 5, pts = []; for (let i = 0; i <= bumps; i++) pts.push({ x: x + (i / bumps) * w, y: y - Math.sin((i / bumps) * Math.PI) * w * 0.35 + rj(4) });
+  g.save(); g.beginPath(); g.moveTo(x - 4, y + 4);
+  for (let i = 0; i < bumps; i++) { const a = pts[i], b = pts[i + 1], r = Math.hypot(b.x - a.x, b.y - a.y) / 2 + 4; g.arc((a.x + b.x) / 2, (a.y + b.y) / 2, r, Math.PI, 0); }
+  g.lineTo(x + w + 4, y + 4); g.closePath(); g.fillStyle = paperPat(g); g.fill(); g.restore();
+  for (let i = 0; i < bumps; i++) { const a = pts[i], b = pts[i + 1]; const r = Math.hypot(b.x - a.x, b.y - a.y) / 2 + 4; g.strokeStyle = GRAPHITE; g.globalAlpha = 0.2 + depth * 0.34; g.lineWidth = 1 + depth * 0.6; g.beginPath(); g.arc((a.x + b.x) / 2, (a.y + b.y) / 2, r, Math.PI, 0); g.stroke(); }
+  pline(g, x - 4, y + 4, x + w + 4, y + 4, depth); smudge(g, [...pts, { x: x + w, y: y + 4 }, { x, y: y + 4 }], 0.05, -0.5, 5); g.globalAlpha = 1;
 }
 function tree(g, x, baseY, h, depth) {
+  mask(g, [{ x: x - 2.5, y: baseY }, { x: x + 2.5, y: baseY }, { x: x + 2.5, y: baseY - h * 0.3 }, { x: x - 2.5, y: baseY - h * 0.3 }]);
   pline(g, x, baseY, x, baseY - h * 0.25, depth);
-  for (let t = 0; t < 3; t++) { const yTop = baseY - h * (0.35 + t * 0.25), yBot = baseY - h * (0.15 + t * 0.25), hw = h * (0.32 - t * 0.07); const tri = [{ x, y: yTop }, { x: x + hw, y: yBot }, { x: x - hw, y: yBot }]; penPath(g, tri, depth, true); smudge(g, [tri[0], tri[1], { x, y: yBot }], 0.09, 1.0, 4); }
+  for (let t = 0; t < 3; t++) {   // bottom tier first: each tier above covers the one below
+    const yTop = baseY - h * (0.35 + t * 0.25), yBot = baseY - h * (0.15 + t * 0.25), hw = h * (0.32 - t * 0.07);
+    const tri = [{ x, y: yTop }, { x: x + hw, y: yBot }, { x: x - hw, y: yBot }];
+    mask(g, tri); penPath(g, tri, depth, true); smudge(g, [tri[0], tri[1], { x, y: yBot }], 0.09, 1.0, 4);
+  }
 }
-function roundTree(g, x, baseY, h, depth) { pline(g, x, baseY, x + rj(3), baseY - h * 0.4, depth); const cx = x, cy = baseY - h * 0.65, r = h * 0.32; g.strokeStyle = GRAPHITE; g.globalAlpha = 0.15 + depth * 0.3; g.lineWidth = 1; g.beginPath(); for (let i = 0; i < 70; i++) { const t = i * 0.5, rr = r * (0.6 + rnd() * 0.5); const px = cx + Math.cos(t) * rr, py = cy + Math.sin(t) * rr * 0.85; i ? g.lineTo(px, py) : g.moveTo(px, py); } g.stroke(); g.globalAlpha = 1; penCircle(g, cx, cy, r, depth, 1); }
+function roundTree(g, x, baseY, h, depth) {
+  const cx = x, cy = baseY - h * 0.65, r = h * 0.32;
+  mask(g, [{ x: x - 3, y: baseY }, { x: x + 3, y: baseY }, { x: x + 3, y: cy }, { x: x - 3, y: cy }]); pline(g, x, baseY, x + rj(3), baseY - h * 0.4, depth);
+  maskCircle(g, cx, cy, r + 2);
+  g.strokeStyle = GRAPHITE; g.globalAlpha = 0.15 + depth * 0.3; g.lineWidth = 1; g.beginPath(); for (let i = 0; i < 70; i++) { const t = i * 0.5, rr = r * (0.6 + rnd() * 0.5); const px = cx + Math.cos(t) * rr, py = cy + Math.sin(t) * rr * 0.85; i ? g.lineTo(px, py) : g.moveTo(px, py); } g.stroke(); g.globalAlpha = 1;
+  penCircle(g, cx, cy, r, depth, 1);
+}
 function flock(g, x, y, n, depth) { for (let i = 0; i < n; i++) { const bx = x + i * 16 + rj(8), by = y + (i % 2) * 6 + rj(4); pline(g, bx - 7, by - 3, bx, by + 1, depth, 1); pline(g, bx, by + 1, bx + 7, by - 3, depth, 1); } }
 function house(g, x, baseY, w, h, depth, redRoof) {
-  const body = [{ x, y: baseY }, { x: x + w, y: baseY }, { x: x + w, y: baseY - h }, { x, y: baseY - h }]; penPath(g, body, depth, true);
-  const roof = [{ x: x - 6, y: baseY - h }, { x: x + w / 2, y: baseY - h - w * 0.45 }, { x: x + w + 6, y: baseY - h }]; penPath(g, roof, depth);
-  if (redRoof) { g.strokeStyle = RED; g.globalAlpha = 0.3; g.lineWidth = 1.2; g.beginPath(); for (let i = 0; i < 12; i++) { g.moveTo(x - 4 + i * (w + 8) / 12, baseY - h); g.lineTo(x + w / 2 + rj(4), baseY - h - w * 0.45 + 5); } g.stroke(); g.globalAlpha = 1; } else smudge(g, roof, 0.1, 0.9, 4);
+  const body = [{ x, y: baseY }, { x: x + w, y: baseY }, { x: x + w, y: baseY - h }, { x, y: baseY - h }];
+  const roof = [{ x: x - 6, y: baseY - h }, { x: x + w / 2, y: baseY - h - w * 0.45 }, { x: x + w + 6, y: baseY - h }];
+  const chim = rnd() < 0.6, cx = x + w * 0.75;
+  if (chim) { const ch = [{ x: cx, y: baseY - h - 1 }, { x: cx + 8, y: baseY - h - 1 }, { x: cx + 8, y: baseY - h - 22 }, { x: cx, y: baseY - h - 22 }]; mask(g, ch); penPath(g, ch, depth, true); }
+  mask(g, body); mask(g, roof);
+  penPath(g, body, depth, true); penPath(g, roof, depth);
+  if (redRoof) { g.strokeStyle = RED; g.globalAlpha = 0.32; g.lineWidth = 1.2; g.beginPath(); for (let i = 0; i < 12; i++) { g.moveTo(x - 4 + i * (w + 8) / 12, baseY - h); g.lineTo(x + w / 2 + rj(4), baseY - h - w * 0.45 + 5); } g.stroke(); g.globalAlpha = 1; } else smudge(g, roof, 0.1, 0.9, 4);
   smudge(g, [{ x: x + w * 0.6, y: baseY }, { x: x + w, y: baseY }, { x: x + w, y: baseY - h }, { x: x + w * 0.6, y: baseY - h }], 0.06, -0.6, 5);
   const ww = Math.min(12, w * 0.2); for (const wx of [x + w * 0.2, x + w * 0.62]) penPath(g, [{ x: wx, y: baseY - h * 0.65 }, { x: wx + ww, y: baseY - h * 0.65 }, { x: wx + ww, y: baseY - h * 0.65 + ww }, { x: wx, y: baseY - h * 0.65 + ww }], depth, true);
   penPath(g, [{ x: x + w * 0.42, y: baseY }, { x: x + w * 0.42, y: baseY - h * 0.4 }, { x: x + w * 0.56, y: baseY - h * 0.4 }, { x: x + w * 0.56, y: baseY }], depth);
-  if (rnd() < 0.6) { const cx = x + w * 0.75; penPath(g, [{ x: cx, y: baseY - h - 4 }, { x: cx, y: baseY - h - 22 }, { x: cx + 8, y: baseY - h - 22 }, { x: cx + 8, y: baseY - h - 1 }], depth); for (let s = 0; s < 3; s++) penCircle(g, cx + 6 + s * 5, baseY - h - 32 - s * 9, 4 + s * 2, depth * 0.5, 1); }
+  if (chim) for (let s = 0; s < 3; s++) penCircle(g, cx + 6 + s * 5, baseY - h - 32 - s * 9, 4 + s * 2, depth * 0.5, 1);
 }
 
 // ---------- scenery: sky, two mountain ranges, a mid ridge with one of three little worlds on it ----------
 function buildBackground() {
-  const g = bg.getContext('2d'); g.clearRect(0, 0, W, H); seed = baseSeed + 17;
+  const g = bg.getContext('2d'); g.clearRect(0, 0, W, H); g._pp = null; seed = baseSeed + 17;
   const night = rnd() < 0.22;
   const midPts = []; for (let i = 0; i <= 24; i++) midPts.push({ x: i * (W / 24), y: 440 + Math.sin(i * 0.9 + 2) * 22 + Math.sin(i * 0.4) * 14 + rj(5) });
   const midY = x => { const i = Math.min(23, Math.max(0, Math.floor(x / (W / 24)))), a = midPts[i], b = midPts[i + 1]; return a.y + (b.y - a.y) * ((x - a.x) / (b.x - a.x)); };
-  // sky
+  // --- sky
   if (night) {
-    penCircle(g, 1040, 180, 34, 0.45); g.save(); g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.arc(1056, 170, 30, 0, 7); g.fill(); g.restore();
+    maskCircle(g, 1040, 180, 36); penCircle(g, 1040, 180, 34, 0.45); g.save(); g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.arc(1056, 170, 30, 0, 7); g.fill(); g.restore();
     for (let i = 0; i < 24; i++) { const sx = 100 + rnd() * 1000, sy = 135 + rnd() * 180, r = 2 + rnd() * 2; pline(g, sx - r, sy, sx + r, sy, 0.3, 1); pline(g, sx, sy - r, sx, sy + r, 0.3, 1); }
   } else {
     const sx = rnd() < 0.5 ? 150 + rnd() * 160 : 900 + rnd() * 140, sy = 175 + rnd() * 30;
-    g.strokeStyle = GRAPHITE; g.globalAlpha = 0.3; g.lineWidth = 1.3; g.beginPath(); for (let i = 0; i < 120; i++) { const t = i * 0.35, r = 3 + i * 0.28 + rj(3); const x = sx + Math.cos(t) * r, y = sy + Math.sin(t) * r; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); g.globalAlpha = 1;
     for (let i = 0; i < 16; i++) { const a = i / 16 * 6.28 + rj(0.2); pline(g, sx + Math.cos(a) * 50, sy + Math.sin(a) * 50, sx + Math.cos(a) * (70 + rj(16)), sy + Math.sin(a) * (70 + rj(16)), 0.4, 1); }
+    maskCircle(g, sx, sy, 46);
+    g.strokeStyle = GRAPHITE; g.globalAlpha = 0.32; g.lineWidth = 1.3; g.beginPath(); for (let i = 0; i < 120; i++) { const t = i * 0.35, r = 3 + i * 0.28 + rj(3); const x = sx + Math.cos(t) * r, y = sy + Math.sin(t) * r; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); g.globalAlpha = 1;
   }
   for (let i = 0, n = 3 + Math.floor(rnd() * 3); i < n; i++) cloud(g, 80 + rnd() * 900, 165 + rnd() * 90, 90 + rnd() * 110, 0.2 + rnd() * 0.35);
   flock(g, 300 + rnd() * 600, 150 + rnd() * 80, 4 + Math.floor(rnd() * 3), 0.35);
-  if (rnd() < 0.6) { const bx = 250 + rnd() * 600, by = 150 + rnd() * 30; g.strokeStyle = GRAPHITE; g.globalAlpha = 0.45; g.lineWidth = 1.2; g.beginPath(); g.ellipse(bx, by, 44, 14, -0.04, 0, 7); g.stroke(); g.globalAlpha = 1; pline(g, bx + 44, by, bx + 66, by - 7, 0.4); pline(g, bx + 44, by, bx + 66, by + 7, 0.4); pline(g, bx + 66, by - 7, bx + 66, by + 7, 0.4); pline(g, bx - 8, by + 14, bx - 8, by + 22, 0.4); pline(g, bx + 8, by + 14, bx + 8, by + 22, 0.4); pline(g, bx - 8, by + 22, bx + 8, by + 22, 0.4); penText(g, ['GO ERASERS', 'PENCILS RULE', 'EAT AT JOE\'S', 'SHARPEN UP', 'hi mom'][Math.floor(rnd() * 5)], bx, by + 4, 11, 0.55); }
-  // far range (faint) and near range (snow caps, shaded faces)
+  if (rnd() < 0.6) { const bx = 250 + rnd() * 600, by = 150 + rnd() * 30;
+    g.save(); g.beginPath(); g.ellipse(bx, by, 46, 16, -0.04, 0, 7); g.fillStyle = paperPat(g); g.fill(); g.restore();
+    g.strokeStyle = PEN_MD; g.lineWidth = 1.3; g.globalAlpha = 0.75; g.beginPath(); g.ellipse(bx, by, 44, 14, -0.04, 0, 7); g.stroke(); g.globalAlpha = 1;
+    mask(g, [{ x: bx + 44, y: by - 7 }, { x: bx + 68, y: by - 8 }, { x: bx + 68, y: by + 8 }, { x: bx + 44, y: by + 7 }]);
+    pline(g, bx + 44, by, bx + 66, by - 7, 0.4); pline(g, bx + 44, by, bx + 66, by + 7, 0.4); pline(g, bx + 66, by - 7, bx + 66, by + 7, 0.4);
+    pline(g, bx - 8, by + 14, bx - 8, by + 22, 0.4); pline(g, bx + 8, by + 14, bx + 8, by + 22, 0.4); pline(g, bx - 8, by + 22, bx + 8, by + 22, 0.4);
+    penText(g, ['GO ERASERS', 'PENCILS RULE', 'EAT AT JOE\'S', 'SHARPEN UP', 'hi mom'][Math.floor(rnd() * 5)], bx, by + 4, 11, 0.55); }
+  // --- far range, then the near range in front of it, each one solid so the one behind stops at its ridge
   const far = [{ x: -20, y: 520 }]; for (let i = 1; i < 10; i++) far.push({ x: i * 130 + rj(40), y: 290 + rnd() * 130 }); far.push({ x: W + 20, y: 520 });
-  penPath(g, far, 0.22); smudge(g, [...far, { x: W + 20, y: 700 }, { x: -20, y: 700 }], 0.045, -0.4, 6);
+  mask(g, [...far, { x: W + 20, y: 720 }, { x: -20, y: 720 }]); penPath(g, far, 0.22); smudge(g, [...far, { x: W + 20, y: 720 }, { x: -20, y: 720 }], 0.05, -0.4, 6);
   const near = [{ x: -20, y: 560 }]; const nN = 6 + Math.floor(rnd() * 2); for (let i = 1; i < nN; i++) near.push({ x: i * (W / nN) + rj(60), y: i % 2 ? 330 + rnd() * 70 : 450 + rnd() * 50 }); near.push({ x: W + 20, y: 560 });
-  penPath(g, near, 0.5); smudge(g, [...near, { x: W + 20, y: 700 }, { x: -20, y: 700 }], 0.04, -0.8, 5);
-  for (let i = 1; i < near.length - 1; i++) { const p = near[i]; if (p.y > 420) continue; const l = near[i - 1], r = near[i + 1], t = 0.28, a = { x: p.x + (l.x - p.x) * t, y: p.y + (l.y - p.y) * t }, b = { x: p.x + (r.x - p.x) * t, y: p.y + (r.y - p.y) * t }; penPath(g, [a, { x: a.x + (b.x - a.x) * 0.25, y: a.y + 12 }, { x: a.x + (b.x - a.x) * 0.5, y: a.y - 4 }, { x: a.x + (b.x - a.x) * 0.75, y: b.y + 12 }, b], 0.5); smudge(g, [p, r, { x: r.x, y: 700 }, { x: p.x, y: 700 }], 0.035, 1.1, 5); }
-  // the mid ridge the little world sits on
-  penPath(g, midPts, 0.55); smudge(g, [...midPts, { x: W, y: 700 }, { x: 0, y: 700 }], 0.05, -0.3, 6);
+  mask(g, [...near, { x: W + 20, y: 720 }, { x: -20, y: 720 }]); penPath(g, near, 0.5); smudge(g, [...near, { x: W + 20, y: 720 }, { x: -20, y: 720 }], 0.045, -0.8, 5);
+  for (let i = 1; i < near.length - 1; i++) { const p = near[i]; if (p.y > 420) continue; const l = near[i - 1], r = near[i + 1], t = 0.28, a = { x: p.x + (l.x - p.x) * t, y: p.y + (l.y - p.y) * t }, b = { x: p.x + (r.x - p.x) * t, y: p.y + (r.y - p.y) * t }; penPath(g, [a, { x: a.x + (b.x - a.x) * 0.25, y: a.y + 12 }, { x: a.x + (b.x - a.x) * 0.5, y: a.y - 4 }, { x: a.x + (b.x - a.x) * 0.75, y: b.y + 12 }, b], 0.5); smudge(g, [p, r, { x: r.x, y: 720 }, { x: p.x, y: 720 }], 0.04, 1.1, 5); }
+  // --- the ridge the little world sits on
+  mask(g, [...midPts, { x: W, y: 720 }, { x: 0, y: 720 }]); penPath(g, midPts, 0.55); smudge(g, [...midPts, { x: W, y: 720 }, { x: 0, y: 720 }], 0.05, -0.3, 6);
   if (theme === 'farm') {
+    for (let x = 40; x < 1160; x += 36) { const y = midY(x) - 3; pline(g, x, y, x + rj(2), y - 24, 0.5, 1); pline(g, x, y - 8, x + 36, midY(x + 36) - 11, 0.45, 1); pline(g, x, y - 18, x + 36, midY(x + 36) - 21, 0.45, 1); }   // fence, behind everything
+    for (let i = 0; i < 3; i++) { const hx = 580 + i * 92 + rj(18), hy = midY(hx) - 10; maskCircle(g, hx, hy, 15); g.strokeStyle = GRAPHITE; g.globalAlpha = 0.4; g.lineWidth = 1; g.beginPath(); for (let k = 0; k < 40; k++) { const t = k * 0.6, r = 2 + k * 0.28; const px = hx + Math.cos(t) * r * 1.3, py = hy + Math.sin(t) * r; k ? g.lineTo(px, py) : g.moveTo(px, py); } g.stroke(); g.globalAlpha = 1; }   // hay bales
+    for (let i = 0; i < 3; i++) { const tx = 80 + i * 64 + rj(10); tree(g, tx, midY(tx) - 2, 54 + i * 16 + rj(10), 0.6); }
     const bx = 280 + rnd() * 60; house(g, bx, midY(bx + 55), 110, 62, 0.7, true); penText(g, 'BARN', bx + 55, midY(bx + 55) - 30, 12, 0.5);
-    { const sx = bx + 130, sy = midY(sx + 17); pline(g, sx, sy, sx, sy - 100, 0.7); pline(g, sx + 34, sy, sx + 34, sy - 100, 0.7); g.strokeStyle = GRAPHITE; g.globalAlpha = 0.5; g.lineWidth = 1.4; g.beginPath(); g.arc(sx + 17, sy - 100, 17, Math.PI, 0); g.stroke(); g.globalAlpha = 1; for (let y = sy - 85; y < sy; y += 16) pline(g, sx, y, sx + 34, y + rj(2), 0.4, 1); smudge(g, [{ x: sx + 20, y: sy }, { x: sx + 34, y: sy }, { x: sx + 34, y: sy - 100 }, { x: sx + 20, y: sy - 100 }], 0.07, -0.5, 4); }
-    for (let x = 40; x < 1160; x += 36) { const y = midY(x) - 3; pline(g, x, y, x + rj(2), y - 24, 0.5, 1); pline(g, x, y - 8, x + 36, midY(x + 36) - 11, 0.45, 1); pline(g, x, y - 18, x + 36, midY(x + 36) - 21, 0.45, 1); }
-    for (let i = 0; i < 4; i++) { const cx = 560 + rnd() * 520, cy = midY(cx) - 9; g.strokeStyle = GRAPHITE; g.globalAlpha = 0.45; g.lineWidth = 1.2; g.beginPath(); g.ellipse(cx, cy, 16, 9, 0, 0, 7); g.stroke(); g.globalAlpha = 1; penCircle(g, cx + 17, cy - 4, 5, 0.6, 1); for (const lx of [-9, -3, 4, 10]) pline(g, cx + lx, cy + 8, cx + lx, cy + 17, 0.5, 1); for (let s = 0; s < 4; s++) penCircle(g, cx + rj(20), cy + rj(8), 2 + rnd() * 2.5, 0.5, 1); }
-    for (let i = 0; i < 3; i++) { const hx = 700 + rnd() * 400, hy = midY(hx) - 10; g.strokeStyle = GRAPHITE; g.globalAlpha = 0.35; g.lineWidth = 1; g.beginPath(); for (let k = 0; k < 40; k++) { const t = k * 0.6, r = 2 + k * 0.28; const px = hx + Math.cos(t) * r * 1.3, py = hy + Math.sin(t) * r; k ? g.lineTo(px, py) : g.moveTo(px, py); } g.stroke(); g.globalAlpha = 1; }
-    windmill = { x: 920 + rnd() * 150 }; windmill.y = midY(windmill.x) - 110; pline(g, windmill.x - 14, midY(windmill.x), windmill.x - 4, windmill.y + 10, 0.7); pline(g, windmill.x + 14, midY(windmill.x), windmill.x + 4, windmill.y + 10, 0.7); for (let y = midY(windmill.x) - 18; y > windmill.y + 12; y -= 22) pline(g, windmill.x - 9, y, windmill.x + 9, y - 10, 0.45, 1);
-    for (let i = 0; i < 3; i++) tree(g, 100 + rnd() * 90 + i * 40, midY(120 + i * 40) - 2, 60 + rnd() * 40, 0.6);
-    roundTree(g, 1150, midY(1150), 90, 0.6);
+    { const sx = bx + 130, sy = midY(sx + 17); mask(g, [{ x: sx, y: sy }, { x: sx + 34, y: sy }, { x: sx + 34, y: sy - 100 }, { x: sx, y: sy - 100 }]); maskCircle(g, sx + 17, sy - 100, 18);
+      pline(g, sx, sy, sx, sy - 100, 0.7); pline(g, sx + 34, sy, sx + 34, sy - 100, 0.7); g.strokeStyle = GRAPHITE; g.globalAlpha = 0.55; g.lineWidth = 1.4; g.beginPath(); g.arc(sx + 17, sy - 100, 17, Math.PI, 0); g.stroke(); g.globalAlpha = 1;
+      for (let y = sy - 85; y < sy; y += 16) pline(g, sx, y, sx + 34, y + rj(2), 0.4, 1); smudge(g, [{ x: sx + 20, y: sy }, { x: sx + 34, y: sy }, { x: sx + 34, y: sy - 100 }, { x: sx + 20, y: sy - 100 }], 0.07, -0.5, 4); }   // silo
+    for (let i = 0; i < 3; i++) { const cx = 830 + i * 96 + rj(20), cy = midY(cx) - 9;
+      g.save(); g.beginPath(); g.ellipse(cx, cy, 17, 10, 0, 0, 7); g.fillStyle = paperPat(g); g.fill(); g.restore();
+      for (const lx of [-9, -3, 4, 10]) pline(g, cx + lx, cy + 8, cx + lx, cy + 17, 0.5, 1);
+      g.strokeStyle = GRAPHITE; g.globalAlpha = 0.5; g.lineWidth = 1.2; g.beginPath(); g.ellipse(cx, cy, 16, 9, 0, 0, 7); g.stroke(); g.globalAlpha = 1;
+      maskCircle(g, cx + 17, cy - 4, 6); penCircle(g, cx + 17, cy - 4, 5, 0.6, 1);
+      for (let s = 0; s < 3; s++) penCircle(g, cx + rj(18), cy + rj(7), 2 + rnd() * 2.5, 0.5, 1); }   // cows
+    windmill = { x: 920 + rnd() * 150 }; windmill.y = midY(windmill.x) - 110;
+    mask(g, [{ x: windmill.x - 15, y: midY(windmill.x) }, { x: windmill.x + 15, y: midY(windmill.x) }, { x: windmill.x + 5, y: windmill.y + 10 }, { x: windmill.x - 5, y: windmill.y + 10 }]);
+    pline(g, windmill.x - 14, midY(windmill.x), windmill.x - 4, windmill.y + 10, 0.75); pline(g, windmill.x + 14, midY(windmill.x), windmill.x + 4, windmill.y + 10, 0.75);
+    for (let y = midY(windmill.x) - 18; y > windmill.y + 12; y -= 22) pline(g, windmill.x - 9, y, windmill.x + 9, y - 10, 0.45, 1);
+    roundTree(g, 1150, midY(1150), 90, 0.7);
   } else if (theme === 'town') {
-    for (let x = 60; x < 1080; x += 130 + rnd() * 70) house(g, x, midY(x + 40), 60 + rnd() * 50, 50 + rnd() * 50, 0.6 + rnd() * 0.15, rnd() < 0.3);
-    { const cx = 600 + rnd() * 100, y = midY(cx); penPath(g, [{ x: cx - 30, y }, { x: cx - 30, y: y - 80 }, { x: cx + 30, y: y - 80 }, { x: cx + 30, y }], 0.7); penPath(g, [{ x: cx - 12, y: y - 80 }, { x: cx - 12, y: y - 130 }, { x: cx, y: y - 190 }, { x: cx + 12, y: y - 130 }, { x: cx + 12, y: y - 80 }], 0.7); pline(g, cx, y - 190, cx, y - 206, 0.7); pline(g, cx - 6, y - 200, cx + 6, y - 200, 0.7); smudge(g, [{ x: cx, y: y - 190 }, { x: cx + 12, y: y - 130 }, { x: cx + 12, y: y - 80 }, { x: cx, y: y - 80 }], 0.1, 1.0, 4); penCircle(g, cx, y - 105, 7, 0.6, 1); pline(g, cx, y - 105, cx, y - 110, 0.6, 1); pline(g, cx, y - 105, cx + 4, y - 103, 0.6, 1); }
-    { const tx = 1080, y = midY(tx); penCircle(g, tx, y - 120, 30, 0.7); pline(g, tx - 22, y - 100, tx - 30, y, 0.7); pline(g, tx + 22, y - 100, tx + 30, y, 0.7); pline(g, tx - 26, y - 60, tx + 26, y - 60, 0.5); pline(g, tx - 24, y - 90, tx + 28, y - 30, 0.5); pline(g, tx + 24, y - 90, tx - 28, y - 30, 0.5); smudge(g, [{ x: tx + 8, y: y - 150 }, { x: tx + 30, y: y - 120 }, { x: tx + 8, y: y - 90 }], 0.08, 0.8, 4); penText(g, 'H2O', tx, y - 116, 12, 0.6); }
-    let px = 30; const poles = []; while (px < W) { const y = midY(px); pline(g, px, y, px + rj(3), y - 90, 0.75); pline(g, px - 12, y - 80, px + 12, y - 80, 0.75); poles.push({ x: px, y: y - 80 }); px += 180 + rnd() * 90; }
-    for (let i = 0; i < poles.length - 1; i++) { const a = poles[i], b = poles[i + 1]; g.strokeStyle = GRAPHITE; g.globalAlpha = 0.4; g.lineWidth = 1; g.beginPath(); g.moveTo(a.x - 10, a.y); g.quadraticCurveTo((a.x + b.x) / 2, a.y + 26, b.x - 10, b.y); g.moveTo(a.x + 10, a.y); g.quadraticCurveTo((a.x + b.x) / 2, a.y + 30, b.x + 10, b.y); g.stroke(); g.globalAlpha = 1; if (rnd() < 0.5) flock(g, (a.x + b.x) / 2 - 20, a.y + 18, 3, 0.5); }
-    for (let i = 0; i < 4; i++) roundTree(g, 90 + rnd() * 1000, midY(600) - 4, 50 + rnd() * 40, 0.55);
+    let px = 30; const poles = []; while (px < W) { const y = midY(px); poles.push({ x: px, y: y - 80, gy: y }); px += 180 + rnd() * 90; }
+    for (let i = 0; i < poles.length - 1; i++) { const a = poles[i], b = poles[i + 1]; g.strokeStyle = GRAPHITE; g.globalAlpha = 0.45; g.lineWidth = 1; g.beginPath(); g.moveTo(a.x - 10, a.y); g.quadraticCurveTo((a.x + b.x) / 2, a.y + 26, b.x - 10, b.y); g.moveTo(a.x + 10, a.y); g.quadraticCurveTo((a.x + b.x) / 2, a.y + 30, b.x + 10, b.y); g.stroke(); g.globalAlpha = 1; if (rnd() < 0.5) flock(g, (a.x + b.x) / 2 - 20, a.y + 18, 3, 0.5); }
+    for (const p of poles) { mask(g, [{ x: p.x - 2.5, y: p.gy }, { x: p.x + 2.5, y: p.gy }, { x: p.x + 2.5, y: p.y - 12 }, { x: p.x - 2.5, y: p.y - 12 }]); pline(g, p.x, p.gy, p.x + rj(3), p.gy - 90, 0.75); pline(g, p.x - 12, p.y, p.x + 12, p.y, 0.75); }
+    for (let i = 0; i < 3; i++) { const tx = 150 + i * 330 + rj(40); roundTree(g, tx, midY(tx) - 4, 50 + rnd() * 30, 0.55); }
+    { const tx = 1080, y = midY(tx); mask(g, [{ x: tx - 30, y }, { x: tx - 22, y: y - 100 }, { x: tx + 22, y: y - 100 }, { x: tx + 30, y }]);
+      pline(g, tx - 22, y - 100, tx - 30, y, 0.7); pline(g, tx + 22, y - 100, tx + 30, y, 0.7); pline(g, tx - 26, y - 60, tx + 26, y - 60, 0.5); pline(g, tx - 24, y - 90, tx + 28, y - 30, 0.5); pline(g, tx + 24, y - 90, tx - 28, y - 30, 0.5);
+      maskCircle(g, tx, y - 120, 32); penCircle(g, tx, y - 120, 30, 0.7); smudge(g, [{ x: tx + 8, y: y - 148 }, { x: tx + 30, y: y - 120 }, { x: tx + 8, y: y - 92 }], 0.08, 0.8, 4); penText(g, 'H2O', tx, y - 116, 12, 0.6); }   // water tower
+    const lots = []; for (let x = 60; x < 1000; x += 130 + rnd() * 70) lots.push({ x, w: 60 + rnd() * 50, h: 50 + rnd() * 50, red: rnd() < 0.3 });
+    { const cx = 600 + rnd() * 100, y = midY(cx); const tower = [{ x: cx - 12, y: y - 80 }, { x: cx - 12, y: y - 130 }, { x: cx, y: y - 190 }, { x: cx + 12, y: y - 130 }, { x: cx + 12, y: y - 80 }];
+      mask(g, [{ x: cx - 30, y }, { x: cx - 30, y: y - 80 }, { x: cx + 30, y: y - 80 }, { x: cx + 30, y }]); mask(g, tower);
+      penPath(g, [{ x: cx - 30, y }, { x: cx - 30, y: y - 80 }, { x: cx + 30, y: y - 80 }, { x: cx + 30, y }], 0.7); penPath(g, tower, 0.7);
+      pline(g, cx, y - 190, cx, y - 206, 0.7); pline(g, cx - 6, y - 200, cx + 6, y - 200, 0.7); smudge(g, [{ x: cx, y: y - 190 }, { x: cx + 12, y: y - 130 }, { x: cx + 12, y: y - 80 }, { x: cx, y: y - 80 }], 0.1, 1.0, 4);
+      maskCircle(g, cx, y - 105, 8); penCircle(g, cx, y - 105, 7, 0.6, 1); pline(g, cx, y - 105, cx, y - 110, 0.6, 1); pline(g, cx, y - 105, cx + 4, y - 103, 0.6, 1); }   // church
+    lots.sort((a, b) => midY(a.x + a.w / 2) - midY(b.x + b.w / 2)).forEach(l => house(g, l.x, midY(l.x + l.w / 2), l.w, l.h, 0.68, l.red));
   } else {
-    for (let i = 0; i < 16; i++) { const x = 40 + rnd() * 1120; tree(g, x, midY(x) - 2, 50 + rnd() * 60, 0.45 + rnd() * 0.4); }
-    { const cx = 520 + rnd() * 160, y = midY(cx); const wall = [{ x: cx - 120, y }, { x: cx - 120, y: y - 70 }, { x: cx + 120, y: y - 70 }, { x: cx + 120, y }]; penPath(g, wall, 0.6); smudge(g, wall, 0.05, -0.6, 6);
-      for (let x = cx - 120; x < cx + 120; x += 24) { pline(g, x, y - 70, x, y - 82, 0.6, 1); pline(g, x, y - 82, x + 12, y - 82, 0.6, 1); pline(g, x + 12, y - 82, x + 12, y - 70, 0.6, 1); }
-      for (let r = 0; r < 4; r++) for (let x = cx - 110 + (r % 2) * 14; x < cx + 110; x += 28) pline(g, x, y - 12 - r * 15, x + 14, y - 12 - r * 15 + rj(2), 0.25, 1);
-      for (const tx of [cx - 140, cx + 100]) { const t = [{ x: tx, y }, { x: tx, y: y - 150 + rj(30) }, { x: tx + 40, y: y - 140 }, { x: tx + 40, y }]; penPath(g, t, 0.7); smudge(g, t, 0.07, -0.7, 5); for (let x = tx; x < tx + 40; x += 14) { pline(g, x, t[1].y, x, t[1].y - 10, 0.6, 1); pline(g, x, t[1].y - 10, x + 7, t[1].y - 10, 0.6, 1); }
-        if (rnd() < 0.7) { pline(g, tx + 20, t[1].y - 10, tx + 20, t[1].y - 50, 0.7); g.strokeStyle = RED; g.globalAlpha = 0.55; g.lineWidth = 1.4; g.beginPath(); g.moveTo(tx + 20, t[1].y - 50); g.lineTo(tx + 48, t[1].y - 42); g.lineTo(tx + 20, t[1].y - 34); g.stroke(); g.globalAlpha = 1; }
-        else { penPath(g, [{ x: tx + 8, y: t[1].y - 10 }, { x: tx + 14, y: t[1].y - 30 }, { x: tx + 26, y: t[1].y - 22 }, { x: tx + 32, y: t[1].y - 10 }], 0.6); penText(g, 'ruins', tx + 20, t[1].y - 46, 11, 0.4); }
-        penPath(g, [{ x: tx + 14, y: t[1].y + 40 }, { x: tx + 14, y: t[1].y + 28 }, { x: tx + 20, y: t[1].y + 22 }, { x: tx + 26, y: t[1].y + 28 }, { x: tx + 26, y: t[1].y + 40 }], 0.5); }
-      penPath(g, [{ x: cx - 16, y }, { x: cx - 16, y: y - 40 }, { x: cx, y: y - 52 }, { x: cx + 16, y: y - 40 }, { x: cx + 16, y }], 0.6); smudge(g, [{ x: cx - 16, y }, { x: cx - 16, y: y - 40 }, { x: cx, y: y - 52 }, { x: cx + 16, y: y - 40 }, { x: cx + 16, y }], 0.12, 1.2, 3); penText(g, 'castle', cx, y - 96, 12, 0.5, -0.03); }
-    { const lx = 150 + rnd() * 60, ly = midY(lx) + 6; g.strokeStyle = INK; g.globalAlpha = 0.3; g.lineWidth = 1.2; for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(lx - 70 + i * 6, ly + i * 4); for (let x = 0; x < 140; x += 14) g.lineTo(lx - 70 + i * 6 + x, ly + i * 4 + Math.sin(x * 0.5 + i) * 2); g.stroke(); } g.globalAlpha = 1; penText(g, 'lake', lx, ly + 36, 11, 0.4); }
+    const cx = 520 + rnd() * 160, y = midY(cx);
+    for (let x = 30; x < W; x += 54 + rnd() * 26) { if (Math.abs(x - cx) < 160) continue; tree(g, x, midY(x) - 2, 44 + rnd() * 24, 0.42); }   // the treeline, back to front
+    { const wall = [{ x: cx - 120, y }, { x: cx - 120, y: y - 70 }, { x: cx + 120, y: y - 70 }, { x: cx + 120, y }];
+      mask(g, wall); penPath(g, wall, 0.62); smudge(g, wall, 0.05, -0.6, 6);
+      for (let x = cx - 120; x < cx + 120; x += 24) { const cr = [{ x, y: y - 70 }, { x, y: y - 82 }, { x: x + 12, y: y - 82 }, { x: x + 12, y: y - 70 }]; mask(g, cr); penPath(g, cr, 0.62); }
+      for (let r = 0; r < 4; r++) for (let x = cx - 110 + (r % 2) * 14; x < cx + 110; x += 28) pline(g, x, y - 12 - r * 15, x + 14, y - 12 - r * 15 + rj(2), 0.25, 1);   // stone courses
+      const gate = [{ x: cx - 16, y }, { x: cx - 16, y: y - 40 }, { x: cx, y: y - 52 }, { x: cx + 16, y: y - 40 }, { x: cx + 16, y }];
+      mask(g, gate); penPath(g, gate, 0.62); smudge(g, gate, 0.12, 1.2, 3);
+      for (const tx of [cx - 140, cx + 100]) { const top = y - 150 + rj(30); const t = [{ x: tx, y }, { x: tx, y: top }, { x: tx + 40, y: top + 10 }, { x: tx + 40, y }];
+        mask(g, t); penPath(g, t, 0.72); smudge(g, t, 0.07, -0.7, 5);
+        for (let x = tx; x < tx + 40; x += 14) { const cr = [{ x, y: top }, { x, y: top - 10 }, { x: x + 7, y: top - 10 }, { x: x + 7, y: top }]; mask(g, cr); penPath(g, cr, 0.62); }
+        if (rnd() < 0.7) { pline(g, tx + 20, top - 10, tx + 20, top - 50, 0.72); g.strokeStyle = RED; g.globalAlpha = 0.55; g.lineWidth = 1.4; g.beginPath(); g.moveTo(tx + 20, top - 50); g.lineTo(tx + 48, top - 42); g.lineTo(tx + 20, top - 34); g.stroke(); g.globalAlpha = 1; }
+        else { penPath(g, [{ x: tx + 8, y: top - 10 }, { x: tx + 14, y: top - 30 }, { x: tx + 26, y: top - 22 }, { x: tx + 32, y: top - 10 }], 0.6); }
+        penPath(g, [{ x: tx + 14, y: y - 30 }, { x: tx + 14, y: y - 42 }, { x: tx + 20, y: y - 48 }, { x: tx + 26, y: y - 42 }, { x: tx + 26, y: y - 30 }], 0.5); }
+      penText(g, 'castle', cx, y + 22, 12, 0.5, -0.03); }
+    for (const tx of [60, 140, 1060, 1150]) tree(g, tx + rj(16), midY(tx) + 10, 84 + rnd() * 26, 0.85);   // a couple of nearer pines at the edges
+    { const lx = 230 + rnd() * 60, ly = midY(lx) + 8; g.strokeStyle = INK; g.globalAlpha = 0.3; g.lineWidth = 1.2; for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(lx - 60 + i * 6, ly + i * 4); for (let x = 0; x < 120; x += 14) g.lineTo(lx - 60 + i * 6 + x, ly + i * 4 + Math.sin(x * 0.5 + i) * 2); g.stroke(); } g.globalAlpha = 1; penText(g, 'lake', lx, ly + 34, 11, 0.4); }
   }
   // marginalia: a page label like the slingshot's
   penText(g, `pg. ${pageNo}  —  the ${theme === 'farm' ? 'farm' : theme === 'town' ? 'edge of town' : 'castle woods'}`, 70, 92, 22, 0.7, -0.01, 'left');
 }
 // ---------- the playable ground: a pencil doodle of hills, contour lines, a heavier edge, whatever's been erased ----------
 function renderTerrain() {
-  const g = terrainCv.getContext('2d'), k = NotebookInk(g); g.clearRect(0, 0, W, H); seed = baseSeed + 555;
+  const g = terrainCv.getContext('2d'), k = NotebookInk(g); g.clearRect(0, 0, W, H); g._pp = null; seed = baseSeed + 555;
   g.save(); g.beginPath(); g.moveTo(0, H); for (let x = 0; x <= W; x += 2) g.lineTo(x, ground[x]); g.lineTo(W, H); g.closePath(); g.clip();
+  g.fillStyle = paperPat(g); g.fillRect(0, 0, W, H);   // opaque: whatever is behind the hill stops at the hill
   g.fillStyle = 'rgba(110,110,120,.07)'; g.fillRect(0, 0, W, H);
   const grad = g.createLinearGradient(0, 400, 0, H); grad.addColorStop(0, 'rgba(110,110,120,0)'); grad.addColorStop(1, 'rgba(110,110,120,.16)'); g.fillStyle = grad; g.fillRect(0, 0, W, H);
   // pressed-harder hatch right under the edge
@@ -218,18 +274,18 @@ function renderTerrain() {
   // grass, and the odd red-pen flower, where the ground hasn't been rubbed out
   for (let x = 8; x < W; x += 9 + Math.floor(rnd() * 8)) { if (!tufts[x]) continue; const y = ground[x]; pline(g, x, y, x - 2 + rj(4), y - 6 - rnd() * 6, 0.45, 1); pline(g, x + 3, y, x + 4 + rj(3), y - 5 - rnd() * 5, 0.45, 1); if (rnd() < 0.03) { g.strokeStyle = RED; g.globalAlpha = 0.55; g.lineWidth = 1.1; g.beginPath(); g.arc(x + 2, y - 13, 3, 0, 7); g.stroke(); g.beginPath(); g.moveTo(x + 2, y - 10); g.lineTo(x + 2, y); g.stroke(); g.globalAlpha = 1; } }
   // rocks, a stump, a signpost, mushrooms
-  const rock = (x) => { const y = groundAt(x); const pts = [{ x: x - 10, y }, { x: x - 8, y: y - 9 }, { x, y: y - 12 }, { x: x + 9, y: y - 8 }, { x: x + 11, y }]; penPath(g, pts, 0.8); smudge(g, pts, 0.1, 0.8, 3); };
+  const rock = (x) => { const y = groundAt(x); const pts = [{ x: x - 10, y }, { x: x - 8, y: y - 9 }, { x, y: y - 12 }, { x: x + 9, y: y - 8 }, { x: x + 11, y }]; mask(g, pts); penPath(g, pts, 0.8); smudge(g, pts, 0.1, 0.8, 3); };
   [330, 560, 840].forEach(x => rock(x + ((baseSeed * 7 + x) % 40)));
-  { const x = 470 + (baseSeed % 13) * 9, y = groundAt(x); penPath(g, [{ x: x - 8, y }, { x: x - 8, y: y - 16 }, { x: x + 8, y: y - 16 }, { x: x + 8, y }], 0.8); g.strokeStyle = GRAPHITE; g.globalAlpha = 0.5; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y - 16, 8, 3, 0, 0, 7); g.stroke(); g.beginPath(); g.ellipse(x, y - 16, 4, 1.5, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
-  { const x = 640 + (baseSeed % 7) * 20, y = groundAt(x); pline(g, x, y, x, y - 42, 0.85); penPath(g, [{ x: x - 4, y: y - 42 }, { x: x + 34, y: y - 44 }, { x: x + 42, y: y - 36 }, { x: x + 34, y: y - 28 }, { x: x - 4, y: y - 30 }], 0.85, true); penText(g, ['THIS WAY', 'NO MAN\'S LAND', 'KEEP OUT', 'DANGER'][baseSeed % 4], x + 17, y - 33, 9, 0.8); }
-  for (let i = 0; i < 3; i++) { const x = 240 + i * 290 + ((baseSeed * (i + 3)) % 60), y = groundAt(x); g.strokeStyle = GRAPHITE; g.globalAlpha = 0.55; g.lineWidth = 1; g.beginPath(); g.arc(x, y - 5, 5, Math.PI, 0); g.stroke(); g.beginPath(); g.moveTo(x - 2, y - 5); g.lineTo(x - 2, y); g.lineTo(x + 2, y); g.lineTo(x + 2, y - 5); g.stroke(); g.globalAlpha = 1; }
+  { const x = 470 + (baseSeed % 13) * 9, y = groundAt(x); mask(g, [{ x: x - 9, y: y + 1 }, { x: x - 9, y: y - 19 }, { x: x + 9, y: y - 19 }, { x: x + 9, y: y + 1 }]); penPath(g, [{ x: x - 8, y }, { x: x - 8, y: y - 16 }, { x: x + 8, y: y - 16 }, { x: x + 8, y }], 0.8); g.strokeStyle = GRAPHITE; g.globalAlpha = 0.5; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y - 16, 8, 3, 0, 0, 7); g.stroke(); g.beginPath(); g.ellipse(x, y - 16, 4, 1.5, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
+  { const x = 640 + (baseSeed % 7) * 20, y = groundAt(x); mask(g, [{ x: x - 2, y }, { x: x + 2, y }, { x: x + 2, y: y - 44 }, { x: x - 2, y: y - 44 }]); mask(g, [{ x: x - 5, y: y - 45 }, { x: x + 43, y: y - 45 }, { x: x + 43, y: y - 27 }, { x: x - 5, y: y - 27 }]); pline(g, x, y, x, y - 42, 0.85); penPath(g, [{ x: x - 4, y: y - 42 }, { x: x + 34, y: y - 44 }, { x: x + 42, y: y - 36 }, { x: x + 34, y: y - 28 }, { x: x - 4, y: y - 30 }], 0.85, true); penText(g, ['THIS WAY', 'NO MAN\'S LAND', 'KEEP OUT', 'DANGER'][baseSeed % 4], x + 17, y - 33, 9, 0.8); }
+  for (let i = 0; i < 3; i++) { const x = 240 + i * 290 + ((baseSeed * (i + 3)) % 60), y = groundAt(x); maskCircle(g, x, y - 5, 6); g.strokeStyle = GRAPHITE; g.globalAlpha = 0.55; g.lineWidth = 1; g.beginPath(); g.arc(x, y - 5, 5, Math.PI, 0); g.stroke(); g.beginPath(); g.moveTo(x - 2, y - 5); g.lineTo(x - 2, y); g.lineTo(x + 2, y); g.lineTo(x + 2, y - 5); g.stroke(); g.globalAlpha = 1; }
   // the forts: yours in ink on the left, theirs in pencil on the right
-  { const fx = 60, fy = groundAt(fx); k.poly([{ x: fx - 30, y: fy }, { x: fx - 30, y: fy - 70 }, { x: fx + 30, y: fy - 70 }, { x: fx + 30, y: fy }], 970, INK, 2, 2); for (let x = fx - 30; x < fx + 30; x += 15) { k.line(x, fy - 70, x, fy - 82, 972 + x, INK, 1.8, 1); k.line(x, fy - 82, x + 8, fy - 82, 973 + x, INK, 1.8, 1); k.line(x + 8, fy - 82, x + 8, fy - 70, 974 + x, INK, 1.8, 1); } k.hatch([{ x: fx - 30, y: fy }, { x: fx - 30, y: fy - 70 }, { x: fx + 30, y: fy - 70 }, { x: fx + 30, y: fy }], 975, INK, 8, 0.9, 0.2); k.line(fx, fy - 82, fx, fy - 118, 976, INK, 2, 1); k.poly([{ x: fx, y: fy - 118 }, { x: fx + 28, y: fy - 110 }, { x: fx, y: fy - 100 }], 977, INK, 1.6, 1); k.text('HOME', fx, fy - 30, { size: 16, color: INK }); }
-  { const fx = 1140, fy = groundAt(fx); const cup = [{ x: fx - 30, y: fy }, { x: fx - 34, y: fy - 90 }, { x: fx + 34, y: fy - 90 }, { x: fx + 30, y: fy }]; penPath(g, cup, 0.85, true); smudge(g, cup, 0.08, -0.7, 5); for (let i = 0; i < 5; i++) { const px = fx - 24 + i * 12, top = fy - 118 - (i % 2) * 8; pline(g, px, fy - 90, px, top, 0.85); penPath(g, [{ x: px - 3, y: top }, { x: px, y: top - 10 }, { x: px + 3, y: top }], 0.85); g.fillStyle = GRAPHITE; g.globalAlpha = 0.6; g.beginPath(); g.moveTo(px - 1.5, top - 5); g.lineTo(px, top - 10); g.lineTo(px + 1.5, top - 5); g.fill(); g.globalAlpha = 1; } penText(g, 'PENCIL CUP', fx, fy - 40, 12, 0.8); }
+  { const fx = 60, fy = groundAt(fx); mask(g, [{ x: fx - 31, y: fy }, { x: fx - 31, y: fy - 84 }, { x: fx + 31, y: fy - 84 }, { x: fx + 31, y: fy }]); k.poly([{ x: fx - 30, y: fy }, { x: fx - 30, y: fy - 70 }, { x: fx + 30, y: fy - 70 }, { x: fx + 30, y: fy }], 970, INK, 2, 2); for (let x = fx - 30; x < fx + 30; x += 15) { k.line(x, fy - 70, x, fy - 82, 972 + x, INK, 1.8, 1); k.line(x, fy - 82, x + 8, fy - 82, 973 + x, INK, 1.8, 1); k.line(x + 8, fy - 82, x + 8, fy - 70, 974 + x, INK, 1.8, 1); } k.hatch([{ x: fx - 30, y: fy }, { x: fx - 30, y: fy - 70 }, { x: fx + 30, y: fy - 70 }, { x: fx + 30, y: fy }], 975, INK, 8, 0.9, 0.2); k.line(fx, fy - 82, fx, fy - 118, 976, INK, 2, 1); k.poly([{ x: fx, y: fy - 118 }, { x: fx + 28, y: fy - 110 }, { x: fx, y: fy - 100 }], 977, INK, 1.6, 1); k.text('HOME', fx, fy - 30, { size: 16, color: INK }); }
+  { const fx = 1140, fy = groundAt(fx); const cup = [{ x: fx - 30, y: fy }, { x: fx - 34, y: fy - 90 }, { x: fx + 34, y: fy - 90 }, { x: fx + 30, y: fy }]; mask(g, cup); penPath(g, cup, 0.85, true); smudge(g, cup, 0.08, -0.7, 5); for (let i = 0; i < 5; i++) { const px = fx - 24 + i * 12, top = fy - 118 - (i % 2) * 8; pline(g, px, fy - 90, px, top, 0.85); penPath(g, [{ x: px - 3, y: top }, { x: px, y: top - 10 }, { x: px + 3, y: top }], 0.85); g.fillStyle = GRAPHITE; g.globalAlpha = 0.6; g.beginPath(); g.moveTo(px - 1.5, top - 5); g.lineTo(px, top - 10); g.lineTo(px + 1.5, top - 5); g.fill(); g.globalAlpha = 1; } penText(g, 'PENCIL CUP', fx, fy - 40, 12, 0.8); }
   // craters: the erased bits show paper, with rub streaks and eraser crumbs
   for (const c of craters) {
     g.save(); g.beginPath(); g.arc(c.x, c.y, c.r + 6, 0, 7); g.clip();
-    g.strokeStyle = PAPER; g.globalAlpha = 0.85; g.lineWidth = 3; for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(c.x - c.r + i * 4, c.y - c.r + i * 5); g.lineTo(c.x + c.r - 10 + i * 4, c.y + c.r - 30 + i * 3); g.stroke(); }
+    g.strokeStyle = paperPat(g); g.globalAlpha = 0.95; g.lineWidth = 4; for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(c.x - c.r + i * 4, c.y - c.r + i * 5); g.lineTo(c.x + c.r - 10 + i * 4, c.y + c.r - 30 + i * 3); g.stroke(); }
     g.strokeStyle = PINK; g.globalAlpha = 0.18; g.lineWidth = 6; for (let i = 0; i < 4; i++) { g.beginPath(); g.moveTo(c.x - c.r + 6 + i * 9, c.y + c.r * 0.5 - i * 12); g.lineTo(c.x + c.r - 4 + i * 5, c.y - c.r * 0.6 + i * 8); g.stroke(); }
     g.globalAlpha = 1; g.restore();
     let s2 = c.seed; const r2 = () => { const x = Math.sin(s2++ * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
@@ -353,8 +409,10 @@ function fighter(c, isPen) {
     arms(x, y - 34, c, anim, col, w, id, false);
   }
   // health, scribbled above the head
-  const hx = x - 30, hy = y - (isPen ? 96 : 84); ink.poly([{ x: hx, y: hy }, { x: hx + 60, y: hy }, { x: hx + 60, y: hy + 9 }, { x: hx, y: hy + 9 }], id + 20, PEN_MD, 1, 1);
-  if (c.hp > 0) { ctx.save(); ctx.beginPath(); ctx.rect(hx, hy, 60 * c.hp / 100, 9); ctx.clip(); ctx.strokeStyle = c.hp > 35 ? (isPen ? PEN_DK : INK) : RED; ctx.globalAlpha = 0.8; ctx.lineWidth = 1.2; ctx.beginPath(); for (let i = 0; i < 40; i++) { ctx.moveTo(hx + i * 1.6, hy - 1 + (i % 2) * 2); ctx.lineTo(hx + i * 1.6 + 6, hy + 11 - (i % 3)); } ctx.stroke(); ctx.restore(); ctx.globalAlpha = 1; }
+  const hx = x - 30, hy = y - (isPen ? 96 : 84);
+  mask(ctx, [{ x: hx - 5, y: hy - 4 }, { x: hx + 78, y: hy - 4 }, { x: hx + 78, y: hy + 14 }, { x: hx - 5, y: hy + 14 }]);
+  ink.poly([{ x: hx, y: hy }, { x: hx + 60, y: hy }, { x: hx + 60, y: hy + 9 }, { x: hx, y: hy + 9 }], id + 20, PEN_MD, 1, 1);
+  if (c.hp > 0) { ctx.save(); ctx.beginPath(); ctx.rect(hx, hy, 60 * c.hp / 100, 9); ctx.clip(); ctx.strokeStyle = c.hp > 35 ? (isPen ? PEN_DK : INK) : RED; ctx.globalAlpha = 0.85; ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.beginPath(); for (let i = 0; i < 22; i++) { const bx = hx + 2.5 + i * 2.7, w = Math.sin(i * 2.3) * 0.7; ctx.moveTo(bx - w, hy + 1.8); ctx.lineTo(bx + w, hy + 7.2); } ctx.stroke(); ctx.restore(); ctx.globalAlpha = 1; }
   ink.text(c.hp + '', hx + 74, hy + 10, { size: 15, color: c.hp > 35 ? PEN_DK : RED, font: 'Patrick Hand', weight: 400, align: 'left' });
   if (c.face === 'dizzy') for (let i = 0; i < 3; i++) { const a = frame * 0.1 + i * 2.1; ink.text('*', x + Math.cos(a) * 22, y - (isPen ? 66 : 62) + Math.sin(a) * 6, { size: 18, color: PEN_MD }); }
 }
@@ -387,6 +445,7 @@ function drawHUD() {
   ink.text('Eraser War', 600, 62, { size: 44, color: INK, rot: -0.02 });
   ink.text(`turn ${turn} · wind ${Math.abs(wind * 10).toFixed(0)} ${wind === 0 ? '' : wind > 0 ? '→' : '←'} · you ${you.hp} · pencil ${pen.hp}`, 600, 90, { size: 18, color: INK, font: 'Patrick Hand', weight: 400, alpha: 0.85 });
   const msg = state === 'aim' ? 'YOUR TURN · aim with the mouse · click to throw' : state === 'aiturn' ? 'the pencil is thinking...' : state === 'over' ? (winner === 'you' ? 'YOU WIN! new game?' : 'the pencil wins. new game?') : '';
+  if (state === 'aim' && turn === 1) ink.text('the farther the crosshair, the harder the throw', 600, 146, { size: 16, color: PEN_MD, font: 'Patrick Hand', weight: 400 });
   if (msg) ink.text(msg, 600, 122, { size: 22, color: state === 'aim' ? INK : state === 'over' ? (winner === 'you' ? INK : RED) : PEN_MD, rot: -0.01, alpha: 0.75 + Math.sin(frame * 0.1) * 0.2 });
   // a windsock planted on the middle hill
   const wx = 600, gy = groundAt(600), top = gy - 60; ink.line(wx, gy, wx + 1, top, 5000, PEN_DK, 1.6, 1); const dir = wind >= 0 ? 1 : -1, len = 8 + Math.abs(wind) * 30, sag = 14 - Math.abs(wind) * 10;
@@ -404,7 +463,6 @@ function drawAim() {
   const a = aimFromMouse(), r = simulate(you, a.ang, a.pow, 90); const show = Math.min(r.pts.length, Math.round(r.t * 0.45) + 8);
   ctx.fillStyle = INK; ctx.globalAlpha = 0.45; for (let i = 0; i < show; i += 3) { ctx.beginPath(); ctx.arc(r.pts[i].x, r.pts[i].y, 2, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
   const h = handOf(you); ink.text(`${Math.round(-a.ang * 180 / Math.PI)}°  power ${Math.round(a.pow)}`, h.x + 20, h.y - 50, { size: 15, color: INK, font: 'Patrick Hand', weight: 400, align: 'left', alpha: 0.8 });
-  if (turn === 1) ink.text('(farther from you = harder throw)', h.x + 20, h.y - 32, { size: 14, color: PEN_MD, font: 'Patrick Hand', weight: 400, align: 'left' });
   ink.circle(mouse.x, mouse.y, 7, 5040, INK, 1.2, 1); ink.line(mouse.x - 12, mouse.y, mouse.x + 12, mouse.y, 5041, INK, 1, 1); ink.line(mouse.x, mouse.y - 12, mouse.x, mouse.y + 12, 5042, INK, 1, 1);
 }
 function draw() {
