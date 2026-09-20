@@ -19,6 +19,8 @@
   #top { position: absolute; left: 74px; top: 14px; }
   #sys { position: absolute; left: 74px; top: 600px; display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
   #sys button, #top #back { color: #7a7a82; border-color: #9a9aa0; }
+  #audio-controls { display:flex; align-items:center; gap:8px; }
+  #volume { width:76px; accent-color:#7a7a82; cursor:pointer; }
   #mute { padding: 4px 8px 1px; line-height: 0; }
   #rename { position: absolute; left: 84px; top: 147px; width: 96px; font-family: 'Patrick Hand', cursive; font-size: 22px; color: #4a4a50; background: #fbf8ee; border: none; border-bottom: 2px solid #9a9aa0; outline: none; padding: 0 2px; }
   #sys button:hover { background: rgba(80,80,90,.07); }
@@ -51,7 +53,7 @@
   <canvas id="c" width="1200" height="720"></canvas>
   <div id="binding" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
   <div id="top"><a href="../../index.html" id="back">← arcade</a></div>
-  <div id="sys"><button id="mute" title="sound" aria-label="sound on"></button><button id="newgame">new game</button></div>
+  <div id="sys"><div id="audio-controls"><button id="mute" title="Mute sound" aria-label="Mute sound"></button><input id="volume" type="range" min="0" max="100" step="5" aria-label="Sound volume" title="Sound volume"></div><button id="newgame">new game</button></div>
   <div id="side">
     <button id="hike">HIKE!</button>
     <aside id="first-play-note" aria-label="First play controls"><p>Draw your routes.</p><p>WASD to move</p><p>click to throw.</p></aside>
@@ -222,32 +224,55 @@ const toField = (sx, sy) => ({ x: sx - FX, y: sy + cam.y });
 
 // ---------- sound ----------
 const SFX = (() => {
-  let ac, master, noiseBuf, muted = false, crowd, crowdGain, scratchGain;
-  function init() { if (ac) return; ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = 0.7; master.connect(ac.destination);
-    noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    crowd = ac.createBufferSource(); crowd.buffer = noiseBuf; crowd.loop = true; const cf = ac.createBiquadFilter(); cf.type = 'lowpass'; cf.frequency.value = 500; crowdGain = ac.createGain(); crowdGain.gain.value = 0.03; crowd.connect(cf).connect(crowdGain).connect(master); crowd.start();
-    const sc = ac.createBufferSource(); sc.buffer = noiseBuf; sc.loop = true; const sf = ac.createBiquadFilter(); sf.type = 'bandpass'; sf.frequency.value = 3200; sf.Q.value = 1.2; scratchGain = ac.createGain(); scratchGain.gain.value = 0; sc.connect(sf).connect(scratchGain).connect(master); sc.start(); }
+  let ac, master, noiseBuf, scratchGain, lastHit = -1;
+  let muted = false, volume = 0.65;
+  try { const saved = JSON.parse(localStorage.getItem('notebook-football-audio')); if (saved) { muted = saved.muted === true; if (Number.isFinite(saved.volume)) volume = Math.max(0, Math.min(1, saved.volume)); } } catch (_) {}
   const now = () => ac.currentTime;
-  function env(g, t, a, peak, d) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
-  function tone(type, f0, f1, dur, vol, t = now(), lp) { const o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur); const g = ac.createGain(); env(g, t, 0.005, vol, dur); let n = o; if (lp) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; o.connect(f); n = f; } n.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.05); }
-  function noise(dur, vol, t = now(), o = {}) { const n = ac.createBufferSource(); n.buffer = noiseBuf; const f = ac.createBiquadFilter(); f.type = o.type || 'bandpass'; f.Q.value = o.q || 1; f.frequency.setValueAtTime(o.f0 || 1000, t); if (o.f1) f.frequency.exponentialRampToValueAtTime(o.f1, t + dur); const g = ac.createGain(); env(g, t, o.attack || 0.003, vol, dur); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + dur + 0.05); }
+  function save() { try { localStorage.setItem('notebook-football-audio', JSON.stringify({muted, volume})); } catch (_) {} }
+  function mix() { if (master) master.gain.setTargetAtTime(muted || document.hidden ? 0 : volume * 0.75, now(), 0.02); }
+  function init() {
+    if (ac) return;
+    const Audio = window.AudioContext || window.webkitAudioContext; if (!Audio) return;
+    try { ac = new Audio(); } catch (_) { return; }
+    master = ac.createGain(); master.gain.value = 0;
+    const limiter = ac.createDynamicsCompressor(); limiter.threshold.value = -16; limiter.knee.value = 16; limiter.ratio.value = 5; limiter.attack.value = 0.004; limiter.release.value = 0.18;
+    master.connect(limiter).connect(ac.destination);
+    noiseBuf = ac.createBuffer(1, ac.sampleRate * 3, ac.sampleRate);
+    const data = noiseBuf.getChannelData(0); let brown = 0;
+    for (let i = 0; i < data.length; i++) { const white = Math.random() * 2 - 1; brown = (brown + 0.025 * white) / 1.025; data[i] = white * 0.65 + brown * 2; }
+    function bed(freq, q, gain) { const source = ac.createBufferSource(), filter = ac.createBiquadFilter(), out = ac.createGain(); source.buffer = noiseBuf; source.loop = true; filter.type = 'bandpass'; filter.frequency.value = freq; filter.Q.value = q; out.gain.value = gain; source.connect(filter).connect(out).connect(master); source.start(); return out; }
+    scratchGain = bed(2600, 0.8, 0); mix();
+  }
+  function env(g, t, attack, peak, duration) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(Math.max(0.0002, peak), t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + attack + duration); }
+  function tone(type, f0, f1, dur, vol, t = now(), lp) {
+    const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur); env(g, t, 0.008, vol, dur);
+    let filter; if (lp) { filter = ac.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = lp; o.connect(filter).connect(g); } else o.connect(g);
+    g.connect(master); o.onended = () => { o.disconnect(); g.disconnect(); if (filter) filter.disconnect(); }; o.start(t); o.stop(t + dur + 0.06);
+  }
+  function noise(dur, vol, t = now(), opts = {}) {
+    const n = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); n.buffer = noiseBuf; f.type = opts.type || 'bandpass'; f.Q.value = opts.q || 0.7; f.frequency.setValueAtTime(opts.f0 || 1000, t); if (opts.f1) f.frequency.exponentialRampToValueAtTime(opts.f1, t + dur); env(g, t, opts.attack || 0.004, vol, dur); n.connect(f).connect(g).connect(master); n.onended = () => { n.disconnect(); f.disconnect(); g.disconnect(); }; n.start(t, Math.random()); n.stop(t + dur + (opts.attack || 0.004) + 0.05);
+  }
+  const ready = () => ac && !muted && !document.hidden;
+  document.addEventListener('visibilitychange', mix);
   return {
-    resume() { init(); if (ac.state === 'suspended') ac.resume(); },
-    toggleMute() { muted = !muted; if (master) master.gain.value = muted ? 0 : 0.7; return muted; },
-    crowd(level) { if (!ac) return; crowdGain.gain.setTargetAtTime(0.03 + level * 0.12, now(), 0.3); },
-    scratch(on) { if (!ac) return; scratchGain.gain.setTargetAtTime(on && !muted ? 0.05 : 0, now(), 0.03); },
-    hut() { if (!ac || muted) return; const t = now(); tone('sawtooth', 180, 120, 0.12, 0.25, t, 900); noise(0.08, 0.3, t + 0.02, { f0: 1200, q: 2 }); noise(0.05, 0.4, t + 0.1, { type: 'highpass', f0: 3000 }); },
-    whistle() { if (!ac || muted) return; const t = now(); tone('sine', 2200, 2500, 0.18, 0.22, t); tone('sine', 2500, 2450, 0.25, 0.18, t + 0.18); },
-    throw_(p = 1) { if (!ac || muted) return; noise(0.18 + (1 - p) * 0.25, 0.12 + p * 0.15, now(), { f0: 500, f1: 1200 + p * 1800, q: 1, attack: 0.04 }); },
-    catch_() { if (!ac || muted) return; const t = now(); tone('sine', 700, 250, 0.08, 0.35, t); noise(0.06, 0.3, t, { f0: 1800, q: 1.5 }); },
-    thump(v = 1) { if (!ac || muted) return; const t = now(); tone('sine', 150, 45, 0.18, 0.4 * v, t); noise(0.1, 0.35 * v, t, { f0: 500, f1: 150, q: 1 }); noise(0.04, 0.25 * v, t, { type: 'highpass', f0: 2500 }); },
-    td() { if (!ac || muted) return; const t = now(); [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f, 0.35, 0.22, t + i * 0.1)); tone('triangle', 1047, 1047, 1.0, 0.2, t + 0.45); tone('triangle', 1319, 1319, 1.0, 0.15, t + 0.45); this.crowd(1); setTimeout(() => this.crowd(0), 2500); },
-    bad() { if (!ac || muted) return; const t = now(); tone('sawtooth', 220, 180, 0.35, 0.16, t, 700); tone('sawtooth', 165, 140, 0.5, 0.16, t + 0.3, 600); },
-    good() { if (!ac || muted) return; const t = now(); tone('square', 880, 880, 0.12, 0.08, t, 2500); tone('square', 1175, 1175, 0.3, 0.08, t + 0.12, 2500); },
-    kick() { if (!ac || muted) return; const t = now(); tone('sine', 120, 60, 0.12, 0.4, t); noise(0.2, 0.25, t, { f0: 400, f1: 1800, q: 1, attack: 0.02 }); },
-    click() { if (!ac || muted) return; noise(0.03, 0.2, now(), { f0: 2500, q: 5 }); },
-    pencil() { if (!ac || muted) return; const t = now(); for (let i = 0; i < 4; i++) noise(0.12, 0.08, t + i * 0.13, { f0: 2500 + Math.random() * 1500, q: 1.5, attack: 0.03 }); },
-    win() { if (!ac || muted) return; const t = now(); [[262, 330, 392], [294, 370, 440], [330, 415, 494], [392, 494, 587, 784]].forEach((ch, i) => ch.forEach(f => tone('triangle', f, f, 0.5, 0.14, t + i * 0.25))); },
+    get muted() { return muted; }, get volume() { return volume; },
+    resume() { init(); if (ac && ac.state === 'suspended') ac.resume().catch(() => {}); },
+    toggleMute() { muted = !muted; mix(); save(); return muted; },
+    setVolume(value) { volume = Math.max(0, Math.min(1, value)); mix(); save(); },
+    scratch(on) { if (ac) scratchGain.gain.setTargetAtTime(on ? 0.009 : 0, now(), 0.03); },
+    hut() { if (!ready()) return; const t = now(); tone('sawtooth', 155, 95, 0.1, 0.16, t, 650); noise(0.08, 0.22, t, {f0:850}); tone('sine', 160, 65, 0.08, 0.3, t + 0.11); noise(0.05, 0.22, t + 0.11, {f0:1900}); },
+    whistle(delay = 0) { if (!ready()) return; const t = now() + delay; [0, 0.13].forEach((d, i) => { tone('sine', 2350, 2280, i ? 0.19 : 0.08, 0.075, t + d); tone('sine', 2470, 2400, i ? 0.19 : 0.08, 0.026, t + d); noise(0.08, 0.035, t + d, {f0:2800,q:3}); }); },
+    throw_(p = 1) { if (!ready()) return; const t = now(); noise(0.17 + (1-p)*0.22, 0.24, t, {f0:650,f1:2600,attack:0.025}); noise(0.12, 0.1, t+0.06, {f0:2600,f1:450}); },
+    catch_() { if (!ready()) return; const t = now(); tone('sine', 190, 75, 0.095, 0.3, t); noise(0.055, 0.34, t, {f0:1600}); noise(0.075, 0.12, t+0.018, {f0:500}); },
+    thump(v = 1) { if (!ready() || now()-lastHit < 0.075) return; lastHit = now(); const t = now(), pitch = 0.9 + Math.random()*0.2; tone('sine', 115*pitch, 38, 0.23, 0.48*v, t); tone('triangle', 185*pitch, 65, 0.09, 0.14*v, t, 650); noise(0.1, 0.42*v, t, {f0:800,f1:220}); noise(0.035, 0.22*v, t, {f0:2300}); noise(0.18, 0.13*v, t+0.035, {f0:400,f1:160}); },
+    incomplete() { if (!ready()) return; const t = now(); tone('sine', 125, 55, 0.07, 0.18, t); noise(0.08, 0.17, t, {f0:750}); tone('sine', 105, 55, 0.05, 0.075, t+0.15); },
+    td() { if (!ready()) return; const t = now()+0.18; [392,523,659,784,1047].forEach((f,i) => { tone('triangle', f, f, i===4 ? 0.8 : 0.18, 0.16, t+i*0.14); tone('sawtooth', f/2, f/2, 0.2, 0.055, t+i*0.14, 1300); }); [523,659,784].forEach(f=>tone('triangle', f,f,0.85,0.075,t+0.74)); },
+    bad() { if (!ready()) return; const t=now(); [294,247,196].forEach((f,i)=>tone('triangle',f,f*0.98,0.2,0.15,t+i*0.17)); },
+    good() { if (!ready()) return; const t=now(); [523,659,784].forEach((f,i)=>tone('triangle',f,f,0.2,0.13,t+i*0.1)); },
+    kick() { if (!ready()) return; const t=now(); tone('sine',170,45,0.2,0.48,t); noise(0.035,0.4,t,{f0:1700}); noise(0.24,0.14,t+0.025,{f0:600,f1:2200,attack:0.035}); },
+    click() { if (ready()) noise(0.025,0.16,now(),{f0:2400,q:2}); },
+    pencil() { if (!ready()) return; for(let i=0;i<4;i++) noise(0.1,0.018,now()+i*0.13,{f0:2500+Math.random()*1500,attack:0.025}); },
+    win() { if (!ready()) return; const t=now(); [[262,330,392],[294,370,440],[330,415,494],[392,494,587,784]].forEach((ch,i)=>ch.forEach(f=>tone('triangle',f,f,0.5,0.1,t+i*0.25))); }
   };
 })();
 
@@ -422,8 +447,12 @@ document.getElementById('clear').onclick = () => { SFX.click(); for (const p of 
 document.getElementById('newgame').onclick = () => { SFX.resume(); SFX.click(); newGame(); };
 const SPK_ON = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="#7a7a82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L9 10 L16 4.5 L16.4 21.5 L9 16.5 L3.2 16.2 Z"/><path d="M21 9.5 Q24 13 21 16.8"/><path d="M25 6 Q30 13 25.3 20.2"/></svg>';
 const SPK_OFF = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="#7a7a82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L9 10 L16 4.5 L16.4 21.5 L9 16.5 L3.2 16.2 Z"/><path d="M21 8.5 L30 17.5"/><path d="M30 8.2 L21.2 17.8"/></svg>';
-const muteBtn = document.getElementById('mute'); muteBtn.innerHTML = SPK_ON;
-muteBtn.onclick = () => { SFX.resume(); const m = SFX.toggleMute(); muteBtn.innerHTML = m ? SPK_OFF : SPK_ON; muteBtn.setAttribute('aria-label', m ? 'sound off' : 'sound on'); };
+const muteBtn = document.getElementById('mute'), volumeSlider = document.getElementById('volume');
+function updateSoundControls() { const silent = SFX.muted || SFX.volume === 0; muteBtn.innerHTML = silent ? SPK_OFF : SPK_ON; muteBtn.setAttribute('aria-label', silent ? 'Unmute sound' : 'Mute sound'); muteBtn.setAttribute('aria-pressed', String(silent)); muteBtn.title = silent ? 'Unmute sound' : 'Mute sound'; volumeSlider.value = Math.round(SFX.volume * 100); }
+updateSoundControls();
+muteBtn.onclick = () => { SFX.resume(); if (SFX.volume === 0) { SFX.setVolume(0.65); if (SFX.muted) SFX.toggleMute(); } else SFX.toggleMute(); updateSoundControls(); };
+volumeSlider.oninput = () => { SFX.resume(); SFX.setVolume(Number(volumeSlider.value) / 100); if (SFX.muted && SFX.volume > 0) SFX.toggleMute(); updateSoundControls(); };
+volumeSlider.onchange = () => SFX.click();
 document.getElementById('fg').onclick = () => { if (state !== 'presnap') return; SFX.resume(); kickFG(); };
 document.getElementById('punt').onclick = () => { if (state !== 'presnap') return; SFX.resume(); SFX.kick(); note('punt.', GRAPHITE); endPossession('punt'); };
 for (const n of ['man', 'blitz', 'zone', 'prevent']) { const b = document.createElement('button'); b.textContent = n; b.dataset.s = n; b.onclick = () => { SFX.resume(); SFX.click(); scheme = n; if (state === 'presnap' && !onOffense()) setupPlay(false); else updateButtons(); }; document.getElementById('schemes').appendChild(b); }
@@ -679,7 +708,9 @@ function checkContact() {
 }
 function endPlay(kind, text, at) {
   firstPlayHelp = false;
-  state = 'result'; resultTimer = 0; SFX.whistle();
+  state = 'result'; resultTimer = 0;
+  if (kind === 'inc') SFX.incomplete();
+  if (kind !== 'td' && kind !== 'pick6') SFX.whistle(kind === 'inc' ? 0.25 : 0.16);
   const losY = yardY(game.los); let spotY = at.y;
   loose = null;
   if (kind === 'inc') spotY = losY;
@@ -691,6 +722,7 @@ function endPlay(kind, text, at) {
   else if (kind === 'int') { note(mine ? 'pencils ball.' : 'YOUR BALL!', mine ? RED : INK); if (mine) setMood('headpunt', 260); else { cheer(200); SFX.good(); } }
   else if (kind === 'pick6') { result.text = 'PICK SIX'; game[def] += 7; note(mine ? 'PICK SIX. pencils +7.' : 'PICK SIX! +7', mine ? RED : INK); if (mine) { SFX.bad(); setMood('headpunt', 260); } else { SFX.td(); cheer(240); } }
   else {
+    if (kind !== 'inc' && game.los + gain >= game.fd) SFX.good();
     note(`${mine ? '' : 'pencils '}${downText()}: ${result.text}${kind === 'sack' ? ' (sack)' : ''}`, GRAPHITE);
     if (kind === 'sack') { if (mine) setMood('squash', 130); else cheer(120); }
     else if (gain >= 20) { if (mine) setMood('worm', 300); else setMood('facepalm', 130); }

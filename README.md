@@ -9,6 +9,8 @@ Small browser games drawn in ballpoint pen and pencil on notebook paper.
 - **Eraser War** — lob erasers over scribbled hills and erase the terrain.
 - **Will It Hold?** — draw roads and braces to carry an egg truck across four increasingly awkward rivers. Your actual strokes bend and break; win to advance or choose a numbered level.
 
+- **Margin Skater** — charge ollies, grind stationery, and link flips across three notebook skate parks. Includes touch controls, checkpoints, and saved best scores.
+
 Paper Football remains available at `games/paper-football/`. The alternative doodled landing page is preserved at `doodle.html`.
 
 ## Run locally
@@ -25,6 +27,8 @@ Run these from the repository root:
 node tests/bridge.cjs
 node tests/baseball.cjs
 node tests/football-contact.cjs
+node tests/football-audio.cjs
+node tests/skater.cjs
 node tests/tennis.cjs
 ```
 
