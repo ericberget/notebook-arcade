@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f8f5eb"><title>Scribble Tennis — Notebook Arcade</title><link rel="stylesheet" href="../../shared/fonts.css"><link rel="stylesheet" href="tennis.css?v=court-2"><script src="../../shared/ink.js" defer></script><script src="tennis.js?v=court-2" defer></script></head>
+<body><main><header><a href="../../index.html">← arcade</a><span>page 03 / sports department</span><div class="view-controls"><button id="crowd" aria-pressed="false" aria-label="Show doodle crowd">mode: minimal</button><button id="sound" aria-pressed="false">sound: off</button></div></header>
+<div class="title"><p>VERY UNOFFICIAL CHAMPIONSHIPS</p><h1>Scribble Tennis<span>!</span></h1><span class="note">all court. no homework.</span></div>
+<section class="scoreboard" aria-label="Match score"><div>you <strong id="you">0</strong></div><p>first to 7 · win by 2</p><div>the pencil <strong id="pencil">0</strong></div></section>
+<div class="court-wrap"><canvas id="court" width="900" height="650" tabindex="0" aria-label="Tennis court. Move with arrow keys or WASD. Returns are automatic. Hold and release Space for a hard shot. Shift queues a lob. Space serves. P pauses." aria-describedby="instructions"></canvas><span class="margin-note">probably<br>Wimbledon ↘</span><span class="bottom-note">↑ this little disaster is you</span></div>
+<p id="status" role="status" aria-live="polite">Your court. Your serve.</p>
+<div class="controls"><button id="serve" class="primary">serve it ↗</button><button id="hard" disabled>hold: hard shot</button><button id="lob" aria-pressed="false" disabled>lob ↑</button><button id="pause" aria-pressed="false">pause</button><button id="reset">new match ↻</button></div>
+<p id="shot-hint" class="shot-hint">auto return · hold Space for power · Shift to lob</p>
+<p id="instructions">Move with <b>arrows / WASD</b>, your mouse, or drag. Move up to volley; retreat for deep balls.<br>Hold <b>Space</b> or <b>hard shot</b>, then release just before contact. <b>Shift / lob</b> queues a high shot.<br>Returns are automatic. Hard shots need closer contact. The dotted oval marks the first bounce.</p>
+<footer>bad drawings. good rallies. <span>✳</span></footer></main></body></html>

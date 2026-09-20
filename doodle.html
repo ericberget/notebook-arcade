@@ -62,6 +62,7 @@ const GAMES = [
   { title: 'Doodle Slingshot', href: 'games/slingshot/index.html', cx: 262, cy: 335, w: 330, h: 175, rot: -0.04, above: 'angry birds', note: 'fling doodles at towers. 9 pages. red pen at the end!!', quip: "this one's got a BOSS", preview: previewSlingshot, color: INK },
   { title: "X's & O's Football", href: 'games/xo-football/index.html', cx: 640, cy: 300, w: 340, h: 180, rot: 0.05, above: 'retro bowl', note: 'draw the play, hike, throw, run. now with DEFENSE', quip: 'draw your own plays!!', preview: previewFootball, color: INK },
   { title: 'Doodle Ballpark', href: 'games/baseball/index.html', cx: 975, cy: 355, w: 320, h: 180, rot: -0.03, above: 'baseball 9', note: 'time the swing, pick the pitch, 3 innings vs the pencils', quip: 'home runs go 550 ft here', preview: previewBaseball, color: INK },
+  { title: 'Eraser War', href: 'games/eraser-war/index.html', cx: 855, cy: 590, w: 290, h: 150, rot: -0.02, above: 'scorched earth', note: 'lob erasers over the hills. hits RUB OUT the ground. mind the wind', quip: 'the pencil talks trash', preview: previewEraser, color: INK },
   { title: 'Paper Football', href: 'games/paper-football/index.html', cx: 560, cy: 585, w: 290, h: 150, rot: 0.03, above: 'meh', note: 'flick the triangle. hang it off the edge. kick it through', quip: 'ok this one is kinda simple', preview: previewPaperFootball, color: INK },
 ];
 let frame = 0, introT = 0, hover = -1, mouse = { x: -1, y: -1 }, trail = [], plane = { t: -1 }, leaving = -1, leaveT = 0, quipT = 0;
@@ -187,6 +188,29 @@ function previewPaperFootball(w, h, hov) {
 }
 
 // ---------- margins: the mascot with a sign, notes, tallies, the pencils' crest ----------
+function previewEraser(w, h, hov) {
+  const speed = hov ? 1.6 : 1, t = ((frame * speed) % 240) / 240;
+  const gy = x => h - 40 + Math.sin(x / 50) * 8 - Math.exp(-Math.pow((x - w / 2) / 40, 2)) * 22;
+  const hit = t > 0.55, bite = hit ? Math.min(1, (t - 0.55) / 0.08) : 0, px = w - 58;
+  // far hills, then the playable hills in pencil with a bite rubbed out after the hit
+  ctx.strokeStyle = PEN_MD; ctx.globalAlpha = 0.4; ctx.lineWidth = 1; ctx.beginPath(); for (let x = 0; x <= w; x += 6) { const y = h - 78 - Math.abs(Math.sin(x / 60 + 1)) * 34; x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+  ctx.strokeStyle = PEN_DK; ctx.lineWidth = 1.6; ctx.globalAlpha = 0.8; ctx.beginPath();
+  for (let x = 4; x <= w - 4; x += 4) { let y = gy(x); const d = Math.abs(x - px); if (bite && d < 24) y += Math.sqrt(24 * 24 - d * d) * 0.8 * bite; x === 4 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
+  ctx.globalAlpha = 0.18; for (let x = 8; x < w; x += 7) { ctx.beginPath(); ctx.moveTo(x, gy(x) + 3); ctx.lineTo(x + 4, gy(x) + 12); ctx.stroke(); } ctx.globalAlpha = 1;
+  // the kid (ink) at left, winding up then throwing
+  const kx = 48, ky = gy(48);
+  ink.circle(kx, ky - 30, 8, 400, INK, 1.8, 1); ink.line(kx, ky - 22, kx, ky - 8, 401, INK, 2, 1); ink.line(kx, ky - 8, kx - 6, ky, 402, INK, 2, 1); ink.line(kx, ky - 8, kx + 6, ky, 403, INK, 2, 1); ink.line(kx - 8, ky - 34, kx + 8, ky - 34, 404, RED, 1.6, 1);
+  const armA = t < 0.12 ? -2.4 + t / 0.12 * 1.6 : -0.8; ink.line(kx, ky - 18, kx + Math.cos(armA) * 14, ky - 18 + Math.sin(armA) * 14, 405, INK, 2, 1);
+  // the pencil at right, sinking into the crater when hit
+  const py = gy(px) + (hit ? 12 * bite : 0);
+  ctx.fillStyle = '#fbf8ee'; ctx.fillRect(px - 5, py - 34, 10, 26); ink.poly([{ x: px - 5, y: py - 8 }, { x: px - 5, y: py - 34 }, { x: px + 5, y: py - 34 }, { x: px + 5, y: py - 8 }], 410, PEN_DK, 1.6, 1); ink.poly([{ x: px - 5, y: py - 34 }, { x: px, y: py - 44 }, { x: px + 5, y: py - 34 }], 411, PEN_DK, 1.4, 1); ctx.fillStyle = '#efb7c3'; ctx.fillRect(px - 5, py - 8, 10, 6); ink.line(px - 4, py - 2, px - 8, py + 2, 412, PEN_DK, 1.4, 1); ink.line(px + 4, py - 2, px + 8, py + 2, 413, PEN_DK, 1.4, 1);
+  ctx.fillStyle = PEN_DK; ctx.beginPath(); ctx.arc(px - 2, py - 24, 1, 0, 7); ctx.arc(px + 2, py - 24, 1, 0, 7); ctx.fill(); if (hit) ink.circle(px, py - 18, 2, 414, PEN_DK, 1, 1); else ink.line(px - 3, py - 18, px + 3, py - 19, 415, PEN_DK, 1, 1);
+  // the eraser in flight, with a dotted arc behind it
+  if (t >= 0.12 && t < 0.55) { const u = (t - 0.12) / 0.43; const ex = kx + 14 + (px - kx - 14) * u, ey = ky - 30 - Math.sin(u * Math.PI) * 60; ctx.fillStyle = INK; ctx.globalAlpha = 0.3; for (let k = 0; k < 8; k++) { const uu = u * k / 8; ctx.beginPath(); ctx.arc(kx + 14 + (px - kx - 14) * uu, ky - 30 - Math.sin(uu * Math.PI) * 60, 1.3, 0, 7); ctx.fill(); } ctx.globalAlpha = 1; ctx.save(); ctx.translate(ex, ey); ctx.rotate(u * 6); ctx.fillStyle = '#efb7c3'; ctx.fillRect(-7, -4, 14, 8); ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.strokeRect(-7, -4, 14, 8); ctx.restore(); }
+  if (hit) { const a = Math.min(1, (t - 0.55) / 0.08) * (t > 0.9 ? (1 - t) / 0.1 : 1); ink.text('WHAM!', px - 30, py - 60, { size: 22, color: RED, rot: -0.12, alpha: a }); ctx.fillStyle = '#efb7c3'; ctx.globalAlpha = a * 0.9; for (let k = 0; k < 8; k++) { const ang = k / 8 * 6.28; ctx.fillRect(px + Math.cos(ang) * (10 + bite * 22) - 2, py - 10 + Math.sin(ang) * (6 + bite * 12), 4, 2); } ctx.globalAlpha = 1; }
+  // a windsock on the middle hill
+  ink.line(w / 2, gy(w / 2), w / 2, gy(w / 2) - 26, 420, PEN_DK, 1.2, 1); ink.poly([{ x: w / 2, y: gy(w / 2) - 26 }, { x: w / 2 + 16, y: gy(w / 2) - 20 + Math.sin(frame * 0.2) }, { x: w / 2, y: gy(w / 2) - 18 }], 421, RED, 1.2, 1);
+}
 function drawFan(x, baseY, mood) {
   const col = PEN_MD, w = 1.6, id = 5000 + (mood ? Math.floor(frame / 8) % 3 * 40 : 0);
   ink.circle(x, baseY, 13, id, col, 2, 1);

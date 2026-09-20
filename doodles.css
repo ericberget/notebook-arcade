@@ -1,0 +1,39 @@
+/* A little of doodle.html's margin mischief, around the readable game library. */
+.site-header{position:relative;padding-top:12px;padding-bottom:12px}
+.brand-block{min-width:0}
+.brand-block h1{position:relative;isolation:isolate;transform:rotate(-1.5deg)}
+.brand-block h1:before{content:'';position:absolute;z-index:-1;left:4%;right:3%;top:31%;bottom:20%;background:#f0d94b55;transform:rotate(-2deg);clip-path:polygon(0 10%,28% 3%,54% 9%,100% 0,99% 90%,75% 96%,44% 92%,1% 100%)}
+.owner-note{margin:-8px 0 3px 18px;font-size:16px;color:var(--pencil);transform:rotate(-1deg)}
+.owner-note span{font-family:var(--hand);font-size:21px;color:var(--ink);margin-left:8px;border-bottom:1px solid #213f9455}
+.header-doodle{position:absolute;right:150px;top:29px;width:160px;height:90px;pointer-events:none}
+.games-section{position:relative}
+.filter-scribble{position:absolute;top:6px;left:42%;font-family:var(--hand);font-size:25px;color:var(--red);transform:rotate(-5deg);pointer-events:none}
+.margin-fan{position:absolute;top:135px;left:-110px;width:100px;height:180px;pointer-events:none}
+.collection-toolbar{margin-top:14px;margin-bottom:48px}
+.game-grid{gap:100px 78px}
+.game-card:nth-child(even){top:19px}
+.game-card:nth-child(1){--tilt:-.9deg!important}
+.game-card:nth-child(2){--tilt:.9deg!important}
+.game-card:nth-child(3){--tilt:-.45deg!important}
+.game-card:nth-child(4){--tilt:1deg!important}
+.card-scribble{position:absolute;top:-32px;left:18px;font-family:var(--hand);font-size:24px;color:var(--red);transform:rotate(-5deg);pointer-events:none}
+.game-card:nth-child(even) .card-scribble{left:auto;right:12px;transform:rotate(5deg)}
+.game-card:nth-child(2) .card-scribble{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:4px}
+.card-meta{align-items:center}
+.card-notes{display:flex;flex-direction:column;align-items:flex-end;gap:0}
+.preview-toggle{font-family:var(--hand);font-size:19px;line-height:1;border:0;padding:5px 0;background:none;color:var(--red);text-decoration:underline;text-decoration-style:dashed;text-decoration-thickness:1px;text-underline-offset:4px}
+.preview-toggle:hover{transform:rotate(-2deg)}
+.game-art{position:relative}
+.game-art .sketch-surface{transition:opacity .2s}
+.doodle-preview{position:absolute;inset:0;display:block;width:100%;height:100%;opacity:0;transition:opacity .2s;pointer-events:none}
+.previewing .game-art .sketch-surface{opacity:0}
+.previewing .doodle-preview{opacity:1}
+.previewing .game-art{background-image:none}
+.after-games{padding-top:54px}
+.next-copy .eyebrow{transform:rotate(-2.5deg)}
+@media(max-width:1250px){.margin-fan{display:none}}
+@media(max-width:900px){.header-doodle{right:100px;width:130px}.filter-scribble{display:none}.game-grid{gap:88px 56px}.card-scribble{font-size:21px}}
+@media(max-width:700px){.brand-block{flex:1}.site-header h1{flex:initial}.site-header{padding-bottom:13px}.header-doodle{display:none}.owner-note{font-size:12px;margin:-3px 0 0 9px}.owner-note span{font-size:17px;margin-left:3px}.collection-toolbar{margin-top:12px;margin-bottom:43px}.game-grid{gap:82px}.game-card:nth-child(even){top:0}.game-card:nth-child(n){--tilt:-.35deg!important}.game-card:nth-child(even){--tilt:.35deg!important}.card-scribble{font-size:21px;top:-29px}.preview-toggle{padding:7px 0;min-height:30px;font-size:18px}.after-games{padding-top:36px}}
+
+.eraser-art{background:none}.eraser-still{display:block;width:100%;height:100%}.previewing .eraser-still{opacity:0}
+.tennis-art{background:none}.tennis-still{display:block;width:100%;height:100%}.previewing .tennis-still{opacity:0}

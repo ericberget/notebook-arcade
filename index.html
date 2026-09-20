@@ -4,14 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f8f5eb">
-  <meta name="description" content="A growing collection of hand-drawn browser games. Sling doodles, draw football plays, flick paper footballs, and step up to the ballpark.">
+  <meta name="description" content="A growing collection of hand-drawn browser games. Sling doodles, draw football plays, rally on the tennis court, step up to the ballpark, and lob erasers at the pencils.">
   <title>Notebook Arcade — Small games. Big notebook energy.</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='2' width='26' height='28' rx='2' fill='%23f8f5eb' stroke='%23213f94' stroke-width='2'/%3E%3Cpath d='M9 3v26' stroke='%23c33e36'/%3E%3Cpath d='M12 10h13M12 16h13M12 22h9' stroke='%23213f94' stroke-width='2'/%3E%3C/svg%3E">
   <link rel="preload" href="assets/fonts/caveat-bold.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="motion.css">
-  <link rel="stylesheet" href="zine.css?v=logo-1">
-  <script src="app.js?v=library-1" defer></script>
+  <link rel="stylesheet" href="zine.css?v=charcoal-cut-1">
+  <link rel="stylesheet" href="doodles.css?v=kraft-2">
+  <script src="app.js?v=tennis-swap-1" defer></script>
+  <script src="shared/ink.js" defer></script>
+  <script src="doodles.js?v=tennis-swap-1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#games">Skip to the games</a>
@@ -20,7 +23,8 @@
   <div class="punch-holes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
   <div class="notebook" id="top">
     <header class="site-header">
-      <h1><a class="wordmark" href="#top" aria-label="Notebook Arcade home"><img class="brand-logo" src="assets/notebook-arcade-wordmark-v2.webp" width="2172" height="724" alt="Notebook Arcade"></a></h1>
+      <div class="brand-block"><h1><a class="wordmark" href="#top" aria-label="Notebook Arcade home"><img class="brand-logo" src="assets/notebook-arcade-wordmark-v2.webp" width="2172" height="724" alt="Notebook Arcade"></a></h1><p class="owner-note">property of: <span>ME. hands off.</span></p></div>
+      <canvas class="header-doodle" width="320" height="180" aria-hidden="true"></canvas>
       <details class="site-menu">
         <summary>Menu <span class="menu-lines" aria-hidden="true"></span></summary>
         <nav aria-label="Main navigation"><a href="#games">The games</a><a href="#next-page">What's next?</a></nav>
@@ -28,30 +32,38 @@
     </header>
     <main>
       <section class="games-section" id="games" aria-label="Browser games">
-        <div class="collection-toolbar"><div class="filters" role="group" aria-label="Filter games"><button class="filter active" type="button" data-filter="all" aria-pressed="true">All games <span>04</span></button><button class="filter" type="button" data-filter="action" aria-pressed="false">Action</button><button class="filter" type="button" data-filter="sports" aria-pressed="false">Sports</button></div><p class="collection-meta" id="game-count" aria-live="polite">4 games · 100% doodled</p></div>
+        <canvas class="margin-fan" width="200" height="360" aria-hidden="true"></canvas>
+        <span class="filter-scribble" aria-hidden="true">pick one. lose an hour. ↙</span>
+        <div class="collection-toolbar"><div class="filters" role="group" aria-label="Filter games"><button class="filter active" type="button" data-filter="all" aria-pressed="true">All games <span>05</span></button><button class="filter" type="button" data-filter="action" aria-pressed="false">Action</button><button class="filter" type="button" data-filter="sports" aria-pressed="false">Sports</button></div><p class="collection-meta" id="game-count" aria-live="polite">5 games · 100% doodled</p></div>
         <div class="game-grid">
-          <article class="game-card reveal" data-category="action" style="--tilt:-.55deg">
-            <span class="tape" aria-hidden="true"></span><div class="card-meta"><span class="page-number">page 01</span><span class="category">Aim. Fling. Repeat.</span></div>
+          <article class="game-card reveal" data-preview="slingshot" data-category="action" style="--tilt:-.55deg">
+            <span class="card-scribble" aria-hidden="true">start here ↴</span><span class="tape" aria-hidden="true"></span><div class="card-meta"><span class="page-number">page 01</span><div class="card-notes"><span class="category">Aim. Fling. Repeat.</span><button class="preview-toggle" type="button" aria-pressed="false">watch it play ↻</button></div></div>
             <a class="game-image-link" href="games/slingshot/index.html" tabindex="-1" aria-hidden="true"><div class="game-art slingshot-art"></div></a>
             <div class="card-body"><h3><a href="games/slingshot/index.html">Doodle Slingshot</a></h3><p>Fling angry doodles at scribbled towers.<br>Nine pages. One red-pen finale.</p><div class="card-bottom"><span class="game-tag">Physics / delightful destruction</span><a class="play-button" href="games/slingshot/index.html" aria-label="Play Doodle Slingshot">Play <span aria-hidden="true">↗</span></a></div></div>
             <svg class="card-outline" viewBox="0 0 560 500" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 10Q210 1 551 7L555 488Q293 500 7 492L4 10"/></svg>
           </article>
-          <article class="game-card reveal" data-category="sports" style="--tilt:.55deg">
-            <span class="tape" aria-hidden="true"></span><div class="card-meta"><span class="page-number">page 02</span><span class="category">Your play. Your rules.</span></div>
+          <article class="game-card reveal" data-preview="football" data-category="sports" style="--tilt:.55deg">
+            <span class="card-scribble" aria-hidden="true">GO TEAM!!</span><span class="tape" aria-hidden="true"></span><div class="card-meta"><span class="page-number">page 02</span><div class="card-notes"><span class="category">Your play. Your rules.</span><button class="preview-toggle" type="button" aria-pressed="false">watch it play ↻</button></div></div>
             <a class="game-image-link" href="games/xo-football/index.html" tabindex="-1" aria-hidden="true"><div class="game-art xo-art"></div></a>
             <div class="card-body"><h3><a href="games/xo-football/index.html">X's &amp; O's Football</a></h3><p>Draw the play. Make the throw.<br>Steer your runner past the X's.</p><div class="card-bottom"><span class="game-tag">Sports / a little strategy</span><a class="play-button" href="games/xo-football/index.html" aria-label="Play X's and O's Football">Play <span aria-hidden="true">↗</span></a></div></div>
             <svg class="card-outline" viewBox="0 0 560 500" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 10Q210 1 551 7L555 488Q293 500 7 492L4 10"/></svg>
           </article>
-          <article class="game-card reveal" data-category="sports" style="--tilt:.35deg">
-            <span class="tape" aria-hidden="true"></span><div class="card-meta"><span class="page-number">page 03</span><span class="category">A desk. A rivalry.</span></div>
-            <a class="game-image-link" href="games/paper-football/index.html" tabindex="-1" aria-hidden="true"><div class="game-art football-art"></div></a>
-            <div class="card-body"><h3><a href="games/paper-football/index.html">Paper Football</a></h3><p>Flick the folded triangle. Catch the edge.<br>Send it sailing through the fingers.</p><div class="card-bottom"><span class="game-tag">Sports / a classroom classic</span><a class="play-button" href="games/paper-football/index.html" aria-label="Play Paper Football">Play <span aria-hidden="true">↗</span></a></div></div>
+          <article class="game-card reveal" data-preview="tennis" data-category="sports" style="--tilt:-.8deg">
+            <span class="card-scribble" aria-hidden="true">new! absolutely unseeded.</span><span class="tape" aria-hidden="true"></span><div class="card-meta"><span class="page-number">page 03</span><div class="card-notes"><span class="category">Love. All. Doodles.</span><button class="preview-toggle" type="button" aria-pressed="false">watch it play ↻</button></div></div>
+            <a class="game-image-link" href="games/tennis/index.html" tabindex="-1" aria-hidden="true"><div class="game-art tennis-art"></div></a>
+            <div class="card-body"><h3><a href="games/tennis/index.html">Scribble Tennis</a></h3><p>Chase the ball. Battle the pencil.<br>Very unofficial. Very competitive.</p><div class="card-bottom"><span class="game-tag">Sports / baseline scribbles</span><a class="play-button" href="games/tennis/index.html" aria-label="Play Scribble Tennis">Play <span aria-hidden="true">↗</span></a></div></div>
             <svg class="card-outline" viewBox="0 0 560 500" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 10Q210 1 551 7L555 488Q293 500 7 492L4 10"/></svg>
           </article>
-          <article class="game-card reveal" data-category="sports" style="--tilt:-.4deg">
-            <span class="tape" aria-hidden="true"></span><div class="card-meta"><span class="page-number">page 04</span><span class="category">Swing for the margins.</span></div>
+          <article class="game-card reveal" data-preview="baseball" data-category="sports" style="--tilt:-.4deg">
+            <span class="card-scribble" aria-hidden="true">swing for the fences ↗</span><span class="tape" aria-hidden="true"></span><div class="card-meta"><span class="page-number">page 04</span><div class="card-notes"><span class="category">Swing for the margins.</span><button class="preview-toggle" type="button" aria-pressed="false">watch it play ↻</button></div></div>
             <a class="game-image-link" href="games/baseball/index.html" tabindex="-1" aria-hidden="true"><div class="game-art baseball-art"></div></a>
             <div class="card-body"><h3><a href="games/baseball/index.html">Doodle Ballpark</a></h3><p>Time your swing. Pick your pitches.<br>Three innings against the pencils.</p><div class="card-bottom"><span class="game-tag">Sports / big little home runs</span><a class="play-button" href="games/baseball/index.html" aria-label="Play Doodle Ballpark">Play <span aria-hidden="true">↗</span></a></div></div>
+            <svg class="card-outline" viewBox="0 0 560 500" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 10Q210 1 551 7L555 488Q293 500 7 492L4 10"/></svg>
+          </article>
+          <article class="game-card reveal" data-preview="eraser" data-category="action" style="--tilt:.7deg">
+            <span class="card-scribble" aria-hidden="true">new! rub the pencil out ↘</span><span class="tape" aria-hidden="true"></span><div class="card-meta"><span class="page-number">page 05</span><div class="card-notes"><span class="category">Aim. Lob. Erase.</span><button class="preview-toggle" type="button" aria-pressed="false">watch it play ↻</button></div></div>
+            <a class="game-image-link" href="games/eraser-war/index.html" tabindex="-1" aria-hidden="true"><div class="game-art eraser-art"></div></a>
+            <div class="card-body"><h3><a href="games/eraser-war/index.html">Eraser War</a></h3><p>Lob erasers over scribbled hills.<br>Every hit rubs the ground out.</p><div class="card-bottom"><span class="game-tag">Artillery / mind the wind</span><a class="play-button" href="games/eraser-war/index.html" aria-label="Play Eraser War">Play <span aria-hidden="true">↗</span></a></div></div>
             <svg class="card-outline" viewBox="0 0 560 500" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 10Q210 1 551 7L555 488Q293 500 7 492L4 10"/></svg>
           </article>
         </div>

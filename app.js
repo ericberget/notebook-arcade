@@ -9,6 +9,7 @@ const motionButton = document.getElementById('motion-toggle');
 function setMotion(off, persist = false) {
   motionOff = off;
   root.classList.toggle('motion-off', off);
+  document.dispatchEvent(new CustomEvent('notebook:motion', {detail:{off}}));
   motionButton.textContent = `Motion: ${off ? 'off' : 'on'}`;
   motionButton.setAttribute('aria-pressed', String(off));
   motionButton.setAttribute('aria-label', off ? 'Turn on sketch animations' : 'Turn off sketch animations');
@@ -98,7 +99,9 @@ function enhanceImage(img, className) {
 enhanceImage(footerImage, 'footer-art');
 const sheet = new Image();
 sheet.addEventListener('load', () => {
-  cards.forEach((card, index) => {
+  cards.forEach(card => {
+    const index = {slingshot:0, football:1, baseball:3}[card.dataset.preview];
+    if (index === undefined) return; // Canvas-based games provide their own artwork.
     const area = card.querySelector('.game-art');
     const width = sheet.naturalWidth / 2, height = sheet.naturalHeight / 2;
     area.append(index === 1
