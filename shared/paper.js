@@ -117,15 +117,15 @@ const NotebookPaper = (() => {
   function spiral(p) {
     for (let y = 34; y < H - 10; y += 40) {
       // punched slot with a shadow inside
-      p.fillStyle = '#e9e4d6'; p.beginPath(); p.roundRect(28, y - 6, 22, 12, 6); p.fill();
-      p.fillStyle = 'rgba(0,0,0,.28)'; p.beginPath(); p.roundRect(30, y - 4, 18, 8, 4); p.fill();
-      p.strokeStyle = 'rgba(0,0,0,.18)'; p.lineWidth = 1; p.beginPath(); p.roundRect(28, y - 6, 22, 12, 6); p.stroke();
+      p.fillStyle = '#e9e4d6'; p.beginPath(); p.roundRect(38, y - 6, 22, 12, 6); p.fill();
+      p.fillStyle = 'rgba(0,0,0,.28)'; p.beginPath(); p.roundRect(40, y - 4, 18, 8, 4); p.fill();
+      p.strokeStyle = 'rgba(0,0,0,.18)'; p.lineWidth = 1; p.beginPath(); p.roundRect(38, y - 6, 22, 12, 6); p.stroke();
       // the wire: dark body with a bright highlight, sweeping from inside the slot out past the page edge
       for (const [w, col, off] of [[5, '#6e6e74', 0], [4.2, '#9a9aa0', 0], [1.6, '#e8e8ec', -1]]) {
         p.strokeStyle = col; p.lineWidth = w; p.lineCap = 'round'; p.beginPath();
-        p.moveTo(44, y + 1 + off); p.bezierCurveTo(30, y - 24 + off, -6, y - 22 + off, -2, y - 2 + off); p.stroke();
+        p.moveTo(54, y + 1 + off); p.bezierCurveTo(40, y - 24 + off, 6, y - 22 + off, 7, y - 2 + off); p.stroke();
       }
-      p.strokeStyle = 'rgba(0,0,0,.25)'; p.lineWidth = 2; p.beginPath(); p.moveTo(2, y + 2); p.lineTo(10, y + 6); p.stroke(); // wire shadow on the page
+      p.strokeStyle = 'rgba(0,0,0,.25)'; p.lineWidth = 2; p.beginPath(); p.moveTo(9, y + 2); p.lineTo(18, y + 6); p.stroke(); // wire shadow on the page
     }
     // slight edge shading where the paper curls at the binding
     const g = p.createLinearGradient(0, 0, 60, 0); g.addColorStop(0, 'rgba(0,0,0,.12)'); g.addColorStop(1, 'rgba(0,0,0,0)'); p.fillStyle = g; p.fillRect(0, 0, 60, H);
