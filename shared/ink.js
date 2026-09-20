@@ -11,7 +11,7 @@ function NotebookInk(ctx) {
     ctx.strokeStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     for (let p = 0; p < passes; p++) {
       if (prog < 1 && p > 0) break;
-      ctx.lineWidth = width * (0.8 + rnd(id + p) * 0.4); ctx.globalAlpha = 0.85;
+      ctx.lineWidth = width * (0.8 + rnd(id + p) * 0.4); ctx.globalAlpha = 0.85 * alphaMul;
       const k = p * 100;
       const mx = (x1 + x2) / 2 + jit(id, k + 1, 3), my = (y1 + y2) / 2 + jit(id, k + 2, 3);
       const L = Math.hypot(x2 - x1, y2 - y1) || 1, ux = (x2 - x1) / L, uy = (y2 - y1) / L;
@@ -35,7 +35,7 @@ function NotebookInk(ctx) {
       if (prog < 1 && p > 0) break;
       const f1 = 1.5 + rnd(id + p) * 2, f2 = 5 + rnd(id + p + 3) * 4, ph1 = rnd(id + p + 7) * 6.28, ph2 = rnd(id + p + 11) * 6.28;
       const drift = p ? (rnd(id + 17) - 0.5) * 2.5 : 0;
-      ctx.globalAlpha = p ? 0.45 : 0.9; ctx.lineWidth = width * (p ? 0.7 : 1) * (0.85 + rnd(id + p + 5) * 0.3);
+      ctx.globalAlpha = (p ? 0.45 : 0.9) * alphaMul; ctx.lineWidth = width * (p ? 0.7 : 1) * (0.85 + rnd(id + p + 5) * 0.3);
       ctx.beginPath();
       for (let i = 0; i <= n; i++) {
         const t = i / n, along = t * L; if (t > prog) break;
@@ -58,7 +58,7 @@ function NotebookInk(ctx) {
     ctx.strokeStyle = color; ctx.lineCap = 'round';
     for (let p = 0; p < passes; p++) {
       if (prog < 1 && p > 0) break;
-      ctx.lineWidth = width * (0.8 + rnd(id + p) * 0.4); ctx.globalAlpha = 0.85; ctx.beginPath();
+      ctx.lineWidth = width * (0.8 + rnd(id + p) * 0.4); ctx.globalAlpha = 0.85 * alphaMul; ctx.beginPath();
       const start = rnd(id + p * 5) * Math.PI * 2, n = 24, stop = Math.round((n + 1) * prog);
       for (let i = 0; i <= stop; i++) { const t = start + (i / n) * Math.PI * 2, rr = r + jit(id, p * 50 + i, 3); const x = cx + Math.cos(t) * rr, y = cy + Math.sin(t) * rr; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
       ctx.stroke();
