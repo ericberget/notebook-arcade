@@ -1,0 +1,11 @@
+#home-ink{position:fixed;inset:0;width:100%;height:100%;z-index:100;pointer-events:none}
+#home-ink.drawing{pointer-events:auto;touch-action:none;cursor:crosshair}
+#pen-tools{position:fixed;right:24px;bottom:20px;z-index:101;display:flex;align-items:center;gap:12px;padding:10px 16px;background:#fbf8ef;color:#213f94;box-shadow:2px 4px 0 #213f9433;border:1.5px solid #213f94;border-radius:3px 7px 2px 5px;font-family:var(--body,'Patrick Hand',cursive);font-size:18px;max-width:calc(100vw - 32px);flex-wrap:wrap}
+#pen-tools button{font:inherit;color:inherit;background:transparent;border:0;border-bottom:1px solid currentColor;padding:4px 2px;cursor:pointer;min-height:36px}
+#pen-tools button:hover{color:#b53636}
+#pen-tools button:focus-visible{outline:2px solid #b53636;outline-offset:4px}
+#pen-tools button:disabled{opacity:.35;cursor:default}
+#pen-options:not([hidden]){display:flex;gap:12px}
+#pen-tip{font-size:16px;color:#626575}
+#pen-toggle[aria-pressed=true]{color:#b53636}
+@media(max-width:600px){#pen-tools{right:12px;bottom:12px;gap:8px;padding:8px 12px}#pen-tip{flex-basis:100%;font-size:14px}}
