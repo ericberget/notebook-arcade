@@ -7,7 +7,7 @@ const input={jump:false,left:false,right:false,grind:false};
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 try{best=JSON.parse(localStorage.getItem('margin-skater-best'))||{};}catch(_){}
 const paper=new Image();paper.src='assets/paper-v1.png';
-const scenery=new Image();scenery.src='assets/coastal-cruise-v2.png';
+const scenery=new Image();scenery.src='assets/coastal-doodles-v3.png';
 const audio=(()=>{
   let ac,master,buffer,muted=false;try{muted=localStorage.getItem('margin-skater-muted')==='true';}catch(_){}
   function init(){if(ac)return;const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;try{ac=new Audio();}catch(_){return;}master=ac.createGain();master.gain.value=muted?0:.45;master.connect(ac.destination);buffer=ac.createBuffer(1,ac.sampleRate,ac.sampleRate);const d=buffer.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;}
@@ -54,6 +54,8 @@ function events(){for(const e of s.events){audio.play(e.type);if(e.type==='ollie
   if(e.type==='star')burst(s.x,s.y-30,12,RED);
   if(e.type==='bank'){toast(`+${e.points}  ${e.chain>1?'LINE LANDED':'NICE LANDING'}`,1.2);}
   if(e.type==='checkpoint'){toast('checkpoint. exhale.',1.4);burst(s.x,s.y-50,10,RED);}
+  if(e.type==='bump'){audio.play('land');toast('a little bump. hop the next one.',1.5);burst(s.x,s.y,8,RED,.5);}
+  if(e.type==='clearObstacle'){toast('nice hop.',1.2);burst(s.x,s.y-18,6,RED,.5);}
   if(e.type==='recover'){toast('back on your feet. keep rolling.',1.5);}
   if(e.type==='bail'){shake=reduced?0:7;toast(e.why,1.3);burst(s.x,s.y-20,25,INK,1.3);}
   if(e.type==='respawn'){trails=[];cam=s.x-W*.27;prev={x:s.x,y:s.y,angle:s.angle};}
@@ -67,7 +69,7 @@ function updateHUD(){
   $('progress').style.width=progress+'%';document.querySelector('.progress').setAttribute('aria-valuenow',Math.round(progress));
   $('charge').style.width=s.charge*100+'%';
   const neighborhood=Math.floor(Math.max(0,s.x-120)/6000);
-  $('course-note').textContent=['An endless afternoon. Tricks optional.','Follow the shoreline. Stay a while.','Another bend. Another little daydream.'][neighborhood%3];
+  $('course-note').textContent=['Little hops. Long afternoons.','Follow the shoreline. Stay a while.','Another bend. Another little daydream.'][neighborhood%3];
   $('combo').textContent=s.rail?'a little slide…':s.combo&& !s.grounded?'make it your own.':'';
 }
 // Stable, slightly imperfect strokes: no random jitter between frames.
@@ -79,7 +81,7 @@ function star(x,y,r=10,color=RED){const p=[];for(let i=0;i<10;i++){const a=i*Mat
 function board(angle,spin=0){ctx.save();ctx.rotate(angle);path([[-28,-11],[-23,-6],[21,-6],[29,-12]],INK,3);line(-20,-4,20,-4,INK,1.1);for(const x of [-17,17]){circle(x,0,5,INK,1.8,PAPER);line(x-3*Math.cos(spin),-3*Math.sin(spin),x+3*Math.cos(spin),3*Math.sin(spin),INK,1);}line(-23,-8,22,-8,RED,1.3);ctx.restore();}
 function skater(x,y,angle){
   ctx.save();ctx.translate(x,y-5);ctx.rotate(angle);ctx.scale(1.18,1.18);
-  const crouch=s.charge*.65+Math.max(0,s.compression)*.7,air=!s.grounded,bend=air?.13:crouch;
+  const crouch=Math.min(.4,s.stumble)*.7+s.charge*.65+Math.max(0,s.compression)*.7,air=!s.grounded,bend=air?.13:crouch;
   const hip={x:-4+(input.right?3:0),y:-41+bend*21},neck={x:7+bend*9,y:hip.y-27+bend*7},head={x:neck.x+3,y:neck.y-12};
   const pushPhase=(s.time%1.5)/1.5, pushing=s.grounded&&!s.rail&&s.charge<.05&&s.compression<.08&&pushPhase<.32;
   const push=pushing?Math.sin(pushPhase/.32*Math.PI):0;
@@ -104,7 +106,7 @@ function terrain(){
     else if(rail.type==='ruler'){path([[rail.x1,rail.y1],[rail.x2,rail.y2],[rail.x2,rail.y2+13],[rail.x1,rail.y1+13]],INK,1.5,true,'#e3cfa350');for(let x=rail.x1+8;x<rail.x2;x+=14)line(x,yAt(x)+4,x,yAt(x)+(Math.round(x)%2?8:12),INK,.7);}
     else{line(rail.x1,rail.y1,rail.x2,rail.y2,INK,3);line(rail.x1+3,rail.y1+5,rail.x2-2,rail.y2+5,GRAY,1.3);}
   }
-  for(const o of s.level.obstacles){if(o.x+o.w<cam-30||o.x>cam+W+30)continue;path([[o.x,o.y],[o.x-4,o.y-o.h+6],[o.x+5,o.y-o.h],[o.x+o.w-5,o.y-o.h],[o.x+o.w,o.y-6],[o.x+o.w-3,o.y]],INK,1.7,true,'#e9b2ad');line(o.x+2,o.y-o.h+8,o.x+o.w-7,o.y-o.h+8,RED,1);for(let i=0;i<4;i++)line(o.x+8+i*7,o.y-8,o.x+13+i*7,o.y-14,'#b4474960',.8);}
+  for(const o of s.level.obstacles){if(o.x+o.w<cam-30||o.x>cam+W+30)continue;ctx.save();if(o.hit)ctx.globalAlpha=.4;path([[o.x,o.y],[o.x-4,o.y-o.h+6],[o.x+5,o.y-o.h],[o.x+o.w-5,o.y-o.h],[o.x+o.w,o.y-6],[o.x+o.w-3,o.y]],INK,1.7,true,'#e9b2ad');line(o.x+2,o.y-o.h+8,o.x+o.w-7,o.y-o.h+8,RED,1);for(let i=0;i<4;i++)line(o.x+8+i*7,o.y-8,o.x+13+i*7,o.y-14,'#b4474960',.8);if(s.level.zen&&!o.hit&&!o.cleared)text('hop ↗',o.x-28,o.y-o.h-24,19,RED,-.04);ctx.restore();}
   for(const item of s.level.stars)if(!s.collected.has(item.id)&&item.x>cam-30&&item.x<cam+W+30){star(item.x,item.y+Math.sin(visualTime*3+item.id)*3,11);}
   for(const n of s.level.notes)if(n.x>cam-300&&n.x<cam+W)text(n.text,n.x,n.y,21,'#b44749b0',-.035);
   for(let i=1;i<s.level.checkpoints.length;i++){const x=s.level.checkpoints[i];if(x<cam-30||x>cam+W+30)continue;const y=P.surface(x,s.level.ground).y;line(x,y,x,y-75,GRAY,1);path([[x,y-75],[x+34,y-67],[x,y-57]],i<=s.checkpointIndex?RED:GRAY,1.5,true,i<=s.checkpointIndex?'#b4474930':null);}
@@ -116,7 +118,7 @@ function draw(alpha,dt){
   if(scenery.complete&&scenery.naturalWidth){
     const h=470,width=h*scenery.naturalWidth/scenery.naturalHeight;
     const travel=cam*.25+s.level.index*width/3, first=Math.floor(travel/width);
-    ctx.globalAlpha=.92;
+    ctx.globalAlpha=.55;
     for(let tile=first;tile*width-travel<W;tile++){
       const x=tile*width-travel;ctx.save();
       // Reflect alternate panels so each shared edge meets itself without a hard seam.
@@ -126,7 +128,7 @@ function draw(alpha,dt){
     }
     ctx.globalAlpha=1;
   } else if(paper.complete&&paper.naturalWidth)ctx.drawImage(paper,0,offsetY,W,600);
-  for(let y=offsetY+18;y<H;y+=36)line(0,y,W,y,'#6688a914',.6);
+
   const px=prev.x+(s.x-prev.x)*alpha,py=prev.y+(s.y-prev.y)*alpha,pa=prev.angle+(s.angle-prev.angle)*alpha;
   const target=px-W*.27+Math.min(60,(s.vx-300)*.1);cam+=(target-cam)*(1-Math.exp(-7*dt));
   ctx.save();ctx.translate(-cam,offsetY);if(shake>.1&&!reduced)ctx.translate(Math.sin(visualTime*73)*shake,Math.cos(visualTime*59)*shake*.6);terrain();
