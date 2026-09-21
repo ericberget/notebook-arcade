@@ -28,6 +28,9 @@
   button:hover { background: rgba(31,61,158,.08); }
   button:disabled { opacity: .35; cursor: default; }
   #back { border: none; border-bottom: 2px solid #1f3d9e; border-radius: 0; text-decoration: none; padding: 6px 10px; transform: rotate(-1.5deg); }
+  #mode { display:flex; gap:6px; }
+  #mode button { flex:1; font-size:16px; padding:3px 5px; }
+  #mode button[aria-pressed="true"], .presets button.sel { background:#1f3d9e; color:#fbf8ee; }
   #side { position: absolute; left: 950px; top: 190px; width: 230px; display: flex; flex-direction: column; gap: 10px; }
   #side, #sys, #top { transition: opacity .7s; }
   #stage.intro #side, #stage.intro #sys, #stage.intro #top { opacity: 0; }
@@ -55,6 +58,7 @@
   <div id="top"><a href="../../index.html" id="back">← arcade</a></div>
   <div id="sys"><div id="audio-controls"><button id="mute" title="Mute sound" aria-label="Mute sound"></button><input id="volume" type="range" min="0" max="100" step="5" aria-label="Sound volume" title="Sound volume"></div><button id="newgame">new game</button></div>
   <div id="side">
+    <div id="mode" aria-label="Game mode"><button id="coach" aria-pressed="true">Coach Mode</button><button id="manual" aria-pressed="false">Player Mode</button></div>
     <button id="hike">HIKE!</button>
     <aside id="first-play-note" aria-label="First play controls"><p>Draw your routes.</p><p>WASD to move</p><p>click to throw.</p></aside>
     <div id="fourth"><button id="fg">kick field goal</button><button id="punt">punt</button></div>
@@ -279,6 +283,7 @@ const SFX = (() => {
 // ---------- game state ----------
 let firstPlayHelp = true;
 let engine, world, players = [], ball, state = 'presnap', frame = 0, playFrame = 0, mouse = { x: 320, y: 1000, down: false };
+let coachMode = true, selectedPlay = null;
 let game, drawing = null, result = null, log = [], resultTimer = 0, fgAnim = null, gameOverText = null;
 // sketch-in intro: introT counts steps since new game; rv(start, dur) = how far along (0..1) a given element's stroke is
 let introT = 9999; const INTRO_LEN = 170;
@@ -332,7 +337,8 @@ function gameOver() { state = 'gameover'; gameOverText = game.you > game.pencils
 function note(text, color = GRAPHITE) { log.push({ text, color }); if (log.length > 9) log.shift(); }
 
 function setupPlay(keepRoutes) {
-  const oldRoutes = keepRoutes ? Object.fromEntries(players.filter(p => p.team === 'o').map(p => [p.name, p.route])) : null;
+  selectedPlay = null;
+  const oldRoutes = keepRoutes && !coachMode ? Object.fromEntries(players.filter(p => p.team === 'o').map(p => [p.name, p.route])) : null;
   engine = Engine.create(); world = engine.world; engine.gravity.y = 0;
   players = []; ball = null; result = null; fgAnim = null; drawing = null; state = 'presnap'; playFrame = 0; banner = null; loose = null;
   const losY = yardY(game.los), cx = FW / 2;
@@ -351,7 +357,7 @@ function setupPlay(keepRoutes) {
   const qb = byName('QB'); qb.hasBall = true; ball = { carrier: qb, flying: null, z: 0 };
   if (!onOffense()) { applyScheme(scheme); ctrl = byName('LB-L'); defReady = false; presnapT = 0; noSnap = false; }   // the pencils pick their play at the snap
   else if (oldRoutes) { for (const p of players) if (p.team === 'o' && oldRoutes[p.name]) p.route = oldRoutes[p.name].map(w => ({ ...w })); }
-  else loadPreset(Object.keys(PASSES)[Math.floor(Math.random() * Object.keys(PASSES).length)]); // automatic calls use pass plays only
+  else if (!coachMode) loadPreset(Object.keys(PASSES)[Math.floor(Math.random() * Object.keys(PASSES).length)]); // automatic calls use pass plays only
   cam.target = Math.max(0, Math.min(FH - H, losY - 470)); cam.y = cam.target;
   updateButtons();
   if (!onOffense() && game.down === 4) aiFourthDown();
@@ -387,19 +393,33 @@ function switchCtrl(f) { // take over the defender you clicked, or the one neare
 }
 function byName(n) { return players.find(p => p.name === n); }
 function loadPreset(name) {
-  const pr = PRESETS[name]; if (!pr) return;
+  const pr = PRESETS[name]; if (!pr || state !== 'presnap') return;
+  selectedPlay = name;
   for (const p of players) if (p.team === 'o') { p.route = []; if (pr[p.name]) p.route = pr[p.name].map(([dx, dy]) => ({ x: p.home.x + dx, y: p.home.y + dy })); }
 }
+function coachPlayReady() { return !drawing && players.some(p => p.team === 'o' && p.route.length > 0); }
+function setMode(coach) {
+  if (state !== 'presnap' && state !== 'gameover') return;
+  coachMode = coach; aim = null; keys.clear(); mouse.down = false; SFX.scratch(false);
+  if (state === 'gameover') newGame(); else setupPlay(false);
+  updateButtons();
+}
 function updateButtons() {
-  document.getElementById('side').classList.toggle('first-play', firstPlayHelp);
+  document.getElementById('side').classList.toggle('first-play', firstPlayHelp && !coachMode);
   const pre = state === 'presnap', off = onOffense();
+  for (const [id, active] of [['coach', coachMode], ['manual', !coachMode]]) { const b = document.getElementById(id); b.setAttribute('aria-pressed', String(active)); b.disabled = !pre && state !== 'gameover'; }
   document.getElementById('side').classList.toggle('def', !off);
-  const hikeB = document.getElementById('hike'); hikeB.textContent = off ? 'HIKE!' : (defReady ? 'set...' : 'SET!'); hikeB.disabled = !pre || (!off && defReady);
+  const hikeB = document.getElementById('hike'); hikeB.textContent = off ? 'HIKE!' : (defReady ? 'set...' : 'SET!'); hikeB.disabled = !pre || (!off && defReady) || (coachMode && off && !coachPlayReady());
   document.getElementById('clear').disabled = !pre;
   [...document.querySelectorAll('.presets button')].forEach(b => b.disabled = !pre);
   [...document.querySelectorAll('#schemes button')].forEach(b => b.classList.toggle('sel', b.dataset.s === scheme));
   document.getElementById('fourth').classList.toggle('on', pre && off && game.down === 4);
   document.getElementById('fg').disabled = !(pre && game.los >= 55);
+  [...document.querySelectorAll('#runs button, #passes button')].forEach(b => b.classList.toggle('sel', b.textContent === selectedPlay));
+  if (coachMode) {
+    hintEl.textContent = state === 'gameover' ? 'game over. new game?' : pre ? (off ? (coachPlayReady() ? `${selectedPlay || 'custom routes'} · press HIKE and watch your team execute.` : 'Choose a run or pass play, or drag from an O to draw a route. Then press HIKE.') : 'Choose your defense, then press SET. Your players handle the rest.') : state === 'live' ? 'Watch the play unfold · your team is in control.' : 'Play complete · get ready for the next call.';
+    return;
+  }
   if (!off) { hintEl.textContent = state === 'gameover' ? 'game over. new game?' : pre ? `DEFENSE · ${SCHEME_TIP[scheme]} · click the field (or SET) when you're ready and the pencils will snap it.` : state === 'live' ? (ball.carrier && ball.carrier.team === 'x' ? 'you picked it off! run it back with the mouse' : 'move your ★ defender with the mouse (or WASD) · click or space to switch to the man nearest the ball') : ''; return; }
   hintEl.textContent = state === 'presnap' ? (game.down === 4 ? '4th down: go for it, kick, or punt' : 'drag from any O to draw its route · click the field to hike') : state === 'live' ? (ball.carrier && ball.carrier.team === 'x' ? 'picked off! your O\'s are chasing him' : ball.carrier && ball.carrier.name === 'QB' ? 'WASD / arrows: run the QB · hold to aim, release to throw · shift or right-click = lob · space = lateral' : 'runner follows your mouse (or WASD) · space or right-click = lateral') : '';
 }
@@ -414,12 +434,13 @@ function qbHasBall() { return state === 'live' && onOffense() && ball.carrier &&
 function onDown(e) {
   SFX.resume(); const s = canvasPos(e), f = toField(s.x, s.y); mouse = { ...f, down: true };
   if (state !== 'live' && s.x >= NAME_BOX.x && s.x <= NAME_BOX.x + NAME_BOX.w && s.y >= NAME_BOX.y && s.y <= NAME_BOX.y + NAME_BOX.h) { renameTeam(); e.preventDefault(); return; }
+  if (coachMode && state === 'live') { e.preventDefault(); return; }
   if (state === 'presnap' && !onOffense()) { setReady(); e.preventDefault(); return; }
   if (state === 'live' && !onOffense()) { if (e.button === undefined || e.button === 0) switchCtrl(f); e.preventDefault(); return; }
   if (state === 'presnap') {
     const p = nearestO(f);
-    if (p) { drawing = p; p.route = []; SFX.scratch(true); }          // drag from an O: draw its route
-    else if (e.button === undefined || e.button === 0) hike();        // click the open field: hike
+    if (p) { drawing = p; p.route = []; selectedPlay = null; SFX.scratch(true); updateButtons(); }          // drag from an O: draw its route
+    else if (!coachMode && (e.button === undefined || e.button === 0)) hike();        // click the open field: hike
     e.preventDefault();
   }
   else if (qbHasBall() && !(e.button === 2 && ball.carrier.scramble)) { aim = { x: f.x, y: f.y, lob: e.button === 2 }; e.preventDefault(); }
@@ -433,7 +454,7 @@ function onMove(e) {
 }
 function onUp() {
   mouse.down = false;
-  if (drawing) { if (drawing.route.length < 2) drawing.route = []; drawing = null; SFX.scratch(false); }
+  if (drawing) { if (drawing.route.length < 2) drawing.route = []; drawing = null; SFX.scratch(false); updateButtons(); }
   if (aim) { if (qbHasBall()) throwAt(aim, lobHeld()); aim = null; }
 }
 window.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight'].includes(e.code)) { keys.add(e.code); if (state === 'live') e.preventDefault(); } });
@@ -441,9 +462,11 @@ window.addEventListener('keyup', e => keys.delete(e.code));
 window.addEventListener('blur', () => keys.clear());
 canvas.addEventListener('mousedown', onDown); window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
 canvas.addEventListener('touchstart', onDown, { passive: false }); window.addEventListener('touchmove', onMove, { passive: false }); window.addEventListener('touchend', onUp);
-window.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if (state === 'presnap') { if (onOffense()) hike(); else setReady(); } else if (e.code === 'Space') { if (!onOffense()) { if (state === 'live') switchCtrl(null); } else if (canLateral()) lateral(null); } } });
+window.addEventListener('keydown', e => { if (['INPUT', 'BUTTON', 'A'].includes(e.target.tagName)) return; if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if (state === 'presnap') { if (onOffense()) hike(); else setReady(); } else if (!coachMode && e.code === 'Space') { if (!onOffense()) { if (state === 'live') switchCtrl(null); } else if (canLateral()) lateral(null); } } });
 document.getElementById('hike').onclick = () => { if (onOffense()) hike(); else setReady(); };
-document.getElementById('clear').onclick = () => { SFX.click(); for (const p of players) if (p.team === 'o') p.route = []; };
+document.getElementById('coach').onclick = () => setMode(true);
+document.getElementById('manual').onclick = () => setMode(false);
+document.getElementById('clear').onclick = () => { if (state !== 'presnap') return; SFX.click(); selectedPlay = null; for (const p of players) if (p.team === 'o') p.route = []; updateButtons(); };
 document.getElementById('newgame').onclick = () => { SFX.resume(); SFX.click(); newGame(); };
 const SPK_ON = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="#7a7a82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L9 10 L16 4.5 L16.4 21.5 L9 16.5 L3.2 16.2 Z"/><path d="M21 9.5 Q24 13 21 16.8"/><path d="M25 6 Q30 13 25.3 20.2"/></svg>';
 const SPK_OFF = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="#7a7a82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L9 10 L16 4.5 L16.4 21.5 L9 16.5 L3.2 16.2 Z"/><path d="M21 8.5 L30 17.5"/><path d="M30 8.2 L21.2 17.8"/></svg>';
@@ -456,12 +479,12 @@ volumeSlider.onchange = () => SFX.click();
 document.getElementById('fg').onclick = () => { if (state !== 'presnap') return; SFX.resume(); kickFG(); };
 document.getElementById('punt').onclick = () => { if (state !== 'presnap') return; SFX.resume(); SFX.kick(); note('punt.', GRAPHITE); endPossession('punt'); };
 for (const n of ['man', 'blitz', 'zone', 'prevent']) { const b = document.createElement('button'); b.textContent = n; b.dataset.s = n; b.onclick = () => { SFX.resume(); SFX.click(); scheme = n; if (state === 'presnap' && !onOffense()) setupPlay(false); else updateButtons(); }; document.getElementById('schemes').appendChild(b); }
-for (const [id, group] of [['runs', RUNS], ['passes', PASSES]]) { const el = document.getElementById(id); Object.keys(group).forEach(n => { const b = document.createElement('button'); b.textContent = n; b.onclick = () => { SFX.resume(); SFX.click(); loadPreset(n); }; el.appendChild(b); }); }
+for (const [id, group] of [['runs', RUNS], ['passes', PASSES]]) { const el = document.getElementById(id); Object.keys(group).forEach(n => { const b = document.createElement('button'); b.textContent = n; b.onclick = () => { SFX.resume(); SFX.click(); loadPreset(n); updateButtons(); }; el.appendChild(b); }); }
 
 // ---------- the play ----------
 function segDist(a, b, p) { const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1; const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2)); return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t)); }
 function routePassesQB(p) { const qb = byName('QB').home; let prev = p.home; for (const w of p.route) { if (segDist(prev, w, qb) < 30) return true; prev = w; } return false; }
-function hike() { if (state !== 'presnap' || introT < 140) return; SFX.resume(); SFX.hut(); state = 'live'; playFrame = 0; drawing = null; for (const p of players) if (p.team === 'o') p.handoff = p.name !== 'QB' && routePassesQB(p); updateButtons(); }
+function hike() { if (state !== 'presnap' || introT < 140 || (coachMode && onOffense() && !coachPlayReady())) return; SFX.resume(); SFX.scratch(false); SFX.hut(); state = 'live'; playFrame = 0; drawing = null; for (const p of players) if (p.team === 'o') p.handoff = p.name !== 'QB' && routePassesQB(p); updateButtons(); }
 function receiverFor(spot) { // whoever can get to the spot: nearest eligible O
   let best = null, bd = 1e9;
   for (const p of players) if (p.team === 'o' && p.kind !== 'OL' && p.kind !== 'QB') { const d = Math.hypot(p.body.position.x - spot.x, p.body.position.y - spot.y); if (d < bd) { bd = d; best = p; } }
@@ -547,7 +570,7 @@ function recoverLoose(p) {
   if (p.team === 'o') { giveBall(p); note(p.name + ' falls on it', INK); SFX.catch_(); banner = null; return; }
   ball.turnoverText = 'FUMBLE! pencils ball.'; intercept(p, at, 'FUMBLE!', 'the ' + p.name + ' recovers it!');
 }
-function giveBall(p) { for (const q of players) q.hasBall = false; p.hasBall = true; ball.carrier = p; p.route = p.name === 'QB' ? p.route : []; p.ri = 0; ball.z = 0; Body.setDensity(p.body, 0.006); updateButtons(); }
+function giveBall(p) { for (const q of players) q.hasBall = false; p.hasBall = true; ball.carrier = p; if (!coachMode && p.name !== 'QB') { p.route = []; p.ri = 0; } ball.z = 0; Body.setDensity(p.body, 0.006); updateButtons(); }
 
 function steer(p, target, speedMul = 1) {
   const b = p.body, dx = target.x - b.position.x, dy = target.y - b.position.y, d = Math.hypot(dx, dy);
@@ -575,10 +598,16 @@ function runTarget(c) { // run upfield, cut away from the nearest defender in th
 }
 function aiCarrier(p, qb) {
   const b = p.body.position;
+  if (coachMode && p.route.length) {
+    if (p.name === 'QB' && b.y < yardY(game.los) - 6) p.scramble = true;
+    if (followRoute(p)) return;
+    if (p.name === 'QB') p.scramble = true;
+  }
   if (p.name === 'QB' && !p.scramble) {
     if (b.y < yardY(game.los) - 6) { p.scramble = true; }
     else {
       if (p.route.length) { if (followRoute(p)) return; p.scramble = true; return; }
+      if (coachMode && players.some(r => r.handoff && r.ri < r.route.length) && playFrame < 100) { steer(p, p.home, 0); return; }
       if (playFrame < 45) steer(p, { x: p.home.x, y: p.home.y + 28 }, 0.9); else steer(p, b, 0);
       if (ball.flying) return;
       const plan = p.plan || (p.plan = { throwAt: 60 });
@@ -586,7 +615,7 @@ function aiCarrier(p, qb) {
       if (playFrame >= plan.throwAt || pressure) {
         const t = bestReceiver(p);
         if (t && ((t.sep > 22 && (t.depth < 180 || t.sep > 36)) || playFrame > 150 || (pressure && t.sep > 12))) { const r = t.r, T = Math.hypot(r.body.position.x - b.x, r.body.position.y - b.y) / 9.5; throwAt({ x: r.body.position.x + r.body.velocity.x * T * 0.85 + (Math.random() - .5) * 44, y: r.body.position.y + r.body.velocity.y * T * 0.85 + (Math.random() - .5) * 36 }, t.depth > 220 && t.sep > 34); }
-        else if (pressure) { p.scramble = true; note('the pencil QB takes off!', GRAPHITE); }
+        else if (pressure) { p.scramble = true; note(onOffense() ? 'QB takes off!' : 'the pencil QB takes off!', GRAPHITE); }
         else plan.throwAt = playFrame + 10;
       }
       return;
@@ -606,7 +635,7 @@ function updateOffense() {
   for (const p of players) {
     if (p.team !== 'o') continue;
     if (p.hasBall) {
-      if (!onOffense()) { aiCarrier(p, qb); continue; }
+      if (coachMode || !onOffense()) { aiCarrier(p, qb); continue; }
       const kd = keyDir(), b = p.body.position;
       if (p.name === 'QB') { // you run him: keys move, otherwise a short drop back and hold the pocket
         if (kd) { steer(p, { x: b.x + kd.x * 60, y: b.y + kd.y * 60 }, 1.0); p.moved = true; }
@@ -649,7 +678,7 @@ function updateDefense() {
   if (loose) { for (const d of players) if (d.team === 'x') { if (d.stumble > 0) { d.stumble--; continue; } if (loose.t > 8 + (d.id % 5) * 3) steer(d, loose, 1.0); } return; }
   if (carrier && carrier.team === 'x') { // run it back; the rest get in the way
     const c = carrier.body.position;
-    if (!onOffense()) { ctrl = carrier; const kd = keyDir(); if (kd) steer(carrier, { x: c.x + kd.x * 60, y: c.y + kd.y * 60 }, 1.05); else steer(carrier, mouse, 1.05); }
+    if (!coachMode && !onOffense()) { ctrl = carrier; const kd = keyDir(); if (kd) steer(carrier, { x: c.x + kd.x * 60, y: c.y + kd.y * 60 }, 1.05); else steer(carrier, mouse, 1.05); }
     else steer(carrier, { x: c.x + (FW / 2 - c.x) * 0.25, y: c.y + 220 }, 1.0);
     for (const d of players) if (d.team === 'x' && d !== carrier) {
       let o = null, od = 1e9; for (const p of players) if (p.team === 'o') { const dist = Math.hypot(p.body.position.x - c.x, p.body.position.y - c.y); if (dist < od) { od = dist; o = p; } }
@@ -661,7 +690,7 @@ function updateDefense() {
   for (const d of players) {
     if (d.team !== 'x') continue;
     if (d.stumble > 0) { d.stumble--; steer(d, d.body.position, 0); d.body.collisionFilter.mask = 0; if (d.stumble === 0) d.body.collisionFilter.mask = 0xFFFFFFFF; continue; }
-    if (!onOffense() && d === ctrl) { const kd = keyDir(), b = d.body.position; if (kd) steer(d, { x: b.x + kd.x * 60, y: b.y + kd.y * 60 }, 1.06); else steer(d, mouse, 1.06); continue; }
+    if (!coachMode && !onOffense() && d === ctrl) { const kd = keyDir(), b = d.body.position; if (kd) steer(d, { x: b.x + kd.x * 60, y: b.y + kd.y * 60 }, 1.06); else steer(d, mouse, 1.06); continue; }
     // pursuit once the ball is out: everyone chases, with a beat of hesitation
     if (live) { if (!d.chase) d.chase = playFrame + 6 + Math.random() * 14; if (playFrame >= d.chase) { const c = carrier.body; steer(d, { x: c.position.x + c.velocity.x * 6, y: c.position.y + c.velocity.y * 6 }, onOffense() ? 1 : 1.05); continue; } }
     if (fly) { const dist = Math.hypot(d.body.position.x - fly.to.x, d.body.position.y - fly.to.y); if (dist < (fly.lob ? 210 : 150) || d.job === 'zone') { steer(d, fly.to, 1.05); continue; } }
@@ -829,7 +858,7 @@ function drawPlayers() {
       if (st) ink.text('*', s.x + 12, s.y - 6, { size: 22, color: defCol, alpha: 0.7 });
       if (p.hasBall) { ink.circle(s.x, s.y, R + 4, 760 + p.id, RED, 1.5, 1); drawBallAt(s.x + 12, s.y - 5, 0); }
       if (!onOffense() && state === 'presnap') ink.text(p.name, s.x, s.y + 24, { size: 13, color: GRAPHITE, font: 'Patrick Hand', weight: 400, alpha: 0.6 * rv(150, 15) });
-      if (!onOffense() && p === ctrl && (state === 'live' || state === 'presnap')) { // the one you're driving
+      if (!coachMode && !onOffense() && p === ctrl && (state === 'live' || state === 'presnap')) { // the one you're driving
         ctx.fillStyle = INK; ctx.beginPath(); ctx.moveTo(s.x - 7, s.y - 26); ctx.lineTo(s.x + 7, s.y - 26); ctx.lineTo(s.x, s.y - 15); ctx.closePath(); ctx.fill();
         if (state === 'presnap' && game.drives.pencils === 0) ink.text('this is you', s.x, s.y - 32, { size: 15, color: INK, font: 'Patrick Hand', weight: 400 });
       }
@@ -895,6 +924,7 @@ function drawResult() {
   }
 }
 function drawAimFinger() {
+  if (coachMode) return;
   if (!onOffense()) { // defense: a little target where your defender is headed, and the pencils lining up before the snap
     if (state === 'live' && ctrl && !(ctrl.hasBall)) { const s = toScreen(mouse.x, mouse.y); ctx.setLineDash([3, 3]); ctx.strokeStyle = INK; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(s.x, s.y, 9, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
     if (state === 'presnap' && introT >= INTRO_LEN && !noSnap) { const ly = yardY(game.los) - cam.y; ink.text(defReady ? 'set! here it comes...' : 'the pencils are lining up · click when you\'re set', FX + FW / 2, ly + 170, { size: 18, color: PEN_DK, font: 'Patrick Hand', weight: 400, alpha: 0.6 + Math.sin(frame * 0.1) * 0.25 }); }
@@ -918,7 +948,7 @@ function drawAimFinger() {
 // ---------- loop ----------
 function step() {
   if (introT < INTRO_LEN) { introT++; if (introT >= 120 && stage.classList.contains('intro')) stage.classList.remove('intro'); if (introT >= INTRO_LEN) SFX.scratch(false); }
-  if (state === 'presnap' && !onOffense() && introT >= INTRO_LEN && !noSnap) { presnapT++; if ((defReady && presnapT >= readyAt + 40) || presnapT > 260) aiSnap(); }
+  if (state === 'presnap' && !onOffense() && introT >= INTRO_LEN && !noSnap) { presnapT++; if ((defReady && presnapT >= readyAt + 40) || (!coachMode && presnapT > 260)) aiSnap(); }
   if (state === 'live') {
     playFrame++;
     updateOffense(); updateDefense();
