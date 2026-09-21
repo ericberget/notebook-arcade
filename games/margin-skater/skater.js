@@ -69,7 +69,7 @@ function updateHUD(){
   $('progress').style.width=progress+'%';document.querySelector('.progress').setAttribute('aria-valuenow',Math.round(progress));
   $('charge').style.width=s.charge*100+'%';
   const neighborhood=Math.floor(Math.max(0,s.x-120)/6000);
-  $('course-note').textContent=['Little hops. Long afternoons.','Follow the shoreline. Stay a while.','Another bend. Another little daydream.'][neighborhood%3];
+  $('course-note').textContent=['Let the hills carry you.','Downhill builds speed. Uphill takes it back.','Another bend. Another little daydream.'][neighborhood%3];
   $('combo').textContent=s.rail?'a little slide…':s.combo&& !s.grounded?'make it your own.':'';
 }
 // Stable, slightly imperfect strokes: no random jitter between frames.
@@ -83,8 +83,8 @@ function skater(x,y,angle){
   ctx.save();ctx.translate(x,y-5);ctx.rotate(angle);ctx.scale(1.18,1.18);
   const crouch=Math.min(.4,s.stumble)*.7+s.charge*.65+Math.max(0,s.compression)*.7,air=!s.grounded,bend=air?.13:crouch;
   const hip={x:-4+(input.right?3:0),y:-41+bend*21},neck={x:7+bend*9,y:hip.y-27+bend*7},head={x:neck.x+3,y:neck.y-12};
-  const pushPhase=(s.time%1.5)/1.5, pushing=s.grounded&&!s.rail&&s.charge<.05&&s.compression<.08&&pushPhase<.32;
-  const push=pushing?Math.sin(pushPhase/.32*Math.PI):0;
+  const pushing=s.grounded&&!s.rail&&s.pushStroke>0;
+  const push=pushing?Math.sin((1-s.pushStroke/.36)*Math.PI):0;
   const feet=[[-17-push*19,-11+push*10],[17,-11]],knees=[[-22-push*10,hip.y+18],[17+bend*9,hip.y+15]];
   // Two-segment legs compress with landing force and crouch charge.
   path([[hip.x,hip.y],knees[0],feet[0]],INK,3);path([[hip.x,hip.y],knees[1],feet[1]],INK,3);
@@ -130,7 +130,7 @@ function draw(alpha,dt){
   } else if(paper.complete&&paper.naturalWidth)ctx.drawImage(paper,0,offsetY,W,600);
 
   const px=prev.x+(s.x-prev.x)*alpha,py=prev.y+(s.y-prev.y)*alpha,pa=prev.angle+(s.angle-prev.angle)*alpha;
-  const target=px-W*.27+Math.min(60,(s.vx-300)*.1);cam+=(target-cam)*(1-Math.exp(-7*dt));
+  const target=px-W*.27+P.clamp((s.vx-235)*.16,-20,95);cam+=(target-cam)*(1-Math.exp(-7*dt));
   ctx.save();ctx.translate(-cam,offsetY);if(shake>.1&&!reduced)ctx.translate(Math.sin(visualTime*73)*shake,Math.cos(visualTime*59)*shake*.6);terrain();
   for(const tr of trails){ctx.globalAlpha=tr.life*.12;line(tr.x-18,tr.y,tr.x+18,tr.y,INK,1.5);}ctx.globalAlpha=1;
   const shadow=P.surface(px,s.level.ground);if(shadow){ctx.save();ctx.globalAlpha=Math.max(.025,.13-(shadow.y-py)*.00035);ctx.fillStyle=INK;ctx.beginPath();ctx.ellipse(px,shadow.y+3,28,3,0,0,TAU);ctx.fill();ctx.restore();}

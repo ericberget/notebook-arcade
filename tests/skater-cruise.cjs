@@ -22,7 +22,7 @@ const ride=(jumping)=>{
  const s=P.create();s.status='playing';let pressed=false;
  for(let i=0;i<120*60;i++){
   const obstacle=s.level.obstacles.find(o=>!o.hit&&!o.cleared&&o.x>s.x-20);
-  const jump=jumping&&!pressed&&s.grounded&&obstacle&&obstacle.x-s.x<95&&obstacle.x-s.x>60;
+  const jump=jumping&&!pressed&&s.grounded&&obstacle&&obstacle.x-s.x<Math.max(60,s.vx*.25+20)&&obstacle.x-s.x>35;
   P.step(s,{jump});pressed=jump;
  }
  return s;

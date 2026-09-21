@@ -46,7 +46,7 @@ function makeLevel(index=0){
 }
 // The cruise grows ahead of the rider and discards distant scenery behind them.
 // Small obstacles invite hops; bumps slow the rider without ending the cruise.
-function cruiseHeight(x,index){return 438+Math.sin(x/680+index)*32+Math.sin(x/1370)*24;}
+function cruiseHeight(x,index){return 438+Math.sin(x/680+index)*64+Math.sin(x/1370)*32;}
 function extendCruise(level){
   const start=level.end, end=start+2400;
   for(let x=start;x<end;x+=120)level.ground.push({x1:x,y1:cruiseHeight(x,level.index),x2:x+120,y2:cruiseHeight(x+120,level.index)});
@@ -67,13 +67,13 @@ function makeCruise(index=0){
   return level;
 }
 function create(level=makeCruise(0)){
-  return {level,bumps:0,cleared:0,stumble:0,starsTotal:0,x:120,y:level.zen?surface(120,level.ground).y:430,vx:level.zen?235:300,vy:0,angle:0,omega:0,grounded:true,rail:null,speed:level.zen?235:300,charge:0,held:false,coyote:.1,buffer:0,bufferPower:0,airTime:0,rotation:0,airPoints:0,airLabel:'',chain:0,combo:0,comboTime:0,score:0,bails:0,time:0,checkpoint:120,checkpointIndex:0,status:'ready',bailTimer:0,compression:0,events:[],collected:new Set(),grindDistance:0,grindScored:0,lastGrind:null,checkpointScore:0};
+  return {level,pushStroke:0,pushCooldown:0,bumps:0,cleared:0,stumble:0,starsTotal:0,x:120,y:level.zen?surface(120,level.ground).y:430,vx:level.zen?235:300,vy:0,angle:0,omega:0,grounded:true,rail:null,speed:level.zen?235:300,charge:0,held:false,coyote:.1,buffer:0,bufferPower:0,airTime:0,rotation:0,airPoints:0,airLabel:'',chain:0,combo:0,comboTime:0,score:0,bails:0,time:0,checkpoint:120,checkpointIndex:0,status:'ready',bailTimer:0,compression:0,events:[],collected:new Set(),grindDistance:0,grindScored:0,lastGrind:null,checkpointScore:0};
 }
 function emit(s,type,extra={}){s.events.push({type,...extra});}
 function bank(s){if(!s.combo)return;const points=Math.round(s.combo*(1+Math.min(4,s.chain-1)*.5));s.score+=points;emit(s,'bank',{points,chain:s.chain});s.combo=0;s.chain=0;s.comboTime=0;}
-function bail(s,why){if(s.status!=='playing')return;if(s.level.zen){const ground=surface(s.x,s.level.ground);if(ground){Object.assign(s,{y:ground.y,angle:ground.angle,grounded:true,rail:null,vy:0,omega:0,speed:235,airTime:0});bank(s);emit(s,'recover');return;}}s.status='bail';s.bailTimer=.85;s.bails++;s.combo=0;s.chain=0;s.airPoints=0;s.held=false;s.charge=0;s.buffer=0;emit(s,'bail',{why});}
+function bail(s,why){if(s.status!=='playing')return;if(s.level.zen){const ground=surface(s.x,s.level.ground);if(ground){Object.assign(s,{y:ground.y,angle:ground.angle,grounded:true,rail:null,vy:0,omega:0,speed:Math.max(120,s.vx*.85),airTime:0});bank(s);emit(s,'recover');return;}}s.status='bail';s.bailTimer=.85;s.bails++;s.combo=0;s.chain=0;s.airPoints=0;s.held=false;s.charge=0;s.buffer=0;emit(s,'bail',{why});}
 function respawn(s){const p=surface(s.checkpoint,s.level.ground);Object.assign(s,{x:s.checkpoint,y:p.y,angle:p.angle,vx:300,vy:0,speed:300,omega:0,grounded:true,rail:null,status:'playing',charge:0,held:false,airTime:0,rotation:0,buffer:0,coyote:.1,grindDistance:0,lastGrind:null});emit(s,'respawn');}
-function ollie(s,power){const a=s.rail?Math.atan2(s.rail.y2-s.rail.y1,s.rail.x2-s.rail.x1):s.angle;const impulse=s.level.zen?580+power*110:400+power*250;s.vx=Math.max(s.level.zen?235:330,s.speed*Math.cos(a)+Math.sin(a)*impulse*.15);s.vy=s.speed*Math.sin(a)-Math.cos(a)*impulse;s.y-=2;s.grounded=false;s.rail=null;s.coyote=0;s.buffer=0;s.airTime=0;s.rotation=0;s.airPoints=40;s.airLabel=power>.65?'POWER OLLIE':'OLLIE';s.omega=-.35;s.compression=-.18;emit(s,'ollie',{power});}
+function ollie(s,power){const a=s.rail?Math.atan2(s.rail.y2-s.rail.y1,s.rail.x2-s.rail.x1):s.angle;const impulse=s.level.zen?580+power*110:400+power*250;s.vx=s.level.zen?s.speed*Math.cos(a):Math.max(330,s.speed*Math.cos(a)+Math.sin(a)*impulse*.15);s.vy=s.speed*Math.sin(a)-(s.level.zen?impulse:Math.cos(a)*impulse);s.y-=2;s.grounded=false;s.rail=null;s.coyote=0;s.buffer=0;s.airTime=0;s.rotation=0;s.airPoints=40;s.airLabel=power>.65?'POWER OLLIE':'OLLIE';s.omega=-.35;s.compression=-.18;emit(s,'ollie',{power});}
 function sweep(s,x0,y0,segments,rail=false){
   let hit=null;
   for(const seg of segments){
@@ -98,6 +98,8 @@ function step(s,input={},dt=DT){
     s.checkpoint=s.x;
   }
   s.stumble=Math.max(0,s.stumble-dt);
+  s.pushCooldown=Math.max(0,(s.pushCooldown||0)-dt);
+  if(s.pushStroke>0)s.pushStroke=Math.max(0,s.pushStroke-dt);
   s.time+=dt;s.compression*=Math.exp(-10*dt);
   const jump=!!input.jump,lean=clamp(input.lean||0,-1,1);
   if(jump)s.charge=clamp(s.charge+dt/0.55,0,1);
@@ -111,7 +113,15 @@ function step(s,input={},dt=DT){
     if(!at){s.grounded=false;s.rail=null;s.airTime=0;s.rotation=0;}
     else{
       const a=at.angle,rolling=s.rail?26:38,push=s.rail?0:Math.max(0,345-s.speed)*1.25;
-      s.speed=s.level.zen?clamp(s.speed+((235-s.speed)*.9+G*Math.sin(a)*.25)*dt,s.stumble>0?135:195,320):clamp(s.speed+(G*Math.sin(a)*.68+push-rolling)*dt,180,690);
+      if(s.level.zen){
+        // Gravity trades height for speed. Rolling resistance and air drag dissipate
+        // energy gradually; neither pulls the rider back to a cruising set point.
+        if(!s.rail&&s.speed<220&&s.pushCooldown===0&&s.charge<.05&&s.stumble===0){s.pushStroke=.36;s.pushCooldown=1.15;}
+        const foot=!s.rail&&s.pushStroke>0?360*Math.sin(Math.PI*(1-s.pushStroke/.36)):0;
+        const hillAssist=!s.rail?Math.max(0,185-s.speed)*4:0;
+        const drag=(s.rail?9:5)+.00009*s.speed*s.speed;
+        s.speed=Math.max(35,s.speed+(G*Math.sin(a)*.78+foot+hillAssist-drag)*dt);
+      }else s.speed=clamp(s.speed+(G*Math.sin(a)*.68+push-rolling)*dt,180,690);
       s.vx=s.speed*Math.cos(a);s.vy=s.speed*Math.sin(a);s.x+=s.vx*dt;
       const next=surface(s.x,segments);
       if(next){s.y=next.y;s.angle+=wrap(next.angle-s.angle)*Math.min(1,dt*25);s.omega=0;}
@@ -130,8 +140,8 @@ function step(s,input={},dt=DT){
     if(hit){
       const error=Math.abs(wrap(s.angle-hit.angle)),impact=s.vy*Math.cos(hit.angle)-s.vx*Math.sin(hit.angle);
       if(!s.level.zen&&error>1.05){bail(s,'land wheels down');return;}
-      s.x=hit.x;s.y=hit.y;s.speed=clamp(s.vx*Math.cos(hit.angle)+s.vy*Math.sin(hit.angle),205,690);
-      const clean=error<.23&&impact<900;s.speed*=clean||s.level.zen?1:0.88;if(s.level.zen)s.speed=clamp(s.speed,210,320);
+      s.x=hit.x;s.y=hit.y;s.speed=clamp(s.vx*Math.cos(hit.angle)+s.vy*Math.sin(hit.angle),s.level.zen?35:205,s.level.zen?1400:690);
+      const clean=error<.23&&impact<900;s.speed*=clean||s.level.zen?1:0.88;if(s.level.zen)s.speed*=.99;
       s.grounded=true;s.rail=hit.rail?hit.segment:null;s.angle=hit.angle;s.omega=0;s.compression=clamp(impact/1100,.15,.75);
       const flips=Math.floor((Math.abs(s.rotation)+.35)/TAU);const points=s.airPoints+flips*400+(clean?60:10);
       if(s.airTime>.12){s.combo+=points;s.chain++;s.comboTime=1.7;emit(s,'land',{clean,impact,points,label:flips?`${flips>1?flips+'× ':''}${s.rotation<0?'BACKFLIP':'FRONTFLIP'}`:s.airLabel||'AIR'});}
@@ -143,7 +153,7 @@ function step(s,input={},dt=DT){
   for(const o of s.level.obstacles){
     if(o.hit||o.cleared)continue;
     if(s.x+19>o.x&&s.x-19<o.x+o.w&&s.y>o.y-o.h+6&&s.y<o.y+45){
-      if(s.level.zen){o.hit=true;s.bumps++;s.speed=140;s.vx=140;s.stumble=.7;s.compression=.6;emit(s,'bump');}
+      if(s.level.zen){o.hit=true;s.bumps++;s.speed*=.72;s.vx*=.72;s.stumble=.7;s.compression=.6;emit(s,'bump');}
       else {bail(s,'eraser wins this round');return;}
     }else if(s.level.zen&&s.x-19>o.x+o.w){o.cleared=true;s.cleared++;s.score+=150;emit(s,'clearObstacle');}
   }
