@@ -1,0 +1,10 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),vm=require('node:vm'),L=require('../games/xo-football/league.js');
+const sandbox={XOLeague:L,URLSearchParams,location:{search:'?you=4&opponent=7'},document:{getElementById:()=>null},window:{}};vm.runInNewContext(fs.readFileSync('games/xo-football/match.js','utf8'),sandbox);const M=sandbox.window.XOMatch;
+const frame=t=>({t,players:[[200,400,0,0],[250,400,1,1]],ball:[200,400,0]});
+M.startPlay(76,true);M.record(frame(1));M.record(frame(6));M.caught('WR-L');M.end('td',100);const highlight=M.getHighlight();assert.equal(highlight.yards,24);assert.equal(highlight.you,4);assert.equal(highlight.player,L.rosters[4][5].name);assert.equal(highlight.frames.length,2);
+M.startPlay(25,false);M.record(frame(1));M.record(frame(6));M.end('td',100);assert.equal(M.getHighlight(),highlight,'opponent touchdown does not replace yours');
+M.startPlay(25,true);for(let i=0;i<250;i++)M.record(frame(i));M.end('tackle',50);assert.equal(M.getHighlight(),highlight,'non-scoring play preserves saved highlight');
+M.startPlay(25,false);for(let i=0;i<250;i++)M.record(frame(i));M.intercepted('CB-L',60);M.end('pick6',0);assert.equal(M.getHighlight().yards,60);assert.equal(M.getHighlight().frames.length,181);assert.equal(M.getHighlight().player,L.rosters[4][13].name);
+M.reset();assert.equal(M.getHighlight(),null,'new game clears in-memory replay');
+const dialog={addEventListener(){}};const view={window:{},document:{getElementById:()=>dialog}};vm.runInNewContext(fs.readFileSync('games/xo-football/replay.js','utf8'),view);assert(view.window.XOReplay.valid(highlight));assert(!view.window.XOReplay.valid({version:1,frames:[{},{}]}));assert(!view.window.XOReplay.valid(null));
+console.log('PASS: actual scoring capture, player attribution, own touchdowns and pick-sixes only, bounded recording, reset and replay validation');

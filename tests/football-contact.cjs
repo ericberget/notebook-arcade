@@ -1,5 +1,5 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const html=fs.readFileSync('games/xo-football/index.html','utf8');
+const html=fs.readFileSync('games/xo-football/play.html','utf8');
 const check=html.slice(html.indexOf('function checkContact()'),html.indexOf('function endPlay('));
 const runner={name:'RB',kind:'RB',team:'o',body:{position:{x:0,y:0}}};
 const defender={team:'x',stumble:0,touching:3,attempted:false,body:{position:{x:1,y:0}}};

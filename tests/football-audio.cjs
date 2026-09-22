@@ -1,5 +1,5 @@
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const html = fs.readFileSync('games/xo-football/index.html','utf8');
+const html = fs.readFileSync('games/xo-football/play.html','utf8');
 const source = html.slice(html.indexOf('// ---------- sound ----------'),html.indexOf('// ---------- game state ----------'))+'\nglobalThis.audio = SFX;';
 function boot(saved, supported = true) {
   const nodes=[], store={value:saved}, listeners={}; let starts=0, context;

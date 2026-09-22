@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict'),L=require('../games/xo-football/league.js');
+const keys=['speed','hands','blocking','iq'];
+for(const rr of L.rosters)assert.deepEqual(Object.keys(rr.find(p=>p.role==='TE').attrs),keys);
+const te={role:'TE',attrs:{hands:80,iq:0}};
+const base=L.catchingMultiplier(te);
+assert.equal(L.catchingMultiplier({...te,attrs:{hands:80,iq:99}}),base*1.05);
+assert.equal(L.catchingMultiplier({...te,role:'WR-L',attrs:{hands:80,iq:99}}),base,'IQ effect is TE only');
+let saved;global.localStorage={getItem:()=>saved,setItem:(_,v)=>saved=v};
+const s=L.create(0,492);L.simDraft(s);const old=s.rosters[0].find(p=>p.role==='TE');const id=old.id;
+old.attrs={speed:71,hands:84,power:90,arm:62};L.save(s);
+const loaded=L.load(),p=loaded.rosters[0].find(p=>p.role==='TE');
+assert.equal(p.id,id);assert.deepEqual(p.attrs,{speed:71,hands:84,blocking:90,iq:62});assert(Number.isFinite(p.overall));
+assert.equal(loaded.draft.picks.length,40);
+for(const p of loaded.draft.prospects.filter(p=>p.role==='TE'))assert.deepEqual(Object.keys(p.attrs),keys);
+L.save(loaded);assert.deepEqual(L.load(),loaded);
+console.log('PASS: TE attributes, IQ catching effect, old save migration, draft prospects, stable saves');
