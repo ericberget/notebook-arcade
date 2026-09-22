@@ -381,7 +381,8 @@ const rv = (start, dur) => Math.max(0, Math.min(1, (introT - start) / dur));
 function startIntro() { introT = 0; stage.classList.add('intro'); SFX.scratch(true); }
 const hintEl = document.getElementById('hint');
 
-const SPEED = { QB: 2.75, RB: 3.05, WR: 3.45, TE: 3.05, OL: 2.5, DE: 2.75, NT: 2.6, LB: 2.95, CB: 3.15, S: 3.2 };
+// Give defenders a little more closing time; preserve each player's speed rating.
+const SPEED = { QB: 2.75 * .93, RB: 3.05 * .93, WR: 3.45 * .93, TE: 3.05, OL: 2.5, DE: 2.75, NT: 2.6, LB: 2.95, CB: 3.15, S: 3.2 };
 const OFFENSE = [ // [name, kind, dx, dy] relative to the ball at the line of scrimmage (dy + is back toward you)
   ['QB', 'QB', 0, 60], ['C', 'OL', 0, 4], ['LG', 'OL', -26, 4], ['RG', 'OL', 26, 4],
   ['RB', 'RB', 0, 104], ['WR-L', 'WR', -235, 6], ['WR-R', 'WR', 235, 6], ['TE', 'TE', 54, 6],
