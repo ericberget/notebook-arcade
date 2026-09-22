@@ -17,6 +17,7 @@ assert.equal(run('phoneGame'),true);assert(nodes.get('wrap').classList.contains(
 assert(run('mobileScale')>.5,'phone field is enlarged rather than shrinking the whole notebook');
 const canvas=nodes.get('c'),scale=run('mobileScale');canvas.getBoundingClientRect=()=>({left:-145,top:105,width:1200*scale,height:720*scale});
 const point=(id,x,y)=>({pointerId:id,pointerType:'touch',clientX:-145+x*scale,clientY:105+y*scale,preventDefault:noop});
+run('introT=9999');canvas.handlers.pointerdown(point(90,330,50));canvas.handlers.pointerup(point(90,330,50));assert.equal(run('state'),'presnap','empty field tap does not accidentally snap on mobile');
 const at=run('byName("WR-L").body.position');const sy=run('cam.y');
 canvas.handlers.pointerdown(point(1,280+at.x,at.y-sy));assert.equal(run('drawing.name'),'WR-L');
 canvas.handlers.pointermove(point(1,280+at.x+15,at.y-sy-65));
@@ -32,6 +33,20 @@ thumb.handlers.pointerup(thumbTouch(7,78,630));assert(run('!!aim && !ball.flying
 canvas.handlers.pointercancel(point(8,550,240));assert(run('!aim && !ball.flying'),'cancelled aim never throws');
 nodes.get('touch-lob').onclick();assert(run('lobHeld()'),'mobile Lob button selects a lob');
 canvas.handlers.pointerdown(point(9,550,240));canvas.handlers.pointerup(point(9,550,240));assert(run('!!ball.flying'),'field release throws the pass');
+// A mobile catch or handoff must keep moving without a finger held on the thumb pad.
+for(const role of ['RB','WR-L']){
+ run(`setupPlay(); introT=9999; hike(); giveBall(byName(${JSON.stringify(role)}));`);
+ const start=run('ball.carrier.body.position.y');for(let i=0;i<8;i++)run('step()');
+ assert(run('ball.carrier.body.position.y')<start-1,role+' automatically runs upfield');
+}
+assert.equal(nodes.get('touch-note').textContent,'Release to keep running');
+thumb.handlers.pointerdown(thumbTouch(10,84,645));assert(run('keyDir(-1).x>0 && keyDir(-1).y===0'),'thumb overrides automatic running');
+thumb.handlers.pointerup(thumbTouch(10,84,645));assert(run('keyDir(-1).x===0 && keyDir(-1).y===-1'),'release resumes forward running');
+run('setupPlay(); introT=9999; hike()');assert.equal(run('keyDir().y'),0,'QB stays in the pocket without thumb input');const pocketStart=run("byName('QB').body.position.y");for(let i=0;i<8;i++)run('step()');assert(run("byName('QB').body.position.y")>pocketStart+1,'QB drops back automatically without thumb input');
+run("setupPlay(); loadPreset('QB sneak'); hike();");const sneakStart=run("byName('QB').body.position.y");for(let i=0;i<8;i++)run('step()');assert(run("byName('QB').body.position.y")<sneakStart-1,'a called QB run follows its route without thumb input');
+run("startDrive('pencils'); state='live'; giveBall(byName('CB-L'));");
+const returnStart=run('ball.carrier.body.position.y');for(let i=0;i<8;i++)run('step()');assert(run('ball.carrier.body.position.y')>returnStart+1,'interception auto-runs toward the opposite end zone');
 win.innerWidth=844;win.innerHeight=390;for(const f of events.resize)f();assert(run('phoneGame'));assert(parseFloat(nodes.get('field-window').style.height)<=278.01,'landscape field fits beside controls');
 win.innerWidth=1400;win.innerHeight=900;for(const f of events.resize)f();assert.equal(run('phoneGame'),false);assert.equal(canvas.style.width,'');assert(nodes.get('stage').style.transform.startsWith('scale('),'desktop returns to full desk view');
-console.log('PASS: enlarged phone field, touch route cancellation, thumb steering, independent movement/aim pointers, lob, pass release, orientation, desktop restoration');
+assert.equal(run('keyDir(-1)'),null,'automatic running stays mobile-only');
+console.log('PASS: phone field, touch routes, thumb steering, independent aiming, lob, automatic runs and returns, QB pocket control, orientation, desktop restoration');

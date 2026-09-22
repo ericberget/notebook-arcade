@@ -100,7 +100,6 @@
   .phone-game #side.first-play #clear{display:block}
   .phone-game #side.first-play #first-play-note{display:none}
   .phone-game #side.first-play #hint{display:block}
-  .phone-game #side.manual-live #touch-controls{display:flex;grid-column:1/-1;align-items:center;justify-content:space-around;gap:20px;padding:2px 10px}
   #thumb-pad{position:relative;width:90px;height:90px;border:1.5px solid #7484a2;border-radius:48% 51% 46% 49%;touch-action:none;background:#233d7806;flex:0 0 90px;cursor:grab}
   #thumb-pad:before{content:'↑';position:absolute;left:38px;top:0;color:#7484a2;font-size:18px}
   #thumb-knob{position:absolute;left:28px;top:28px;width:32px;height:32px;border:1.5px solid #233d78;border-radius:50%;background:#f3ead1;pointer-events:none}
@@ -119,6 +118,24 @@
     .phone-game .presets button{font-size:15px;min-height:38px}.phone-game #play-tabs{gap:6px}.phone-game #play-tabs button{font-size:15px;padding:2px 5px}
     .phone-game #touch-controls{gap:10px;padding:0!important}#touch-actions button{min-width:62px}
   }
+  /* Keep the steering control in one predictable place before and after the snap. */
+  .phone-game #mode{grid-column:1;grid-row:1}
+  .phone-game #side #auto-design{grid-column:2;grid-row:1;margin:0;min-height:44px;font-size:12px;gap:5px;align-self:center;justify-self:stretch;text-align:left}
+  .phone-game .toggle-track{flex:0 0 27px}
+  .phone-game #side #touch-controls{display:flex;grid-column:1/-1;grid-row:2;align-items:center;justify-content:space-between;gap:22px;padding:2px 0}
+  .phone-game #thumb-pad{width:118px;height:118px;flex-basis:118px;border:2px solid #405b8c;background:#f4df9229;box-shadow:inset 0 0 0 6px #233d7808}
+  .phone-game #thumb-pad:before{left:52px;top:2px;font-size:22px;color:#405b8c}
+  .phone-game #thumb-pad:after{content:'RUN / STEER';position:absolute;bottom:6px;left:0;right:0;text-align:center;font:10px 'Courier New',monospace;color:#405b8c;pointer-events:none}
+  .phone-game #thumb-knob{width:42px;height:42px;left:36px;top:36px;border-width:2px;background:#ead393}
+  .phone-game #touch-actions{flex:1;gap:6px}
+  .phone-game #touch-actions #hike{flex:0 0 100%;box-sizing:border-box}
+  .phone-game #touch-actions button:not(#hike){min-height:42px}
+  .phone-game #side:not(.manual-live) #touch-actions button:not(#hike){display:none!important}
+  .phone-game #side:not(.manual-controls) #thumb-pad,.phone-game #side:not(.manual-controls) #touch-note{display:none}
+  .phone-game #touch-note{font-size:12px;line-height:1.2}
+  .phone-game button,.phone-game #thumb-pad{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+  .phone-game #thumb-pad{touch-action:none}
+  @media(orientation:landscape) and (max-height:500px){.phone-game #side #touch-controls{gap:12px}.phone-game #thumb-pad{width:100px;height:100px;flex-basis:100px}.phone-game #thumb-knob{left:27px;top:27px}.phone-game #thumb-pad:before{left:43px}.phone-game #side #auto-design{font-size:11px}}
 </style>
 </head>
 <body>
@@ -262,7 +279,7 @@ function fit() {
   if (phoneGame) {
     const landscape = window.innerWidth > window.innerHeight && window.innerHeight <= 500;
     const availableWidth = window.innerWidth - (landscape ? 306 : 16);
-    mobileScale = Math.min(availableWidth / 660, Math.max(220, window.innerHeight - (landscape ? 112 : 338)) / H);
+    mobileScale = Math.min(availableWidth / 660, Math.max(220, window.innerHeight - (landscape ? 112 : 480)) / H);
     stage.style.transform = 'none'; stage.style.marginLeft = '0'; stage.style.marginTop = '0';
     canvas.style.width = W * mobileScale + 'px'; canvas.style.height = H * mobileScale + 'px';
     canvas.style.left = `calc(50% - ${600 * mobileScale}px)`; fieldWindow.style.height = H * mobileScale + 'px';
@@ -522,7 +539,7 @@ function updateButtons() {
   document.getElementById('fg').disabled = !(pre && game.los >= 55);
   [...document.querySelectorAll('#runs button, #passes button')].forEach(b => b.classList.toggle('sel', b.textContent === selectedPlay));
   if (phoneGame && !coachMode) {
-    hintEl.textContent = pre ? (off ? 'Choose a play or draw routes. Tap HIKE when ready.' : 'Choose a defense, then tap SET.') : state === 'live' ? (off ? 'Thumb control to move · aim on the field, release to throw.' : 'Thumb control to move · tap Switch to change defender.') : state === 'gameover' ? 'Final score.' : 'Next play coming up.';
+    hintEl.textContent = pre ? (off ? 'Choose a play or draw routes. Tap HIKE when ready.' : 'Choose a defense, then tap SET.') : state === 'live' ? (off ? (ball.carrier?.team === 'o' && ball.carrier.name !== 'QB' ? 'Auto-running · drag the thumb control to steer.' : 'Thumb control to move · aim on the field, release to throw.') : (ball.carrier?.team === 'x' ? 'Auto-running the return · drag to steer.' : 'Thumb control to move · tap Switch to change defender.')) : state === 'gameover' ? 'Final score.' : 'Next play coming up.';
     return;
   }
   if (coachMode) {
@@ -539,18 +556,18 @@ function canvasPos(e) { const r = canvas.getBoundingClientRect(); const t = e.to
 function nearestO(f, maxD = 22) { let best = null, bd = maxD; for (const p of players) if (p.team === 'o') { const d = Math.hypot(p.body.position.x - f.x, p.body.position.y - f.y); if (d < bd) { bd = d; best = p; } } return best; }
 let aim = null;                      // where the pass is being aimed while the mouse is held
 const keys = new Set();
-function keyDir() { let x = 0, y = 0; if (keys.has('ArrowLeft') || keys.has('KeyA')) x -= 1; if (keys.has('ArrowRight') || keys.has('KeyD')) x += 1; if (keys.has('ArrowUp') || keys.has('KeyW')) y -= 1; if (keys.has('ArrowDown') || keys.has('KeyS')) y += 1; if (!x && !y) return phoneGame ? (touchVector || {x:0,y:0}) : null; const L = Math.hypot(x, y); return { x: x / L, y: y / L }; }
+function keyDir(autoForward = 0) { let x = 0, y = 0; if (keys.has('ArrowLeft') || keys.has('KeyA')) x -= 1; if (keys.has('ArrowRight') || keys.has('KeyD')) x += 1; if (keys.has('ArrowUp') || keys.has('KeyW')) y -= 1; if (keys.has('ArrowDown') || keys.has('KeyS')) y += 1; if (!x && !y) return phoneGame ? (thumbPointer !== null ? (touchVector || {x:0,y:0}) : {x:0,y:autoForward}) : null; const L = Math.hypot(x, y); return { x: x / L, y: y / L }; }
 function qbHasBall() { return state === 'live' && onOffense() && ball.carrier && ball.carrier.name === 'QB' && !ball.flying; }
 function onDown(e) {
   SFX.resume(); const s = canvasPos(e), f = toField(s.x, s.y); mouse = { ...f, down: true };
   if (state !== 'live' && s.x >= NAME_BOX.x && s.x <= NAME_BOX.x + NAME_BOX.w && s.y >= NAME_BOX.y && s.y <= NAME_BOX.y + NAME_BOX.h) { renameTeam(); e.preventDefault(); return; }
   if (coachMode && state === 'live') { e.preventDefault(); return; }
-  if (state === 'presnap' && !onOffense()) { setReady(); e.preventDefault(); return; }
+  if (state === 'presnap' && !onOffense()) { if (!phoneGame) setReady(); e.preventDefault(); return; }
   if (state === 'live' && !onOffense()) { if (e.button === undefined || e.button === 0) switchCtrl(f); e.preventDefault(); return; }
   if (state === 'presnap') {
     const p = nearestO(f, e.pointerType === 'touch' ? Math.min(48, 24 / mobileScale) : 22);
     if (p) { drawing = p; p.route = []; selectedPlay = null; autoDesigned = false; SFX.scratch(true); updateButtons(); }          // drag from an O: draw its route
-    else if (!coachMode && (e.button === undefined || e.button === 0)) hike();        // click the open field: hike
+    else if (!phoneGame && !coachMode && (e.button === undefined || e.button === 0)) hike(); // Phone snaps use the dedicated button.
     e.preventDefault();
   }
   else if (qbHasBall() && !(e.button === 2 && ball.carrier.scramble)) { aim = { x: f.x, y: f.y, lob: e.button === 2 }; e.preventDefault(); }
@@ -758,9 +775,9 @@ function updateOffense() {
     if (p.team !== 'o') continue;
     if (p.hasBall) {
       if (coachMode || !onOffense()) { aiCarrier(p, qb); continue; }
-      const kd = keyDir(), b = p.body.position;
+      const kd = keyDir(p.name === 'QB' ? 0 : -1), b = p.body.position;
       if (p.name === 'QB') { // you run him: keys move, otherwise a short drop back and hold the pocket
-        if (kd) { steer(p, { x: b.x + kd.x * 60, y: b.y + kd.y * 60 }, 1.0); p.moved = true; }
+        if (kd && (kd.x || kd.y || (phoneGame && thumbPointer !== null))) { steer(p, { x: b.x + kd.x * 60, y: b.y + kd.y * 60 }, 1.0); p.moved = true; }
         else if (!followRoute(p)) { if (!p.moved && playFrame < 45) steer(p, { x: p.home.x, y: p.home.y + 28 }, 0.9); else steer(p, b, 0); }
         if (b.y < yardY(game.los) - 6 && !p.scramble) { p.scramble = true; note('QB takes off!', INK); updateButtons(); }
       } else if (kd) steer(p, { x: b.x + kd.x * 60, y: b.y + kd.y * 60 }, 1.1);
@@ -800,7 +817,7 @@ function updateDefense() {
   if (loose) { for (const d of players) if (d.team === 'x') { if (d.stumble > 0) { d.stumble--; continue; } if (loose.t > 8 + (d.id % 5) * 3) steer(d, loose, 1.0); } return; }
   if (carrier && carrier.team === 'x') { // run it back; the rest get in the way
     const c = carrier.body.position;
-    if (!coachMode && !onOffense()) { ctrl = carrier; const kd = keyDir(); if (kd) steer(carrier, { x: c.x + kd.x * 60, y: c.y + kd.y * 60 }, 1.05); else steer(carrier, mouse, 1.05); }
+    if (!coachMode && !onOffense()) { ctrl = carrier; const kd = keyDir(1); if (kd) steer(carrier, { x: c.x + kd.x * 60, y: c.y + kd.y * 60 }, 1.05); else steer(carrier, mouse, 1.05); }
     else steer(carrier, { x: c.x + (FW / 2 - c.x) * 0.25, y: c.y + 220 }, 1.0);
     for (const d of players) if (d.team === 'x' && d !== carrier) {
       let o = null, od = 1e9; for (const p of players) if (p.team === 'o') { const dist = Math.hypot(p.body.position.x - c.x, p.body.position.y - c.y); if (dist < od) { od = dist; o = p; } }
@@ -994,6 +1011,9 @@ function drawPlayers() {
     const s = toScreen(p.body.position.x, p.body.position.y); if (s.y < -30 || s.y > H + 30) continue;
     const pp = rv(112 + p.id * 3, 14);   // each player gets scribbled on in turn
     if (pp <= 0) continue;
+    if (phoneGame && !coachMode && (state === 'presnap' || state === 'live') && (onOffense() ? p.hasBall && p.team === 'o' : p === ctrl)) {
+      ctx.save(); ctx.fillStyle = '#edc742'; ctx.globalAlpha = .3; ctx.beginPath(); ctx.arc(s.x, s.y, R + 10, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = .7; ctx.strokeStyle = '#b28b22'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
+    }
     if (p.team === 'x') {
       const st = p.stumble > 0;
       ctx.save(); if (phoneGame) { ctx.translate(s.x, s.y); ctx.scale(1.22, 1.22); ctx.translate(-s.x, -s.y); }
@@ -1152,16 +1172,18 @@ function tick(now = performance.now()) {
 let touchVector = null, touchLob = false, thumbPointer = null, lastMobileScore = '';
 const phoneSide = document.getElementById('side'), thumbPad = document.getElementById('thumb-pad'), thumbKnob = document.getElementById('thumb-knob');
 // The desktop erase button stays in place; the phone layout groups it with Run / Pass.
-function placeClearButton() { const clear = document.getElementById('clear'); if (phoneGame) document.getElementById('play-tabs').appendChild(clear); else phoneSide.insertBefore(clear, document.getElementById('touch-controls')); }
+function placeClearButton() { const clear = document.getElementById('clear'), hikeButton = document.getElementById('hike'); if (phoneGame) { document.getElementById('play-tabs').appendChild(clear); document.getElementById('touch-actions').insertBefore(hikeButton,document.getElementById('touch-lob')); } else { phoneSide.insertBefore(clear, document.getElementById('touch-controls')); phoneSide.insertBefore(hikeButton,document.getElementById('auto-design')); } }
 function updatePhoneControls(pre, off) {
   phoneSide.classList.toggle('live-play', !pre);
   phoneSide.classList.toggle('manual-live', !coachMode && state === 'live');
+  phoneSide.classList.toggle('manual-controls', !coachMode);
   if (pre) { touchVector = null; touchLob = false; }
-  document.getElementById('touch-lob').style.display = off ? '' : 'none';
+  const running = state === 'live' && ball?.carrier && (off ? ball.carrier.team === 'o' && ball.carrier.name !== 'QB' : ball.carrier.team === 'x');
+  document.getElementById('touch-lob').style.display = off && !running ? '' : 'none';
   document.getElementById('touch-pitch').style.display = off ? '' : 'none';
   document.getElementById('touch-switch').style.display = off ? 'none' : '';
   document.getElementById('touch-lob').setAttribute('aria-pressed', String(touchLob));
-  document.getElementById('touch-note').textContent = off ? 'Aim on field · release to throw' : 'Drag to move · Switch defender';
+  document.getElementById('touch-note').textContent = running ? 'Release to keep running' : pre ? 'Thumb control to run / steer' : off ? 'Aim on field · release to throw' : 'Drag to move · Switch defender';
 }
 function updateMobileScore() {
   if (!phoneGame || !game) return;
