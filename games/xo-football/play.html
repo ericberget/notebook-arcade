@@ -55,91 +55,69 @@
   .toggle-track:after{content:'';position:absolute;width:9px;height:9px;left:2px;top:2px;background:#7f899a;border-radius:50%;transition:transform .15s}
   #auto-design[aria-checked='true'] .toggle-track{background:#f5ce49}
   #auto-design[aria-checked='true'] .toggle-track:after{transform:translateX(12px);background:#233d78}
-  .phone-game #auto-design{grid-column:1/-1;min-height:32px;justify-self:start;font-size:14px;margin-top:-5px}
-  #mobile-score,#play-tabs,#touch-controls{display:none}
+  #mobile-score,#mobile-menu,#play-tabs,#touch-controls{display:none}
   #field-window{position:absolute;inset:0;width:1200px;height:720px}
-  #wrap.phone-game{width:100%;height:100dvh;overflow:auto;background:repeating-linear-gradient(0deg,transparent 0 31px,#7e9dcc25 31px 32px),#fbf8ee;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);box-sizing:border-box;color:#233d78}
-  .phone-game #stage{width:100%;height:auto;min-height:100%;display:grid;grid-template-columns:1fr 1fr;align-content:start;box-shadow:none}
-  .phone-game #stage:before,.phone-game #stage:after,.phone-game #binding{display:none}
-  .phone-game #top{position:static;grid-row:1;grid-column:1;align-self:center;margin-left:10px}
-  .phone-game #back{display:inline-flex;align-items:center;min-height:40px;font-size:16px;padding:0 5px;border:0}
-  .phone-game #sys{position:static;grid-row:1;grid-column:2;flex-direction:row;justify-content:flex-end;gap:8px;margin:0 10px 0 0;align-items:center}
-  .phone-game #volume{display:none}
-  .phone-game #sys button{min-height:44px;font-size:14px;padding:3px 6px;border-width:1px}
-  .phone-game #mute{border:0}
-  .phone-game #mobile-score{display:grid;grid-row:2;grid-column:1/-1;grid-template-columns:minmax(0,1fr) 100px minmax(0,1fr);gap:0 8px;padding:5px 16px 7px;border-bottom:1px solid #6c83a66b;font-family:'Courier New',monospace}
-  .mobile-team{display:flex;align-items:center;gap:8px;min-width:0;font-size:11px}
-  .mobile-team span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .mobile-team strong{font:34px/1 'Caveat',cursive;flex-shrink:0}
-  .mobile-team:last-of-type{justify-content:flex-end}
-  .mobile-down{text-align:center;line-height:1.3;font-size:13px}
-  .mobile-down b{font-size:11px;display:block;font-weight:400;color:#73757d}
-  #mobile-status{grid-column:1/-1;font-size:10px;text-align:center;margin-top:4px;color:#656975}
-  .phone-game #field-window{position:relative;inset:auto;grid-row:3;grid-column:1/-1;width:calc(100% - 16px);margin:0 8px;overflow:hidden}
-  .phone-game #c{position:absolute;top:0;max-width:none;clip-path:inset(0 22.5%)}
-  .phone-game #side{position:static;grid-row:4;grid-column:1/-1;width:auto;display:grid;grid-template-columns:minmax(0,1fr) 100px;gap:8px;margin:0;padding:8px 16px 14px;border-top:1px solid #6c83a66b;background:#fbf8eef5}
-  .phone-game #mode{align-self:center}
-  .phone-game #mode button{min-height:44px;font-size:16px;padding:4px 3px;border-width:1px;transform:none}
-  .phone-game #hike{font-size:32px;min-height:48px;background:#f5ce49 url('assets/button-pencil-gold-v1.png') center/cover;color:#253449;border:1px solid #4b5b77;border-radius:1px;transform:rotate(-1deg)}
-  .phone-game #side .label:not(#hint),.phone-game #first-play-note{display:none}
-  .phone-game #play-tabs{display:flex;grid-column:1/-1;gap:16px}
-  .phone-game #play-tabs button{font-size:17px;min-height:40px;padding:3px 9px;border:0;border-bottom:2px solid transparent;border-radius:0;transform:none}
-  .phone-game #play-tabs button[aria-pressed='true']{border-color:#233d78}
-  .phone-game #play-tabs #clear{margin-left:auto;font-size:14px;color:#727681}
-  .phone-game #side .presets{display:grid;grid-column:1/-1;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
-  .phone-game .presets button{min-height:42px;padding:4px 2px;font-size:17px;border-width:1px;transform:none}
-  .phone-game #schemes{grid-template-columns:repeat(4,minmax(0,1fr))}
-  .phone-game #side .offonly:not(.presets){grid-column:1/-1}
-  .phone-game #side:not(.show-passes) #passes,.phone-game #side.show-passes #runs,.phone-game #side.def #runs,.phone-game #side.def #passes,.phone-game #side.def #play-tabs,.phone-game #side:not(.def) #schemes{display:none}
-  .phone-game #fourth.on{grid-column:1/-1;gap:10px}
-  .phone-game #fourth button{min-height:44px;flex:1}
-  .phone-game #side.live-play .presets,.phone-game #side.live-play #play-tabs{display:none}
-  .phone-game #hint{grid-column:1/-1;font-size:14px;line-height:1.3;min-height:18px;margin:0;opacity:1;color:#69717d;transform:none}
-  .phone-game #side.first-play .presets{display:grid}
-  .phone-game #side.first-play:not(.show-passes) #passes,.phone-game #side.first-play.show-passes #runs,.phone-game #side.first-play:not(.def) #schemes,.phone-game #side.first-play.def #runs,.phone-game #side.first-play.def #passes,.phone-game #side.first-play.live-play .presets{display:none}
-  .phone-game #side.first-play #clear{display:block}
-  .phone-game #side.first-play #first-play-note{display:none}
-  .phone-game #side.first-play #hint{display:block}
-  #thumb-pad{position:relative;width:90px;height:90px;border:1.5px solid #7484a2;border-radius:48% 51% 46% 49%;touch-action:none;background:#233d7806;flex:0 0 90px;cursor:grab}
-  #thumb-pad:before{content:'↑';position:absolute;left:38px;top:0;color:#7484a2;font-size:18px}
-  #thumb-knob{position:absolute;left:28px;top:28px;width:32px;height:32px;border:1.5px solid #233d78;border-radius:50%;background:#f3ead1;pointer-events:none}
-  #touch-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:9px}
+  #thumb-pad{position:relative;width:118px;height:118px;flex:0 0 118px;border:2px solid #405b8c;border-radius:48% 51% 46% 49%;touch-action:none;background:#f4df9229;box-shadow:inset 0 0 0 6px #233d7808;cursor:grab}
+  #thumb-pad:before{content:'↑';position:absolute;left:52px;top:2px;font-size:22px;color:#405b8c}
+  #thumb-pad:after{content:'RUN / STEER';position:absolute;bottom:6px;left:0;right:0;text-align:center;font:10px 'Courier New',monospace;color:#405b8c;pointer-events:none}
+  #thumb-knob{position:absolute;left:28px;top:28px;width:58px;height:58px;border:2px solid #233d78;border-radius:50%;background:#ead393;pointer-events:none}
+  #touch-actions{display:flex;flex-wrap:wrap;justify-content:center;align-content:center;gap:8px;flex:1}
   #touch-actions button{min-width:72px;min-height:46px;font-size:18px;border-width:1px}
   #touch-actions button[aria-pressed='true']{background:#f5ce49 url('assets/button-pencil-gold-v1.png') center/cover}
-  #touch-actions small{flex:0 0 100%;text-align:center;color:#6b7180;font-size:13px}
+  #touch-actions small{flex:0 0 100%;text-align:center;color:#6b7180;font-size:14px;line-height:1.2}
+  #wrap.phone-game{width:100%;height:100dvh;overflow:auto;background:#fbf8ee;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);box-sizing:border-box;color:#233d78}
+  .phone-game #stage{width:100%;height:auto;min-height:100%;display:grid;grid-template-columns:36px minmax(0,1fr) 44px;align-content:start;box-shadow:none}
+  .phone-game #stage:before,.phone-game #stage:after,.phone-game #binding{display:none}
+  .phone-game #top{position:static;grid-row:1;grid-column:1;align-self:center;margin:0}
+  .phone-game #back{display:flex;align-items:center;justify-content:center;min-height:48px;padding:0;border:0;font-size:0;transform:none}
+  .phone-game #back:before{content:'‹';font:34px/1 'Courier New',monospace}
+  .phone-game #mobile-score{display:grid;grid-row:1;grid-column:2;grid-template-columns:minmax(0,1fr) 90px minmax(0,1fr);gap:0 4px;padding:4px 0;font-family:'Courier New',monospace;align-items:center;min-height:48px;box-sizing:border-box}
+  .mobile-team{display:flex;align-items:center;gap:5px;min-width:0;font-size:14px}
+  .mobile-team span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mobile-team strong{font:30px/1 'Caveat',cursive;flex-shrink:0}
+  .mobile-team:last-of-type{justify-content:flex-end}
+  .mobile-down{text-align:center;font-size:14px;line-height:1.15}
+  .mobile-down b{font-size:11px;display:block;font-weight:400;color:#73757d}
+  #mobile-status{grid-column:1/-1;font-size:11px;text-align:center;color:#656975;line-height:1.2}
+  .phone-game #mobile-menu{display:block;grid-column:3;grid-row:1;align-self:center;z-index:6}
+  .phone-game #mobile-menu summary{list-style:none;cursor:pointer;min-height:48px;display:flex;align-items:center;justify-content:center;font:28px 'Courier New',monospace}
+  .phone-game #mobile-menu summary::-webkit-details-marker{display:none}
+  .phone-game #mobile-menu-items{position:absolute;right:8px;top:52px;width:238px;padding:14px;background:#fbf8ee;border:1px solid #526991;box-shadow:2px 5px 14px #15244633;display:grid;gap:14px}
+  .phone-game #mobile-menu #sys{position:static;display:flex;flex-direction:column;gap:12px;align-items:stretch}
+  .phone-game #mobile-menu #audio-controls{justify-content:space-between}
+  .phone-game #mobile-menu #volume{width:148px}
+  .phone-game #mobile-menu button{min-height:44px;transform:none}
+  .phone-game #mobile-menu #mode{display:flex;gap:6px}
+  .phone-game #mobile-menu #schemes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .phone-game #mobile-menu:not(.def) #schemes{display:none}
+  .phone-game #field-window{position:relative;inset:auto;grid-row:2;grid-column:1/-1;width:calc(100% - 16px);margin:0 8px;overflow:hidden;border-top:1px solid #6c83a64b}
+  .phone-game #c{position:absolute;top:0;max-width:none;clip-path:inset(0 22.5%)}
+  .phone-game #side{position:static;grid-row:3;grid-column:1/-1;width:auto;display:flex;flex-direction:column;gap:6px;margin:0;padding:10px 20px;border-top:1px solid #6c83a64b;background:#fbf8ee}
+  .phone-game #side #auto-design,.phone-game #side #mode,.phone-game #side .label,.phone-game #side .presets,.phone-game #play-tabs,.phone-game #first-play-note,.phone-game #side #hint{display:none!important}
+  .phone-game #side #touch-controls{display:flex;align-items:center;gap:22px;height:122px}
+  .phone-game #hike{position:absolute;left:28px;top:28px;width:62px;height:62px;min-width:0;min-height:0;padding:0;z-index:2;font:27px 'Caveat',cursive;border:2px solid #4b5b77;border-radius:48% 51% 46% 49%;background:#f5ce49 url('assets/button-pencil-gold-v1.png') center/cover;color:#253449;transform:none}
+  .phone-game #side:not(.ready-play) #hike{display:none}
+  .phone-game #side:not(.manual-live) #touch-actions button{display:none!important}
+  .phone-game #side:not(.manual-controls) #thumb-pad:after{content:'COACH'}
+  .phone-game #fourth.on{display:flex;gap:8px;order:1}
+  .phone-game #fourth button{min-height:44px;flex:1}
+  .phone-game button,.phone-game summary,.phone-game #thumb-pad{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+  .phone-game #thumb-pad{touch-action:none}
   .phone-game #match-finish{position:fixed!important;left:20px!important;right:20px!important;top:25%!important;width:auto!important;max-height:65dvh;overflow:auto;box-sizing:border-box;font-size:13px!important}
   .phone-game #match-finish strong{font-size:20px!important}
   @media(orientation:landscape) and (max-height:500px){
-    .phone-game #stage{grid-template-columns:minmax(0,1fr) 290px}
-    .phone-game #mobile-score{grid-row:2;grid-column:1;padding:3px 14px}
-    .phone-game #field-window{grid-row:3;grid-column:1}
-    .phone-game #side{grid-row:2/4;grid-column:2;align-self:start;border-top:0;border-left:1px solid #6c83a66b;padding:7px 12px;max-height:calc(100dvh - 46px);overflow:auto;grid-template-columns:minmax(0,1fr) 78px}
-    .phone-game #mode{flex-direction:column;gap:3px}.phone-game #mode button{min-height:34px;font-size:15px}
-    .phone-game .presets button{font-size:15px;min-height:38px}.phone-game #play-tabs{gap:6px}.phone-game #play-tabs button{font-size:15px;padding:2px 5px}
-    .phone-game #touch-controls{gap:10px;padding:0!important}#touch-actions button{min-width:62px}
+    .phone-game #stage{grid-template-columns:36px minmax(0,1fr) 44px 190px}
+    .phone-game #field-window{grid-column:1/4;grid-row:2}
+    .phone-game #side{grid-column:4;grid-row:1/3;border-top:0;border-left:1px solid #6c83a64b;padding:8px;max-height:calc(100dvh - 16px);overflow:auto}
+    .phone-game #side #touch-controls{height:auto;flex-direction:column;gap:12px}
+    .phone-game #mobile-menu-items{right:198px}
+    .phone-game #fourth.on{flex-direction:column}
   }
-  /* Keep the steering control in one predictable place before and after the snap. */
-  .phone-game #mode{grid-column:1;grid-row:1}
-  .phone-game #side #auto-design{grid-column:2;grid-row:1;margin:0;min-height:44px;font-size:12px;gap:5px;align-self:center;justify-self:stretch;text-align:left}
-  .phone-game .toggle-track{flex:0 0 27px}
-  .phone-game #side #touch-controls{display:flex;grid-column:1/-1;grid-row:2;align-items:center;justify-content:space-between;gap:22px;padding:2px 0}
-  .phone-game #thumb-pad{width:118px;height:118px;flex-basis:118px;border:2px solid #405b8c;background:#f4df9229;box-shadow:inset 0 0 0 6px #233d7808}
-  .phone-game #thumb-pad:before{left:52px;top:2px;font-size:22px;color:#405b8c}
-  .phone-game #thumb-pad:after{content:'RUN / STEER';position:absolute;bottom:6px;left:0;right:0;text-align:center;font:10px 'Courier New',monospace;color:#405b8c;pointer-events:none}
-  .phone-game #thumb-knob{width:42px;height:42px;left:36px;top:36px;border-width:2px;background:#ead393}
-  .phone-game #touch-actions{flex:1;gap:6px}
-  .phone-game #touch-actions #hike{flex:0 0 100%;box-sizing:border-box}
-  .phone-game #touch-actions button:not(#hike){min-height:42px}
-  .phone-game #side:not(.manual-live) #touch-actions button:not(#hike){display:none!important}
-  .phone-game #side:not(.manual-controls) #thumb-pad,.phone-game #side:not(.manual-controls) #touch-note{display:none}
-  .phone-game #touch-note{font-size:12px;line-height:1.2}
-  .phone-game button,.phone-game #thumb-pad{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
-  .phone-game #thumb-pad{touch-action:none}
-  @media(orientation:landscape) and (max-height:500px){.phone-game #side #touch-controls{gap:12px}.phone-game #thumb-pad{width:100px;height:100px;flex-basis:100px}.phone-game #thumb-knob{left:27px;top:27px}.phone-game #thumb-pad:before{left:43px}.phone-game #side #auto-design{font-size:11px}}
 </style>
 </head>
 <body>
 <div id="wrap"><div id="stage">
+  <details id="mobile-menu"><summary aria-label="Game options">⋯</summary><div id="mobile-menu-items"></div></details>
   <div id="mobile-score" aria-label="Scoreboard"><div class="mobile-team"><span id="mobile-you"></span><strong id="mobile-you-score">0</strong></div><div class="mobile-down"><b id="mobile-quarter">Q1</b><span id="mobile-down">1st &amp; 10</span></div><div class="mobile-team"><strong id="mobile-opponent-score">0</strong><span id="mobile-opponent"></span></div><div id="mobile-status"></div></div>
   <div id="field-window"><canvas id="c" width="1200" height="720" aria-label="Football field. Drag from an O to draw a route."></canvas></div>
   <div id="binding" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
@@ -271,19 +249,25 @@ function drawMascot() {
   head(x, baseY, 'flat'); const sh = body(x, baseY); arms(sh, { x: x - 14, y: baseY + 31 }, { x: x + 14, y: baseY + 29 });
 }
 const stage = document.getElementById('stage');
-let phoneGame = false, mobileScale = 1;
+let phoneGame = false, mobileScale = 1, fieldViewHeight = H;
 function fit() {
   phoneGame = window.innerWidth <= 700 || (window.innerWidth <= 1000 && window.innerHeight <= 500);
   document.getElementById('wrap').classList.toggle('phone-game', phoneGame);
   const fieldWindow = document.getElementById('field-window');
   if (phoneGame) {
     const landscape = window.innerWidth > window.innerHeight && window.innerHeight <= 500;
-    const availableWidth = window.innerWidth - (landscape ? 306 : 16);
-    mobileScale = Math.min(availableWidth / 660, Math.max(220, window.innerHeight - (landscape ? 112 : 480)) / H);
+    const availableWidth = window.innerWidth - (landscape ? 206 : 16);
+    const wrapStyle = window.getComputedStyle?.(document.getElementById('wrap'));
+    const safeArea = (parseFloat(wrapStyle?.paddingTop) || 0) + (parseFloat(wrapStyle?.paddingBottom) || 0);
+    const availableHeight = Math.max(240, window.innerHeight - safeArea - (landscape ? 56 : 220));
+    mobileScale = landscape ? Math.min(availableWidth / 660, availableHeight / H) : availableWidth / 660;
+    fieldViewHeight = Math.min(1360, availableHeight / mobileScale);
+    canvas.height = Math.round(fieldViewHeight);
     stage.style.transform = 'none'; stage.style.marginLeft = '0'; stage.style.marginTop = '0';
-    canvas.style.width = W * mobileScale + 'px'; canvas.style.height = H * mobileScale + 'px';
-    canvas.style.left = `calc(50% - ${600 * mobileScale}px)`; fieldWindow.style.height = H * mobileScale + 'px';
+    canvas.style.width = W * mobileScale + 'px'; canvas.style.height = fieldViewHeight * mobileScale + 'px';
+    canvas.style.left = `calc(50% - ${600 * mobileScale}px)`; fieldWindow.style.height = fieldViewHeight * mobileScale + 'px';
   } else {
+    fieldViewHeight = H; canvas.height = H;
     const rim = 40, s = Math.min((window.innerWidth - rim * 2) / (W + 52), (window.innerHeight - rim * 2) / H);
     stage.style.transform = `scale(${s})`; stage.style.marginLeft = ((window.innerWidth - (W + 52) * s) / 2 + 52 * s) + 'px'; stage.style.marginTop = ((window.innerHeight - H * s) / 2) + 'px';
     canvas.style.width = ''; canvas.style.height = ''; canvas.style.left = ''; fieldWindow.style.height = '';
@@ -469,8 +453,8 @@ function setupPlay(keepRoutes) {
   const qb = byName('QB'); qb.hasBall = true; ball = { carrier: qb, flying: null, z: 0 };
   if (!onOffense()) { applyScheme(scheme); ctrl = byName('LB-L'); defReady = false; presnapT = 0; noSnap = false; }   // the pencils pick their play at the snap
   else if (oldRoutes) { for (const p of players) if (p.team === 'o' && oldRoutes[p.name]) p.route = oldRoutes[p.name].map(w => ({ ...w })); }
-  else if (autoPlayDesign) designAutoPlay();
-  cam.target = Math.max(0, Math.min(FH - H, losY - 470)); cam.y = cam.target;
+  else if (phoneGame || autoPlayDesign) designAutoPlay();
+  cam.target = Math.max(0, Math.min(FH - fieldViewHeight, losY - (phoneGame ? fieldViewHeight * .68 : 470))); cam.y = cam.target;
   updateButtons();
   if (!onOffense() && game.down === 4) aiFourthDown();
 }
@@ -531,7 +515,7 @@ function updateButtons() {
   const autoToggle=document.getElementById('auto-design');autoToggle.setAttribute('aria-checked',String(autoPlayDesign));autoToggle.disabled=!pre||!off;
   for (const [id, active] of [['coach', coachMode], ['manual', !coachMode]]) { const b = document.getElementById(id); b.setAttribute('aria-pressed', String(active)); b.disabled = !pre && state !== 'gameover'; }
   document.getElementById('side').classList.toggle('def', !off);
-  const hikeB = document.getElementById('hike'); hikeB.textContent = off ? 'HIKE!' : (defReady ? 'set...' : 'SET!'); hikeB.disabled = !pre || (!off && defReady) || (coachMode && off && !coachPlayReady());
+  const hikeB = document.getElementById('hike'); hikeB.textContent = off ? (phoneGame ? 'HIKE' : 'HIKE!') : (defReady ? 'set...' : 'SET!'); hikeB.disabled = !pre || (!off && defReady) || (coachMode && off && !coachPlayReady());
   document.getElementById('clear').disabled = !pre;
   [...document.querySelectorAll('.presets button')].forEach(b => b.disabled = !pre);
   [...document.querySelectorAll('#schemes button')].forEach(b => b.classList.toggle('sel', b.dataset.s === scheme));
@@ -539,7 +523,7 @@ function updateButtons() {
   document.getElementById('fg').disabled = !(pre && game.los >= 55);
   [...document.querySelectorAll('#runs button, #passes button')].forEach(b => b.classList.toggle('sel', b.textContent === selectedPlay));
   if (phoneGame && !coachMode) {
-    hintEl.textContent = pre ? (off ? 'Choose a play or draw routes. Tap HIKE when ready.' : 'Choose a defense, then tap SET.') : state === 'live' ? (off ? (ball.carrier?.team === 'o' && ball.carrier.name !== 'QB' ? 'Auto-running · drag the thumb control to steer.' : 'Thumb control to move · aim on the field, release to throw.') : (ball.carrier?.team === 'x' ? 'Auto-running the return · drag to steer.' : 'Thumb control to move · tap Switch to change defender.')) : state === 'gameover' ? 'Final score.' : 'Next play coming up.';
+    hintEl.textContent = pre ? (off ? 'AutoPlay design · tap HIKE.' : 'Choose a defense, then tap SET.') : state === 'live' ? (off ? (ball.carrier?.team === 'o' && ball.carrier.name !== 'QB' ? 'Auto-running · drag the thumb control to steer.' : 'Thumb control to move · aim on the field, release to throw.') : (ball.carrier?.team === 'x' ? 'Auto-running the return · drag to steer.' : 'Thumb control to move · tap Switch to change defender.')) : state === 'gameover' ? 'Final score.' : 'Next play coming up.';
     return;
   }
   if (coachMode) {
@@ -552,7 +536,7 @@ function updateButtons() {
 }
 
 // ---------- input ----------
-function canvasPos(e) { const r = canvas.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: (t.clientX - r.left) * W / r.width, y: (t.clientY - r.top) * H / r.height }; }
+function canvasPos(e) { const r = canvas.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: (t.clientX - r.left) * W / r.width, y: (t.clientY - r.top) * fieldViewHeight / r.height }; }
 function nearestO(f, maxD = 22) { let best = null, bd = maxD; for (const p of players) if (p.team === 'o') { const d = Math.hypot(p.body.position.x - f.x, p.body.position.y - f.y); if (d < bd) { bd = d; best = p; } } return best; }
 let aim = null;                      // where the pass is being aimed while the mouse is held
 const keys = new Set();
@@ -934,13 +918,13 @@ function endPossession(how, spot) {
 
 // ---------- drawing ----------
 function drawField() {
-  const top = cam.y, bot = cam.y + H;
+  const top = cam.y, bot = cam.y + fieldViewHeight;
   // sidelines + end zones
   const L = toScreen(0, 0).x, Rr = toScreen(FW, 0).x;
   const ez = rv(55, 45);
   const zT = onOffense() ? zoneTop : zoneBot, zB = onOffense() ? zoneBot : zoneTop;   // whoever has the ball attacks the top end zone
   if (ez > 0 && GOAL_TOP - cam.y > 0) ctx.drawImage(zT, 0, 0, FW * ez, GOAL_TOP, L, 0 - cam.y, FW * ez, GOAL_TOP);
-  if (ez > 0 && GOAL_BOT - cam.y < H) ctx.drawImage(zB, 0, 0, FW * ez, GOAL_TOP, L, GOAL_BOT - cam.y, FW * ez, GOAL_TOP);
+  if (ez > 0 && GOAL_BOT - cam.y < fieldViewHeight) ctx.drawImage(zB, 0, 0, FW * ez, GOAL_TOP, L, GOAL_BOT - cam.y, FW * ez, GOAL_TOP);
   // sidelines are drawn in field space (full length, then offset) so their wobble doesn't slide as the camera moves
   ctx.save(); ctx.translate(0, -cam.y);
   ink.longLine(L, FH, L, 0, 1, INK, 3.5, 2, 2.2, rv(0, 40)); ink.longLine(Rr, FH, Rr, 0, 2, INK, 3.5, 2, 2.2, rv(6, 40));
@@ -1008,7 +992,7 @@ function drawPlayers() {
     ink.line(s.x, s.y - R - 2, s.x + 14, s.y - R - 34, 771, INK, 1.2, 1); ink.line(s.x + 14, s.y - R - 34, s.x + 8, s.y - R - 30, 772, INK, 1.2, 1); ink.line(s.x + 14, s.y - R - 34, s.x + 13, s.y - R - 27, 773, INK, 1.2, 1);
   }
   for (const p of players) {
-    const s = toScreen(p.body.position.x, p.body.position.y); if (s.y < -30 || s.y > H + 30) continue;
+    const s = toScreen(p.body.position.x, p.body.position.y); if (s.y < -30 || s.y > fieldViewHeight + 30) continue;
     const pp = rv(112 + p.id * 3, 14);   // each player gets scribbled on in turn
     if (pp <= 0) continue;
     if (phoneGame && !coachMode && (state === 'presnap' || state === 'live') && (onOffense() ? p.hasBall && p.team === 'o' : p === ctrl)) {
@@ -1091,7 +1075,7 @@ function drawAimFinger() {
   if (coachMode) return;
   if (!onOffense()) { // defense: a little target where your defender is headed, and the pencils lining up before the snap
     if (state === 'live' && ctrl && !(ctrl.hasBall)) { const s = toScreen(mouse.x, mouse.y); ctx.setLineDash([3, 3]); ctx.strokeStyle = INK; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(s.x, s.y, 9, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
-    if (state === 'presnap' && introT >= INTRO_LEN && !noSnap) { const ly = yardY(game.los) - cam.y; ink.text(defReady ? 'set! here it comes...' : 'the pencils are lining up · click when you\'re set', FX + FW / 2, ly + 170, { size: 18, color: PEN_DK, font: 'Patrick Hand', weight: 400, alpha: 0.6 + Math.sin(frame * 0.1) * 0.25 }); }
+    if (state === 'presnap' && introT >= INTRO_LEN && !noSnap) { const ly = yardY(game.los) - cam.y; ink.text(defReady ? 'set! here it comes...' : (phoneGame ? 'tap SET when ready' : 'the pencils are lining up · click when you\'re set'), FX + FW / 2, ly + 170, { size: 18, color: PEN_DK, font: 'Patrick Hand', weight: 400, alpha: 0.6 + Math.sin(frame * 0.1) * 0.25 }); }
     return;
   }
   if (state !== 'live' || !ball.carrier) return;
@@ -1142,12 +1126,12 @@ function step() {
     }
     if (state === 'live' && playFrame > 900) endPlay('inc', 'play blown dead', ball.carrier ? ball.carrier.body.position : { x: FW / 2, y: yardY(game.los) });
     const fy = ball.flying ? ball.flying.from.y + (ball.flying.to.y - ball.flying.from.y) * ball.flying.t / ball.flying.T : loose ? loose.y : ball.carrier ? ball.carrier.body.position.y : cam.target + 400;
-    cam.target = Math.max(0, Math.min(FH - H, fy - 400));
+    cam.target = Math.max(0, Math.min(FH - fieldViewHeight, fy - (phoneGame ? fieldViewHeight * .62 : 400)));
   } else if (state === 'result') {
     Engine.update(engine, 1000 / 60); for (const p of players) Body.setVelocity(p.body, { x: p.body.velocity.x * 0.85, y: p.body.velocity.y * 0.85 });
     if (++resultTimer > (result.kind === 'td' ? 130 : 75)) afterResult();
   } else if (state === 'fg') {
-    fgAnim.t++; cam.target = Math.max(0, Math.min(FH - H, yardY(game.los) - 560));
+    fgAnim.t++; cam.target = Math.max(0, Math.min(FH - fieldViewHeight, yardY(game.los) - (phoneGame ? fieldViewHeight * .72 : 560)));
     if (fgAnim.t === fgAnim.T) { const mine = onOffense(); if (fgAnim.good) { game[mine ? 'you' : 'pencils'] += 3; note(`${mine ? '' : 'pencils '}${fgAnim.dist} yd field goal is GOOD. +3`, mine ? INK : RED); if (mine) SFX.good(); else { SFX.bad(); setMood('facepalm', 120); } } else { note(`${mine ? '' : 'pencils '}${fgAnim.dist} yd field goal: no good.`, mine ? RED : INK); if (mine) { SFX.bad(); setMood('facepalm', 150); } else { SFX.good(); cheer(120); } } }
     if (fgAnim.t > fgAnim.T + 70) endPossession(fgAnim.good ? 'fg' : 'kickmiss');
   }
@@ -1160,8 +1144,8 @@ function tick(now = performance.now()) {
   if (!lastT) lastT = now; acc += Math.min(200, now - lastT); lastT = now;
   let n = 0; while (acc >= 1000 / 60 && n < 5) { step(); acc -= 1000 / 60; n++; }
 
-  ctx.drawImage(paper, 0, 0);
-  ctx.save(); ctx.beginPath(); ctx.rect(FX - 30, 0, FW + 60, H); ctx.clip();
+  for (let y = 0; y < fieldViewHeight; y += H) ctx.drawImage(paper, 0, y);
+  ctx.save(); ctx.beginPath(); ctx.rect(FX - 30, 0, FW + 60, fieldViewHeight); ctx.clip();
   drawField(); drawRoutes(); drawPlayers(); drawAimFinger();
   ctx.restore();
   if (introT >= 150) drawMascot();
@@ -1172,9 +1156,20 @@ function tick(now = performance.now()) {
 let touchVector = null, touchLob = false, thumbPointer = null, lastMobileScore = '';
 const phoneSide = document.getElementById('side'), thumbPad = document.getElementById('thumb-pad'), thumbKnob = document.getElementById('thumb-knob');
 // The desktop erase button stays in place; the phone layout groups it with Run / Pass.
-function placeClearButton() { const clear = document.getElementById('clear'), hikeButton = document.getElementById('hike'); if (phoneGame) { document.getElementById('play-tabs').appendChild(clear); document.getElementById('touch-actions').insertBefore(hikeButton,document.getElementById('touch-lob')); } else { phoneSide.insertBefore(clear, document.getElementById('touch-controls')); phoneSide.insertBefore(hikeButton,document.getElementById('auto-design')); } }
+function placeClearButton() {
+  const clear=document.getElementById('clear'), hikeButton=document.getElementById('hike'), menu=document.getElementById('mobile-menu-items');
+  if(phoneGame){
+    document.getElementById('play-tabs').appendChild(clear); thumbPad.appendChild(hikeButton);
+    for(const id of ['mode','schemes','sys'])menu.appendChild(document.getElementById(id));
+  }else{
+    phoneSide.insertBefore(clear,document.getElementById('touch-controls')); phoneSide.insertBefore(hikeButton,document.getElementById('auto-design'));
+    phoneSide.insertBefore(document.getElementById('mode'),hikeButton); phoneSide.insertBefore(document.getElementById('schemes'),clear); stage.appendChild(document.getElementById('sys'));
+  }
+}
 function updatePhoneControls(pre, off) {
   phoneSide.classList.toggle('live-play', !pre);
+  phoneSide.classList.toggle('ready-play', pre);
+  document.getElementById('mobile-menu').classList.toggle('def', !off);
   phoneSide.classList.toggle('manual-live', !coachMode && state === 'live');
   phoneSide.classList.toggle('manual-controls', !coachMode);
   if (pre) { touchVector = null; touchLob = false; }
@@ -1183,12 +1178,13 @@ function updatePhoneControls(pre, off) {
   document.getElementById('touch-pitch').style.display = off ? '' : 'none';
   document.getElementById('touch-switch').style.display = off ? 'none' : '';
   document.getElementById('touch-lob').setAttribute('aria-pressed', String(touchLob));
-  document.getElementById('touch-note').textContent = running ? 'Release to keep running' : pre ? 'Thumb control to run / steer' : off ? 'Aim on field · release to throw' : 'Drag to move · Switch defender';
+  document.getElementById('touch-note').textContent = running ? 'Release to keep running' : pre ? (off ? 'AutoPlay design' : 'Tap SET when ready') : off ? 'Aim on field · release to throw' : 'Drag to move · Switch defender';
 }
 function updateMobileScore() {
   if (!phoneGame || !game) return;
   const overtime = game.drives.you >= 4 && game.drives.pencils >= 4;
-  const values = [teamName, game.you, opponentName, game.pencils, state === 'gameover' ? 'FINAL' : overtime ? 'OT' : 'Q' + game.q, state === 'gameover' ? '' : downText(), state === 'gameover' ? 'Game complete' : `${onOffense() ? 'Your ball' : opponentName + ' ball'} · ${game.los <= 50 ? 'own ' + game.los : 'opponent ' + (100 - game.los)}`];
+  const values = [teamName.slice(0,3).toUpperCase(), game.you, opponentName.slice(0,3).toUpperCase(), game.pencils, state === 'gameover' ? 'FINAL' : overtime ? 'OT' : 'Q' + game.q, state === 'gameover' ? '' : downText(), state === 'gameover' ? 'Game complete' : `${onOffense() ? 'YOUR BALL' : 'DEFENSE'} · ${game.los <= 50 ? 'OWN ' + game.los : 'OPP ' + (100 - game.los)}`];
+  document.getElementById('mobile-you').setAttribute('aria-label',teamName); document.getElementById('mobile-opponent').setAttribute('aria-label',opponentName);
   const signature = values.join('|'); if (signature === lastMobileScore) return; lastMobileScore = signature;
   ['mobile-you','mobile-you-score','mobile-opponent','mobile-opponent-score','mobile-quarter','mobile-down','mobile-status'].forEach((id,i) => document.getElementById(id).textContent = values[i]);
 }
@@ -1202,7 +1198,7 @@ window.addEventListener('blur',releaseThumb);
 document.getElementById('touch-lob').onclick=()=>{touchLob=!touchLob;document.getElementById('touch-lob').setAttribute('aria-pressed',String(touchLob));};
 document.getElementById('touch-pitch').onclick=()=>{if(state==='live'&&!coachMode&&onOffense()&&canLateral())lateral(null);};
 document.getElementById('touch-switch').onclick=()=>{if(state==='live'&&!coachMode&&!onOffense())switchCtrl(null);};
-window.addEventListener('resize',()=>{touchVector=null;placeClearButton();updateButtons();updateMobileScore();});
+window.addEventListener('resize',()=>{touchVector=null;placeClearButton();if(phoneGame&&state==='presnap'&&onOffense()&&!coachPlayReady())designAutoPlay();if(state==='presnap'){cam.target=Math.max(0,Math.min(FH-fieldViewHeight,yardY(game.los)-(phoneGame?fieldViewHeight*.68:470)));cam.y=cam.target;}else{cam.target=Math.max(0,Math.min(FH-fieldViewHeight,cam.target));cam.y=Math.max(0,Math.min(FH-fieldViewHeight,cam.y));}updateButtons();updateMobileScore();});
 if (phoneGame) placeClearButton();
 if(MATCH?.season){document.getElementById('back').href='index.html#season';document.getElementById('back').textContent='← season';document.getElementById('newgame').textContent='restart matchup';}
 newGame(); tick();
