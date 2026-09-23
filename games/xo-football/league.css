@@ -55,3 +55,34 @@ dialog{color:var(--ink);padding:0;border:1px solid #6b7d9e;width:calc(100% - 28p
 .action:after{inset:2px -2px -2px 1px;border-color:#4b5b7799;transform:rotate(-.35deg)}
 .action:before{content:'';position:absolute;inset:0 -18px;pointer-events:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 44'%3E%3Cpath d='M3 4L10 12M1 23L10 22M4 40L11 32' fill='none' stroke='%23efc641' stroke-width='3.5' stroke-linecap='round'/%3E%3Cpath d='M3 3L10 11M1 22L10 21M4 39L11 31' fill='none' stroke='%23455462' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E") left center/14px 44px no-repeat,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 44'%3E%3Cpath d='M3 12L11 5M4 23L12 24M3 32L10 40' fill='none' stroke='%23efc641' stroke-width='3.5' stroke-linecap='round'/%3E%3Cpath d='M3 11L11 4M4 22L12 23M3 31L10 39' fill='none' stroke='%23455462' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E") right center/14px 44px no-repeat}
 .action:hover{background-color:#f5ce49;filter:brightness(1.025)}
+
+/* The new round arrives as ink on paper; browsing a prospect is not a drafted pick. */
+.draft-heading{display:grid;grid-template-columns:minmax(145px,1fr) minmax(0,3fr) minmax(145px,1fr);gap:12px;align-items:center}
+.draft-heading>div:first-child{grid-column:2;text-align:center}
+.draft-heading>.draft-room-actions,.draft-heading>.text-button{grid-column:3;justify-self:end}
+.draft-heading h1{white-space:normal}
+.draft-enter .draft-heading h1{animation:draft-title-ink .42s ease-out both}
+.draft-enter .prospect{animation:draft-card-arrive .32s ease-out var(--deal-delay) both}
+.draft-enter .prospect-o path{stroke-dasharray:1;animation:draft-circle-ink .48s ease-out calc(var(--deal-delay) + 90ms) both}
+.draft-enter .draft-bar-ink{animation:draft-fill-ink .52s ease-out calc(var(--deal-delay) + 130ms) both}
+@keyframes draft-title-ink{from{clip-path:inset(0 100% 0 0);opacity:.4}to{clip-path:inset(0);opacity:1}}
+@keyframes draft-card-arrive{from{opacity:0;translate:0 9px}to{opacity:1;translate:0 0}}
+@keyframes draft-circle-ink{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes draft-fill-ink{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0)}}
+@media(max-width:650px){
+ .draft-heading{grid-template-columns:1fr;gap:8px}
+ .draft-heading>div:first-child{grid-column:1}
+ .draft-heading>.draft-room-actions,.draft-heading>.text-button{grid-column:1;justify-self:center}
+ .draft-heading>.draft-room-actions{flex-direction:row;gap:24px;align-items:center}
+ .draft-room-actions .text-button{max-width:none;min-height:36px;text-align:center}
+}
+
+.development-notes p{margin:10px 0}
+
+/* Earn as a squad, then choose the player and attribute before spending. */
+.performance-card{display:block;grid-column:1/-1;border-top:1px dashed var(--line);margin-top:18px;padding:13px 0 3px;text-decoration:none}
+.performance-card>span{display:block;font-size:11px}.performance-card>strong{display:block;font:48px/1 var(--hand);margin:4px 0}.performance-card small{font:11px 'Courier New';color:var(--muted)}.performance-card>span:last-child{text-decoration:underline;text-underline-offset:4px}
+.upgrades-page{max-width:900px;margin:auto}.upgrades-page .section-top a{font-size:12px;white-space:nowrap}.points-balance{display:flex;gap:20px;align-items:center;justify-content:center;margin:25px 0}.points-balance>strong{font:78px/1 var(--hand);border-bottom:3px double #d4b34b}.points-balance span,.points-balance small{display:block}.points-balance small{font-size:11px;color:var(--muted);margin-top:5px}
+.upgrade-roster{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:28px}.upgrade-roster button{min-width:0;background:none;border:1px solid var(--line);padding:10px 6px}.upgrade-roster button.selected{border-color:var(--ink);background:#f7e3a240;box-shadow:1px 2px 0 #c4aa7144}.upgrade-roster strong{display:block;font:29px/1 var(--hand);overflow-wrap:anywhere;margin:8px 0}.upgrade-roster small,.upgrade-roster span{font-size:10px}.upgrade-name{text-align:center;margin-bottom:20px}.upgrade-attributes{max-width:630px;margin:auto}.upgrade-attribute{display:grid;grid-template-columns:minmax(0,1fr) 115px;gap:5px 24px;align-items:center;margin:20px 0}.upgrade-attribute>div{display:flex;justify-content:space-between;gap:8px}.upgrade-attribute strong{font-weight:400}.upgrade-attribute strong small{color:var(--muted);font-size:10px}.upgrade-attribute .bar{grid-row:2;grid-column:1;height:24px}.upgrade-attribute button{grid-column:2;grid-row:1/3;font-size:12px;min-height:44px}
+.upgrade-confirm{max-width:630px;margin:24px auto 0;padding:18px;border:1px solid var(--ink);background:#f7e3a230}.upgrade-confirm>div{display:flex;justify-content:flex-end;gap:22px;align-items:center;margin-top:15px}.upgrade-confirm p{font-size:13px}.upgrade-confirm .action{font-size:30px}.upgrade-result{min-height:30px;text-align:center;margin:16px 0;font-size:12px}.points-rules{margin:16px auto;max-width:630px;font-size:12px;color:var(--muted)}.points-rules p{margin-top:12px}
+@media(max-width:650px){.performance-card{margin-top:5px;padding:10px 4px;display:grid;grid-template-columns:1fr auto;gap:4px;text-align:left}.performance-card>strong{grid-column:2;grid-row:1/3;font-size:43px;margin:0}.upgrades-page h1{font-size:43px}.points-balance{gap:12px;margin:20px 0}.points-balance>strong{font-size:68px}.points-balance span{font-size:12px}.points-balance small{font-size:10px}.upgrade-roster{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.upgrade-roster{margin-bottom:18px}.upgrade-roster button{padding:8px 4px}.upgrade-roster strong{font-size:23px;min-height:46px;margin:5px 0}.upgrade-roster span{display:none}.upgrade-attribute{grid-template-columns:minmax(0,1fr) 91px;gap:5px 12px;font-size:12px}.upgrade-attribute button{font-size:10px}.upgrade-confirm{padding:14px}.upgrade-confirm>div{gap:18px}.upgrade-confirm .action{font-size:27px}}

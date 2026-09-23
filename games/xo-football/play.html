@@ -113,6 +113,8 @@
     .phone-game #mobile-menu-items{right:198px}
     .phone-game #fourth.on{flex-direction:column}
   }
+  #match-finish{max-height:310px;overflow:auto;box-sizing:border-box}
+  .match-development{border-top:1px solid #243e8333;margin-top:12px;padding-top:8px;font-size:12px;text-align:left} .match-development strong{font-size:14px!important;display:block;margin-bottom:4px}
 </style>
 </head>
 <body>
@@ -141,8 +143,8 @@
     <div class="label" id="hint">drag from any O to draw its route</div>
   </div>
 </div></div>
-<script src="league.js?v=eight-clubs-1"></script>
-<script src="match.js?v=eight-clubs-1"></script>
+<script src="league.js?v=performance-points-1"></script>
+<script src="match.js?v=performance-points-1"></script>
 <script src="../../shared/matter.min.js"></script>
 <script src="../../shared/paper.js?v=binding-2"></script>
 <script src="../../shared/ink.js"></script>
@@ -704,8 +706,53 @@ function steer(p, target, speedMul = 1) {
   Body.applyForce(b, b.position, { x: (want.x - b.velocity.x) * k, y: (want.y - b.velocity.y) * k });
 }
 function followRoute(p) {
-  if (p.ri < p.route.length) { const w = p.route[p.ri]; if (Math.hypot(w.x - p.body.position.x, w.y - p.body.position.y) < 10) p.ri++; steer(p, p.route[Math.min(p.ri, p.route.length - 1)]); return true; }
+  if (p.ri < p.route.length) {
+    const w = p.route[p.ri];
+    if (Math.hypot(w.x - p.body.position.x, w.y - p.body.position.y) < 10) { routeCut(p, p.ri); p.ri++; }
+    steer(p, p.route[Math.min(p.ri, p.route.length - 1)]); return true;
+  }
   return false;
+}
+// Read a stretch of ink on each side of a waypoint, not each tiny mouse wobble.
+function routeDirection(p, index, direction) {
+  const pivot = p.route[index]; let point = pivot, distance = 0;
+  for (let i = index + direction; i >= -1 && i < p.route.length; i += direction) {
+    const next = i === -1 ? p.home : p.route[i], length = Math.hypot(next.x - point.x, next.y - point.y);
+    const portion = length ? Math.min(1, (32 - distance) / length) : 0;
+    point = { x: point.x + (next.x - point.x) * portion, y: point.y + (next.y - point.y) * portion };
+    distance += length * portion;
+    if (distance >= 32 || i === -1) break;
+  }
+  const dx = (point.x - pivot.x) * direction, dy = (point.y - pivot.y) * direction, length = Math.hypot(dx, dy);
+  return distance >= 24 && length >= 22 ? { x: dx / length, y: dy / length } : null;
+}
+function coverageRead(d) {
+  // A corner's cushion, leverage and reaction rhythm stay consistent for this snap.
+  return d.coverage || (d.coverage = {
+    cadence: 5 + Math.floor(Math.random() * 7), cushion: 14 + Math.random() * 10,
+    shade: (Math.random() - .5) * 10, pace: .97 + Math.random() * .06,
+    bite: .54 + Math.random() * .2
+  });
+}
+function routeCut(p, index) {
+  if (state !== 'live' || p.kind !== 'WR' || p.hasBall || ball.carrier?.name !== 'QB' || ball.carrier.scramble || ball.flying || loose) return;
+  if (index >= p.route.length - 1 || (p.cutCount || 0) >= 2 || playFrame - (p.lastCutFrame ?? -999) < 96) return;
+  const incoming = routeDirection(p, index, -1), outgoing = routeDirection(p, index, 1);
+  if (!incoming || !outgoing || incoming.x * outgoing.x + incoming.y * outgoing.y > .5) return;
+  const at = p.body.position;
+  if (p.lastCutSpot && Math.hypot(at.x - p.lastCutSpot.x, at.y - p.lastCutSpot.y) < 72) return;
+  p.lastCutFrame = playFrame; p.lastCutSpot = { ...at }; p.cutCount = (p.cutCount || 0) + 1;
+  for (const d of players) {
+    if (d.team !== 'x' || d.kind !== 'CB' || d.job !== 'man' || d.tgt !== p.name || d.stumble > 0) continue;
+    if (!coachMode && !onOffense() && d === ctrl) continue;
+    if (Math.hypot(d.body.position.x - at.x, d.body.position.y - at.y) > 82) continue;
+    const read = coverageRead(d), edge = ((p.profile?.attrs.speed ?? 70) - (d.profile?.attrs.speed ?? 70)) / 500;
+    if (Math.random() >= Math.max(.4, Math.min(.82, read.bite + edge))) { delete d.aim; continue; }
+    const delay = 15 + Math.floor(Math.random() * 9);
+    d.cutRead = { until: playFrame + delay, recover: playFrame + delay + 36,
+      aim: { x: d.body.position.x + incoming.x * 36, y: d.body.position.y + incoming.y * 36 } };
+    delete d.aim;
+  }
 }
 function nearestDefDist(p) { let bd = 1e9; for (const d of players) if (d.team === 'x' && d.stumble <= 0) bd = Math.min(bd, Math.hypot(d.body.position.x - p.body.position.x, d.body.position.y - p.body.position.y)); return bd; }
 function bestReceiver(qb) { // the pencil QB's read: separation plus a taste for depth
@@ -815,16 +862,39 @@ function updateDefense() {
     if (d.stumble > 0) { d.stumble--; steer(d, d.body.position, 0); d.body.collisionFilter.mask = 0; if (d.stumble === 0) d.body.collisionFilter.mask = 0xFFFFFFFF; continue; }
     if (!coachMode && !onOffense() && d === ctrl) { const kd = keyDir(), b = d.body.position; if (kd) steer(d, { x: b.x + kd.x * 60, y: b.y + kd.y * 60 }, 1.06); else steer(d, mouse, 1.06); continue; }
     // pursuit once the ball is out: everyone chases, with a beat of hesitation
-    if (live) { if (!d.chase) d.chase = playFrame + 6 + Math.random() * 14; if (playFrame >= d.chase) { const c = carrier.body; steer(d, { x: c.position.x + c.velocity.x * 6, y: c.position.y + c.velocity.y * 6 }, onOffense() ? 1 : 1.05); continue; } }
-    if (fly) { const dist = Math.hypot(d.body.position.x - fly.to.x, d.body.position.y - fly.to.y); if (dist < (fly.lob ? 210 : 150) || d.job === 'zone') { steer(d, fly.to, 1.05); continue; } }
+    if (live) {
+      delete d.cutRead;
+      const trackingRB = d.kind === 'LB' && d.job === 'man' && d.tgt === carrier.name && carrier.kind === 'RB';
+      if (!d.chase) d.chase = playFrame + (trackingRB ? 3 + Math.random() * 5 : 6 + Math.random() * 14);
+      if (playFrame >= d.chase) { const c = carrier.body; steer(d, { x: c.position.x + c.velocity.x * 6, y: c.position.y + c.velocity.y * 6 }, onOffense() ? 1 : 1.05); continue; }
+    }
+    // Plant and turn after biting on a WR's cut. Collisions and tackles stay active.
+    let recovery = 1;
+    if (d.cutRead) {
+      if (d.job !== 'man' || playFrame >= d.cutRead.recover) delete d.cutRead;
+      else if (playFrame < d.cutRead.until) { steer(d, d.cutRead.aim, .82); continue; }
+      else recovery = 1 + .18 * (d.cutRead.recover - playFrame) / 36;
+    }
+    if (fly) { const dist = Math.hypot(d.body.position.x - fly.to.x, d.body.position.y - fly.to.y); if (dist < (fly.lob ? 210 : 150) || d.job === 'zone') { steer(d, fly.to, 1.05 * recovery); continue; } }
     if (d.job === 'rush') { const boost = playFrame > 200 ? 1.35 : playFrame > 130 ? 1.15 : 1; const c = carrier || qb; steer(d, c.body.position, boost); continue; }
     if (d.job === 'zoneSpot') { // hold a spot, pick up whoever wanders into it
       let best = null, bd = 90; for (const r of players) if (r.team === 'o' && r.kind !== 'OL' && r.kind !== 'QB') { const dist = Math.hypot(r.body.position.x - d.zone.x, r.body.position.y - d.zone.y); if (dist < bd) { bd = dist; best = r; } }
       if (best) steer(d, { x: best.body.position.x + best.body.velocity.x * 3, y: best.body.position.y - 16 }, 0.92); else steer(d, d.zone, 0.9); continue;
     }
     if (d.job === 'man') {
-      const r = byName(d.tgt); if (d.tgt && (playFrame % 7 === d.id % 7 || !d.aim)) d.aim = { x: r.body.position.x + r.body.velocity.x * 4, y: r.body.position.y - (d.soft ? 34 : 18) + r.body.velocity.y * 4 };
-      steer(d, d.aim, onOffense() ? 0.88 : 0.97); continue;
+      const r = byName(d.tgt); if (!r) continue;
+      const read = d.kind === 'CB' ? coverageRead(d) : null;
+      const trackingRB = d.kind === 'LB' && r.kind === 'RB';
+      const released = trackingRB && Math.hypot(r.body.position.x - r.home.x, r.body.position.y - r.home.y) > 14;
+      const cadence = trackingRB ? 3 : read?.cadence || 7, lead = released ? 8 : 4;
+      const cushion = d.soft ? 34 : trackingRB ? 10 : read?.cushion || 18;
+      if (playFrame % cadence === d.id % cadence || !d.aim) d.aim = {
+        x: Math.max(R, Math.min(FW - R, r.body.position.x + r.body.velocity.x * lead + (read?.shade || 0))),
+        y: r.body.position.y - cushion + r.body.velocity.y * lead
+      };
+      // The RB's assigned linebacker reads his movement sooner and closes the flat.
+      const pace = trackingRB ? (released ? 1.04 : .98) : (onOffense() ? .88 : .97) * (read?.pace || 1);
+      steer(d, d.aim, pace * recovery); continue;
     }
     // safety: shade toward the deepest receiver, stay deep
     let deep = null; for (const p of players) if (p.team === 'o' && p.kind !== 'OL' && p.kind !== 'QB' && (!deep || p.body.position.y < deep.body.position.y)) deep = p;

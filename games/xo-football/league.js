@@ -30,6 +30,13 @@
     p.attrs={speed:a.speed,arm:a.arm,accuracy:a.accuracy??a.hands??70,leadership:a.leadership??a.power??70};
     p.overall=Math.round(p.attrs.arm*.35+p.attrs.accuracy*.35+p.attrs.speed*.15+p.attrs.leadership*.15);return p;
   }
+  function ratePlayer(p){
+    positionAttributes(p);const a=p.attrs;
+    if(p.role==='RB')p.overall=Math.round(a.speed*.45+a.power*.4+a.hands*.15);
+    else if(position(p.role)==='WR')p.overall=Math.round(a.hands*.45+a.speed*.35+a.power*.2);
+    return p;
+  }
+  function capProspect(p){for(const k of Object.keys(p.attrs))p.attrs[k]=Math.min(k==='speed'?90:92,p.attrs[k]);return ratePlayer(p);}
   const catchingMultiplier=p=>(p?.attrs.hands==null?1:.72+p.attrs.hands/250)*(p?.role==='TE'?1+(p.attrs.iq??0)/99*.05:1);
   const leadershipBoost=qb=>Math.max(0,Math.min(99,qb?.attrs.leadership??0))/99*.05;
   function effectiveAttrs(p,qb){const a={...p.attrs};if(p.role.startsWith('WR'))for(const k of ['speed','hands','power'])a[k]=Math.min(99,a[k]*(1+leadershipBoost(qb)));return a;}
@@ -74,15 +81,15 @@
     const names=['Moose','Peanut','Scooter','Bubba','Captain','Nugget','Nacho','Tugboat','Rusty','Boomer','Pickle','Nibbles','Spud','Lefty','Buck','Ziggy','Muffin','Chester','Goose','Dudley'];
     const surnames=['Fumblesworth','McNugget','Taterington','Wafflehouse','Crumple','Doodleberry','Snacks','Pancake','Underpants','Yardwork','Ovenmitts','Ketchup','Velcro','Soggycleats','Honk','Paperclip','Dingdong','Lunchbox','McZoom','Sideburns'];
     for(const [pos,count]of [['QB',16],['WR',32],['RB',16],['TE',16]])for(let i=0;i<count;i++){
-      const n=result.length,j=(n*73+(seed>>>0)%400)%400,a=()=>48+Math.floor(r()*49);
-      const attrs={speed:a(),hands:a(),power:a(),arm:a()};
+      const n=result.length,j=(n*73+(seed>>>0)%400)%400,a=()=>48+Math.floor(r()*45);
+      const attrs={speed:48+Math.floor(r()*43),hands:a(),power:a(),arm:a()};
       if(pos==='QB')attrs.arm=Math.max(attrs.arm,65);if(pos==='WR')attrs.hands=Math.max(attrs.hands,60);if(pos==='RB')attrs.speed=Math.max(attrs.speed,62);if(pos==='TE')attrs.power=Math.max(attrs.power,62);
       const p={id:`d${seed}-${n}`,team:null,role:pos,name:names[j%20]+' '+surnames[Math.floor(j/20)],number:pos==='QB'?1+i:20+n%70,quirk:quirks[n%quirks.length],attrs};
-      p.overall=Math.round(pos==='QB'?attrs.arm*.5+attrs.speed*.25+attrs.power*.25:pos==='RB'?attrs.speed*.45+attrs.power*.4+attrs.hands*.15:attrs.hands*.45+attrs.speed*.35+attrs.power*.2);result.push(positionAttributes(p));
+      result.push(ratePlayer(p));
     }return result;
   }
   function draftTurn(s){if(!s?.draft||s.draft.complete)return null;const index=s.draft.picks.length,round=Math.floor(index/s.draft.order.length),slot=index%s.draft.order.length,order=round%2?[...s.draft.order].reverse():s.draft.order;return {round,team:order[slot],role:draftRoles[round],pick:index+1};}
-  function draftOptions(s){const turn=draftTurn(s);if(!turn)return [];const taken=new Set(s.draft.picks.map(p=>p.playerId));return s.draft.prospects.filter(p=>p.role===position(turn.role)&&!taken.has(p.id)).sort((a,b)=>b.overall-a.overall||a.id.localeCompare(b.id));}
+  function draftOptions(s){const turn=draftTurn(s);if(!turn)return [];const taken=new Set(s.draft.picks.map(p=>p.playerId));return s.draft.prospects.filter(p=>p.role===position(turn.role)&&!taken.has(p.id)).map(capProspect).sort((a,b)=>b.overall-a.overall||a.id.localeCompare(b.id));}
   function commitPick(s,p,automatic){const turn=draftTurn(s);const player={...p,attrs:{...p.attrs},team:turn.team,role:turn.role};const rr=s.rosters[turn.team],i=rr.findIndex(p=>p.role===turn.role);rr[i]=player;s.draft.picks.push({round:turn.round,team:turn.team,playerId:p.id,role:turn.role,automatic});s.draft.complete=s.draft.picks.length===s.draft.order.length*draftRoles.length;}
   function autoPick(s){const turn=draftTurn(s),options=draftOptions(s);const preference=(turn.role==='QB'?['speed','accuracy','leadership','arm']:turn.role==='TE'?['speed','hands','blocking','iq']:['speed','hands','power','arm'])[turn.team%4];options.sort((a,b)=>(b.overall+b.attrs[preference]*.1)-(a.overall+a.attrs[preference]*.1));commitPick(s,options[0],true);}
   function draftPick(s,id){const turn=draftTurn(s);if(!turn||turn.team!==s.team)return false;const p=draftOptions(s).find(p=>p.id===id);if(!p)return false;commitPick(s,p,false);while(draftTurn(s)&&draftTurn(s).team!==s.team)autoPick(s);return true;}
@@ -90,8 +97,47 @@
   function standings(s){const rows=clubsFor(s).map(t=>({...t,w:0,l:0,pf:0,pa:0})),byId=Object.fromEntries(rows.map(t=>[t.id,t]));for(const week of s.schedule.slice(0,regularWeeks(s)))for(const g of week)if(g.score){const [a,b]=g.score;for(const [id,f,ag]of [[g.home,a,b],[g.away,b,a]]){byId[id].pf+=f;byId[id].pa+=ag;byId[id][f>ag?'w':'l']++;}}return rows.sort((a,b)=>b.w-a.w||(b.pf-b.pa)-(a.pf-a.pa)||b.pf-a.pf||a.id-b.id);}
   function current(s){return s.complete||!s.draft?.complete?null:s.schedule[s.week]?.find(g=>g.home===s.team||g.away===s.team)||null;}
   function add(stats,id,delta){const target=stats[id]||(stats[id]=blank());for(const k of Object.keys(blank()))target[k]=(Number.isFinite(target[k])?target[k]:0)+(Number.isFinite(delta[k])?delta[k]:0);}
+  const upgradeCost=100;
+  const upgradeAttributes=p=>Object.keys(p.attrs).filter(k=>k!=='arm'||p.role==='QB');
+  const performance=(s,team=s?.team)=>({...{points:0,earned:0,spent:0},...s?.performance?.[team]});
+  function spendUpgrade(s,team,playerId,attribute){
+    if(!s?.draft?.complete)return {accepted:false,reason:'Finish the draft first.'};
+    const p=rosterFor(s,team).find(p=>p.id===playerId&&draftRoles.includes(p.role));
+    if(!p||!upgradeAttributes(p).includes(attribute))return {accepted:false,reason:'Choose a player and attribute from your squad.'};
+    if(p.attrs[attribute]>=99)return {accepted:false,reason:'That attribute is already 99.'};
+    const bank=performance(s,team);
+    if(bank.points<upgradeCost)return {accepted:false,reason:'You need 100 performance points for an upgrade.'};
+    const from=p.attrs[attribute];p.attrs[attribute]=Math.min(99,from+1);ratePlayer(p);
+    (p.upgrades??={})[attribute]=(p.upgrades[attribute]||0)+1;
+    bank.points-=upgradeCost;bank.spent+=upgradeCost;(s.performance??={})[team]=bank;
+    if(team===s.team)s.rosterRevision=(s.rosterRevision||0)+1;
+    return {accepted:true,player:p.name,attribute,from,to:p.attrs[attribute],points:bank.points};
+  }
+  const upgradePlayer=(s,id,attribute)=>spendUpgrade(s,s?.team,id,attribute);
+  // Count passing/receiving yards and passing/scoring TDs only once.
+  function awardPerformance(s,team,gameStats,won){
+    const total=blank(),rr=rosterFor(s,team);
+    for(const p of rr)for(const k of Object.keys(total)){
+      const v=gameStats[p.id]?.[k];if(Number.isFinite(v))total[k]+=Math.max(0,v);
+    }
+    const breakdown={yards:Math.floor((Math.max(total.pass,total.receive)+total.rush+total.returns)/5),
+      catches:Math.floor(total.catches)*2,touchdowns:Math.floor(Math.max(total.td,total.passTd))*15,win:won?20:0};
+    const earned=Math.min(200,Object.values(breakdown).reduce((a,b)=>a+b,0)),bank=performance(s,team);
+    bank.points+=earned;bank.earned+=earned;(s.performance??={})[team]=bank;
+    // Other clubs spend their own points. The user's bank is never spent for them.
+    if(team!==s.team)while(performance(s,team).points>=upgradeCost){
+      const players=rr.filter(p=>draftRoles.includes(p.role)&&upgradeAttributes(p).some(k=>p.attrs[k]<99)).sort((a,b)=>a.overall-b.overall);
+      if(!players.length)break;
+      const p=players[0],attribute=upgradeAttributes(p).sort((a,b)=>p.attrs[a]-p.attrs[b])[0];
+      if(!spendUpgrade(s,team,p.id,attribute).accepted)break;
+    }
+    return {earned,balance:bank.points,breakdown};
+  }
   function sim(s,g){const r=random(s.seed+g.home*107+g.away*137+s.week*829);let a=7*(1+Math.floor(r()*5))+3*Math.floor(r()*3),b=7*(1+Math.floor(r()*5))+3*Math.floor(r()*3);if(a===b)a+=3;g.score=[a,b];g.simulated=true;
-    for(const [id,score]of [[g.home,a],[g.away,b]]){const roster=rosterFor(s,id);let remain=Math.floor(score/7);for(const p of roster){if(['RB','WR-L','WR-R','TE'].includes(p.role)){const yards=15+Math.floor(r()*90),td=Math.min(remain,Math.floor(r()*3));remain-=td;add(s.stats,p.id,{[p.role==='RB'?'rush':'receive']:yards,td,catches:p.role==='RB'?0:Math.max(td,Math.ceil(yards/12))});if(p.role!=='RB')add(s.stats,roster[0].id,{pass:yards,passTd:td});}}if(remain)add(s.stats,roster[4].id,{td:remain});}
+    const gameStats={};
+    for(const [id,score]of [[g.home,a],[g.away,b]]){const roster=rosterFor(s,id);let remain=Math.floor(score/7);for(const p of roster){if(['RB','WR-L','WR-R','TE'].includes(p.role)){const yards=15+Math.floor(r()*90),td=Math.min(remain,Math.floor(r()*3));remain-=td;add(gameStats,p.id,{[p.role==='RB'?'rush':'receive']:yards,td,catches:p.role==='RB'?0:Math.max(td,Math.ceil(yards/12))});if(p.role!=='RB')add(gameStats,roster[0].id,{pass:yards,passTd:td});}}if(remain)add(gameStats,roster[4].id,{td:remain});}
+    for(const [id,delta]of Object.entries(gameStats))add(s.stats,id,delta);
+    awardPerformance(s,g.home,gameStats,a>b);awardPerformance(s,g.away,gameStats,b>a);
   }
   function advance(s){if(s.schedule[s.week].some(g=>!g.score))return; s.week++;const weeks=regularWeeks(s);
     if(s.week===weeks){const top=standings(s).slice(0,4);s.schedule.push([{id:'semi-1',home:top[0].id,away:top[3].id,score:null},{id:'semi-2',home:top[1].id,away:top[2].id,score:null}]);}
@@ -100,9 +146,11 @@
   }
   function finish(s,matchId,you,opponent,stats){const g=current(s);if(!g||g.id!==matchId||g.score||!Number.isFinite(you)||!Number.isFinite(opponent)||you===opponent)return false;
     g.score=g.home===s.team?[you,opponent]:[opponent,you];for(const [id,delta]of Object.entries(stats||{}))if(rosterFor(s,g.home).concat(rosterFor(s,g.away)).some(p=>p.id===id))add(s.stats,id,delta);
+    const homePoints=awardPerformance(s,g.home,stats||{},g.score[0]>g.score[1]),awayPoints=awardPerformance(s,g.away,stats||{},g.score[1]>g.score[0]);
+    s.lastPerformance={matchId,week:s.week,...(s.team===g.home?homePoints:awayPoints)};
     for(const other of s.schedule[s.week])if(!other.score)sim(s,other);advance(s);return true;
   }
   function finishSpectatorWeek(s){if(!s.draft?.complete||s.complete||current(s))return false;for(const g of s.schedule[s.week])if(!g.score)sim(s,g);advance(s);return true;}
-  const api={activeTeams,clubsFor,regularWeeks,archive,archives,catchingMultiplier,leadershipBoost,effectiveAttrs,passError,teams,rosters,roles,rosterFor,allPlayers,draftRoles,draftTurn,draftOptions,draftPick,simDraft,legacySave,blank,create,save,load,standings,current,finish,finishSpectatorWeek,add};
+  const api={upgradeCost,upgradeAttributes,performance,upgradePlayer,activeTeams,clubsFor,regularWeeks,archive,archives,catchingMultiplier,leadershipBoost,effectiveAttrs,passError,teams,rosters,roles,rosterFor,allPlayers,draftRoles,draftTurn,draftOptions,draftPick,simDraft,legacySave,blank,create,save,load,standings,current,finish,finishSpectatorWeek,add};
   root.XOLeague=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
