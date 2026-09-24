@@ -1,6 +1,7 @@
 /* A single notebook opening, using the same paper, ink and desk as the game. */
 body.opening-active{overflow:hidden}
-.opening-film{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;overflow:hidden;background:linear-gradient(#281b1050,#281b1050),url('assets/student-desk-v1.webp') center/cover;opacity:1;transition:opacity .42s ease}
+body.opening-active>.notebook{visibility:hidden}
+.opening-film{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;overflow:hidden;background:linear-gradient(#281b1050,#281b1050),url('../../assets/student-desk-v1.webp') center/cover #38291f;opacity:1;transition:opacity .42s ease}
 .opening-film.leaving{opacity:0;pointer-events:none}
 .opening-scene{width:min(580px,78vw,calc((100dvh - 90px)*.89));aspect-ratio:560/630;perspective:1800px;position:relative;transform:translateY(22px) rotate(-6deg) scale(.88);filter:drop-shadow(10px 25px 20px #130b0860);will-change:transform}
 .opening-sheet,.opening-cover{position:absolute;inset:0;border-radius:2px 7px 5px 1px}
@@ -12,7 +13,7 @@ body.opening-active{overflow:hidden}
 .opening-cover:before{content:'';position:absolute;inset:0 0 0 20px;border-left:3px double #9e866f60;background:linear-gradient(90deg,#755f4425,transparent 9%)}
 .opening-cover img{position:absolute;width:68%;left:19%;top:25%;mix-blend-mode:multiply;transform:rotate(-7deg);opacity:.86}
 .opening-wire{position:absolute;left:-24px;top:10%;bottom:9%;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none}
-.opening-wire i{display:block;width:59px;height:32px;background:url('assets/notebook-wire-v1.png') -15px -20px/100px 67px no-repeat;filter:drop-shadow(1px 2px 1px #160b0650)}
+.opening-wire i{display:block;width:59px;height:32px;background:url('../../assets/notebook-wire-v1.png') -15px -20px/100px 67px no-repeat;filter:drop-shadow(1px 2px 1px #160b0650)}
 .opening-controls{position:absolute;bottom:max(17px,env(safe-area-inset-bottom));left:22px;right:22px;display:flex;justify-content:flex-end}
 .opening-skip{min-height:44px;padding:8px 18px;color:#233d78;font:14px 'Courier New',monospace;background:#fbf8ee;border:1px solid #657399;box-shadow:2px 3px 0 #20130930;transform:rotate(-2deg)}
 .opening-skip:hover{background:#f9e6a8}.opening-skip:focus-visible{outline:3px solid #f0c445;outline-offset:4px}
