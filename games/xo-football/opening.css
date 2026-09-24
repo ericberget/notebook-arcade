@@ -1,0 +1,26 @@
+/* A single notebook opening, using the same paper, ink and desk as the game. */
+body.opening-active{overflow:hidden}
+.opening-film{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;overflow:hidden;background:linear-gradient(#281b1050,#281b1050),url('assets/student-desk-v1.webp') center/cover;opacity:1;transition:opacity .42s ease}
+.opening-film.leaving{opacity:0;pointer-events:none}
+.opening-scene{width:min(580px,78vw,calc((100dvh - 90px)*.89));aspect-ratio:560/630;perspective:1800px;position:relative;transform:translateY(22px) rotate(-6deg) scale(.88);filter:drop-shadow(10px 25px 20px #130b0860);will-change:transform}
+.opening-sheet,.opening-cover{position:absolute;inset:0;border-radius:2px 7px 5px 1px}
+.opening-sheet{background:repeating-linear-gradient(0deg,transparent 0 31px,#7e9dcc30 31px 32px),#fbf8ee;box-shadow:2px 3px 0 #e6dfd0,4px 5px 0 #aaa291,6px 8px 0 #dfd7c5;overflow:hidden}
+.opening-sheet:before{content:'';position:absolute;inset:0 auto 0 34px;border-left:1px solid #c556566b;box-shadow:3px 0 #c5565622}
+.opening-sheet:after{content:'';position:absolute;inset:0;background:url('assets/scouting-paper-v1.png') center/100% 120%;mix-blend-mode:multiply;opacity:.28;pointer-events:none}
+.opening-sheet canvas{position:absolute;inset:0;width:100%;height:100%}
+.opening-cover{background:#e6dabd url('assets/scouting-paper-v1.png') center/100% 115%;transform-origin:0 50%;transform-style:preserve-3d;backface-visibility:hidden;box-shadow:inset 6px 0 12px #765e4430,inset 0 0 0 1px #8d775a80,2px 3px 3px #33251c40;will-change:transform}
+.opening-cover:before{content:'';position:absolute;inset:0 0 0 20px;border-left:3px double #9e866f60;background:linear-gradient(90deg,#755f4425,transparent 9%)}
+.opening-cover img{position:absolute;width:68%;left:19%;top:25%;mix-blend-mode:multiply;transform:rotate(-7deg);opacity:.86}
+.opening-wire{position:absolute;left:-24px;top:10%;bottom:9%;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none}
+.opening-wire i{display:block;width:59px;height:32px;background:url('assets/notebook-wire-v1.png') -15px -20px/100px 67px no-repeat;filter:drop-shadow(1px 2px 1px #160b0650)}
+.opening-controls{position:absolute;bottom:max(17px,env(safe-area-inset-bottom));left:22px;right:22px;display:flex;justify-content:flex-end}
+.opening-skip{min-height:44px;padding:8px 18px;color:#233d78;font:14px 'Courier New',monospace;background:#fbf8ee;border:1px solid #657399;box-shadow:2px 3px 0 #20130930;transform:rotate(-2deg)}
+.opening-skip:hover{background:#f9e6a8}.opening-skip:focus-visible{outline:3px solid #f0c445;outline-offset:4px}
+.menu-opening-replay{display:block;margin:36px auto 0;padding:10px 4px;min-height:44px;border:0;background:none;color:var(--muted);font:12px 'Courier New',monospace;text-decoration:underline;text-underline-offset:5px}
+.menu-opening-replay:hover{color:var(--ink)}
+.menu-arriving .masthead{animation:opening-menu-title .5s ease-out both}
+.menu-arriving .mode-option{animation:opening-menu-choice .48s ease-out both}.menu-arriving .mode-option:nth-child(2){animation-delay:.1s}
+@keyframes opening-menu-title{from{opacity:.4;translate:0 5px}to{opacity:1;translate:0 0}}
+@keyframes opening-menu-choice{from{opacity:0;translate:0 9px}to{opacity:1;translate:0 0}}
+@media(max-width:650px){.opening-scene{width:min(84vw,calc((100dvh - 115px)*.89))}.opening-wire{left:-17px}.opening-wire i{width:49px;background-position:-21px -20px}.opening-controls{right:18px}.menu-opening-replay{margin-top:28px}}
+@media(prefers-reduced-motion:reduce){.opening-film{transition:none}.opening-scene{transform:none!important}.menu-arriving .masthead,.menu-arriving .mode-option{animation:none}}
