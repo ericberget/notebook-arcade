@@ -1,11 +1,11 @@
 /* The title sequence is isolated from the season save and from match gameplay. */
 (() => {
   'use strict';
-  const SEEN_KEY = 'xo-football-opening-v1';
   const DURATION = 5150;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const home = () => !location.hash || location.hash === '#home';
-  let running = null, seenInMemory = false;
+  // Fresh entries to the football menu get an opening; internal routes do not.
+  let running = null, shownThisVisit = !home();
   const clamp = n => Math.max(0, Math.min(1, n));
   const ease = n => {n=clamp(n);return n*n*(3-2*n);};
   const between = (t, start, duration) => clamp((t-start)/duration);
@@ -103,12 +103,10 @@
     }
   }
 
-  function seen(){try{return seenInMemory || localStorage.getItem(SEEN_KEY)==='1';}catch{return seenInMemory;}}
-  function remember(){seenInMemory=true;try{localStorage.setItem(SEEN_KEY,'1');}catch{/* The menu still works without browser storage. */}}
   function finish(animate=true){
     if(!running)return;
     const state=running;running=null;cancelAnimationFrame(state.frame);clearTimeout(state.safety);
-    state.controller.abort();remember();
+    state.controller.abort();
     state.main.inert=state.wasInert;document.body.classList.remove('opening-active');
     if(animate && !reduced.matches){state.main.classList.add('menu-arriving');setTimeout(()=>state.main.classList.remove('menu-arriving'),750);}
     state.overlay.inert=true;state.overlay.removeAttribute('aria-modal');state.overlay.classList.add('leaving');
@@ -116,8 +114,9 @@
     if(home())(state.returnFocus?.isConnected?state.returnFocus:document.querySelector('.mode-option'))?.focus({preventScroll:true});
   }
   async function start(manual=false){
-    if(running || !home() || (!manual && (seen() || reduced.matches)))return;
+    if(running || !home() || (!manual && (shownThisVisit || reduced.matches)))return;
     const main=document.querySelector('main.notebook');if(!main)return;
+    shownThisVisit=true;
     const overlay=document.createElement('section');overlay.className='opening-film';
     overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','X’s and O’s Football opening');
     overlay.innerHTML=`<div class="opening-scene" aria-hidden="true"><div class="opening-sheet"><canvas width="1120" height="1260"></canvas></div><div class="opening-cover"><img src="assets/logo-pen-v2.png" alt="" draggable="false"></div><div class="opening-wire">${'<i></i>'.repeat(7)}</div></div><div class="opening-controls"><button class="opening-skip" type="button">Skip intro →</button></div>`;
@@ -161,5 +160,8 @@
   }
   const content=document.getElementById('content');
   if(content)new MutationObserver(()=>{replayButton();start();}).observe(content,{childList:true});
+  window.addEventListener('pageshow',event=>{
+    if(event.persisted){shownThisVisit=!home();replayButton();start();}
+  });
   replayButton();start();
 })();
