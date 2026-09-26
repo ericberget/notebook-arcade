@@ -9,6 +9,8 @@ Small browser games drawn in ballpoint pen and pencil on notebook paper.
 - **Eraser War** — lob erasers over scribbled hills and erase the terrain.
 - **Will It Hold?** — draw roads and braces to carry an egg truck across four increasingly awkward rivers. Your actual strokes bend and break; win to advance or choose a numbered level.
 
+- **Splash Line** — draw water slides from the tower to the pool, pass Lifeguard Lou's inspection, then open them in your own water park and ride them in first person.
+
 - **Margin Skater** — charge ollies, grind stationery, and link flips across three notebook skate parks. Includes touch controls, checkpoints, and saved best scores.
 
 Paper Football remains available at `games/paper-football/`. The alternative doodled landing page is preserved at `doodle.html`.
