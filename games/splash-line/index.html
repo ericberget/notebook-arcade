@@ -169,6 +169,12 @@
   .snup { display: flex; align-items: center; gap: 10px; border-bottom: 1px dashed rgba(31,61,158,.3); padding: 3px 0; font-size: 16px; line-height: 1.15; }
   .snup > div { flex: 1; } .snup b { font-family: Caveat, cursive; font-size: 22px; } .snup small { color: var(--graphite); font-size: 14px; }
   .snup button { font-size: 16px; padding: 2px 10px; white-space: nowrap; } .snup .got { color: #2c8a3c; font-size: 16px; white-space: nowrap; }
+  #diveTwist { position: absolute; right: 40px; bottom: 22px; width: 118px; height: 118px; border-radius: 50%; font-family: Caveat, cursive; font-size: 30px; background: #9b5de5; color: #fff; border: 3px solid var(--ink); box-shadow: 3px 4px 0 rgba(0,0,0,.2); touch-action: none; }
+  #diveTwist:active { transform: scale(.94); }
+  .dvlist { display: grid; gap: 2px; margin: 4px 0 8px; }
+  .dvrow { display: flex; align-items: center; gap: 10px; border-bottom: 1.5px dashed rgba(31,61,158,.3); padding: 4px 0; }
+  .dvrow .dvn { flex: 1; font-size: 16px; line-height: 1.15; } .dvrow b { font-family: Caveat, cursive; font-size: 25px; } .dvrow small { color: var(--graphite); font-size: 14px; }
+  .dvrow.locked { opacity: .55; } .dvrow svg { flex: none; }
   #mute { position: absolute; top: 12px; right: 18px; }
   .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 10px 0 16px; }
   .steps div { font-size: 17px; line-height: 1.25; }
@@ -283,6 +289,7 @@
     <ul id="seNotes" hidden></ul>
     <div class="row"><button class="primary" id="seAgain">Surf again</button><button id="seNext">Next wave &rarr;</button><button id="seShack">Surf Shack</button><button id="sePark">Park</button></div>
   </div>
+  <button id="diveTwist" hidden aria-label="Twist">TWIST &#8635;</button>
   <div id="testerCard" class="card" hidden>
     <div class="row"><div><div class="eyebrow">The test crew</div><h2>Pick your test rider</h2></div><div class="grow"></div><button id="testerClose">Close</button></div>
     <p style="margin:4px 0 0">Every rider weighs the same, so Lifeguard Lou's rules don't change. They just scream differently.</p>
@@ -2470,7 +2477,7 @@ function openTesters() {
   for (const t of TESTERS) {
     const b = document.createElement('button'); b.className = 'tester' + (tester().id === t.id ? ' on' : '');
     b.innerHTML = `<canvas></canvas><span class="nm">${esc(t.name)}</span><span class="bl">${esc(t.blurb)}</span>`;
-    b.onclick = () => { state.tester = t.id; save(); $('#testerCard').hidden = true; updateTesterBtn(); SFX.voice(t.voice); if (scene === 'surf') { surfMenuRender(); toast(`${t.name} is surfing now.`); } else toast(`${t.name} is your test rider now.`); };
+    b.onclick = () => { state.tester = t.id; save(); $('#testerCard').hidden = true; updateTesterBtn(); SFX.voice(t.voice); if (scene === 'surf') { surfMenuRender(); toast(`${t.name} is surfing now.`); } else if (!$('#lotCard').hidden && $('#dvRider')) { showDiveCard(); toast(`${t.name} is diving now.`); } else toast(`${t.name} is your test rider now.`); };
     grid.appendChild(b);
     requestAnimationFrame(() => drawTesterCard(b.querySelector('canvas'), t.id));
   }
@@ -2695,6 +2702,7 @@ const MINI_INFO = {
 const MINI = { type: null, t: 0, score: 0, lives: 0, over: false, hold: false, px: 600, py: 360, d: null, labels: [], parts: [], endAt: 0 };
 function showMiniCard(type) {
   if (CTR[type]) return ctrCard(CTR[type]);
+  if (type === 'dive') return showDiveCard();
   hidePanels(); SFX.pop();
   const info = MINI_INFO[type], best = (state.best || {})[type] || 0, el = $('#lotCard'), s = type === 'river' ? null : slotOf(type);
   el.innerHTML = `<div class="eyebrow">Your park</div><h2>${esc(info.name)}</h2><p>${esc(info.how)}</p><p style="font-size:16px;color:#4a4a4f">Best score: <b>${best}</b>. Earn up to 20 tickets per game.</p><div class="row"><button class="primary" id="mnPlay">Play!</button><button id="mnClose">Close</button></div>`;
@@ -2722,13 +2730,14 @@ function miniEnd() {
   if (MINI.over) return; MINI.over = true; MINI.endAt = now;
   const info = MINI_INFO[MINI.type];
   state.best = state.best || {};
-  const best = state.best[MINI.type] || 0, isBest = MINI.score > best;
-  if (isBest) state.best[MINI.type] = MINI.score;
+  const bk = info.bestKey || MINI.type, best = state.best[bk] || 0, isBest = MINI.score > best;
+  if (isBest) state.best[bk] = MINI.score;
   const tix = Math.min(20, Math.ceil(MINI.score / info.div));
   if (tix > 0) setTickets(state.tickets + tix); else save();
   const stars = info.stars ? info.stars.filter(s => MINI.score >= s).length : -1, unit = info.unit || '';
-  $('#miniEndTitle').textContent = isBest && MINI.score > 0 ? 'New best score!' : stars === 3 ? 'Superstar shift!' : info.endText || 'Nice try!';
-  $('#miniEndScore').innerHTML = (stars >= 0 ? `<span class="stars" style="display:block;font-size:46px;letter-spacing:6px">${[0, 1, 2].map(k => `<span class="${k < stars ? '' : 'off'}">\u2605</span>`).join('')}</span>` : '') + `${unit ? 'Coins' : 'Score'} <b>${MINI.score}</b> &middot; Best <b>${Math.max(best, MINI.score)}</b> &middot; <b>+${tix}</b> tickets` + (stars >= 0 && stars < 3 ? `<br><small style="color:#4a4a4f">Next star at ${info.stars[stars]} ${unit || 'points'}</small>` : '');
+  const ex = info.onEnd ? info.onEnd(stars) : null;
+  $('#miniEndTitle').textContent = ex && ex.title ? ex.title : isBest && MINI.score > 0 ? 'New best score!' : stars === 3 ? 'Superstar shift!' : info.endText || 'Nice try!';
+  $('#miniEndScore').innerHTML = (stars >= 0 ? `<span class="stars" style="display:block;font-size:46px;letter-spacing:6px">${[0, 1, 2].map(k => `<span class="${k < stars ? '' : 'off'}">\u2605</span>`).join('')}</span>` : '') + `${unit ? 'Coins' : 'Score'} <b>${MINI.score}</b> &middot; Best <b>${Math.max(best, MINI.score)}</b> &middot; <b>+${tix}</b> tickets` + (stars >= 0 && stars < 3 ? `<br><small style="color:#4a4a4f">Next star at ${info.stars[stars]} ${unit || 'points'}</small>` : '') + (ex && ex.html ? ex.html : '');
   setTimeout(() => { if (scene === 'mini') $('#miniEnd').hidden = false; }, 700);
   if (isBest && MINI.score > 0) SFX.fanfare(); else SFX.pop();
 }
@@ -2933,78 +2942,10 @@ function jumperDraw(c, d, kind) {
 
 // ---------- more attractions to buy, each with its own game ----------
 Object.assign(MINI_INFO, {
-  dive: { name: 'High Dive', how: 'Tap when the board bends lowest for a big bounce. In the air, hold to tuck and flip, then let go to straighten out. Head first scores best!', div: 8, stat: d => `dive ${Math.min(6, d.n + 1)} of 6`, endText: 'Great diving!' },
   blaster: { name: 'Water Blasters', how: 'Tap to squirt! Soak the pencils and the ducks before they slide away. Gold ducks are worth 5. Do not soak Lifeguard Lou!', time: 35, div: 3 },
   bumper: { name: 'Bumper Boats', how: 'Steer your boat with the mouse or your finger. Bump the pencil boats to splash them, and scoop up the rubber duckies.', time: 40, div: 2 },
   rescue: { name: 'Lifeguard Tower', how: 'Someone is waving for help! Tap when the arrow is right over them to toss a ring buoy. Miss three swimmers and your shift is over.', lives: 3, div: 1, endText: 'Shift over!' },
 });
-
-// ===== High Dive =====
-const DV = { BY: 250, WY: 600, TIP: 330 };
-MINI_INIT.dive = () => ({ n: 0, phase: 'bounce', bt: 0, x: 312, y: DV.BY, vx: 0, vy: 0, a: 0, tuck: false, perfect: false, judges: null, jt: 0, ripples: [], flex: 0 });
-MINI_TAP.dive = () => {
-  const d = MINI.d; if (d.phase !== 'bounce') return;
-  const o = Math.sin(d.bt * 5.2), pw = (o + 1) / 2;
-  d.perfect = pw > 0.88; d.phase = 'air'; d.vx = 170 + 70 * pw; d.vy = -(430 + 380 * pw); d.a = 0; d.y = DV.BY + o * 14; d.flex = o;
-  SFX.boing(); if (d.perfect) miniLabel('Perfect bounce!', 380, 190, '#2c8a3c'); else if (pw < 0.35) miniLabel('wobbly bounce', 380, 200, GRAPH);
-};
-MINI_STEP.dive = (dt, d) => {
-  d.flex *= Math.exp(-dt * 5);
-  if (d.phase === 'bounce') { d.bt += dt; return; }
-  if (d.phase === 'air') {
-    d.tuck = MINI.hold; d.vy += 980 * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.a += (d.tuck ? 8.5 : 1.5) * dt;
-    if (d.y >= DV.WY - 12 && d.vy > 0) diveEnter(d);
-    return;
-  }
-  d.jt += dt;
-  if (d.jt > 2.4) { d.n++; if (d.n >= 6) { miniEnd(); return; } Object.assign(d, { phase: 'bounce', bt: 0, x: 312, y: DV.BY, a: 0, tuck: false, judges: null, jt: 0 }); }
-};
-function diveEnter(d) {
-  const TAU = Math.PI * 2, m = ((d.a % TAU) + TAU) % TAU, headOff = Math.abs(m - Math.PI), feetOff = Math.min(m, TAU - m), flips = Math.floor((d.a + 0.9) / TAU);
-  let base, text, big;
-  if (d.tuck) { base = 5; text = 'CANNONBALL!'; big = 2.2; }
-  else if (headOff < 0.45) { base = 7.5; text = 'Clean entry!'; big = 0.5; }
-  else if (headOff < 0.95) { base = 5.5; text = 'Nice dive!'; big = 0.9; }
-  else if (feetOff < 0.55) { base = 4; text = 'Pencil dive'; big = 0.7; }
-  else { base = 1; text = 'BELLY FLOP!'; big = 1.8; }
-  const js = [0, 1, 2].map(() => clamp(Math.round((base + flips * 1.5 + (d.perfect ? 0.5 : 0) + (Math.random() - 0.5)) * 2) / 2, 0, 10));
-  MINI.score += Math.round(js[0] + js[1] + js[2]); d.judges = js; d.phase = 'judge'; d.jt = 0; d.entry = text;
-  miniLabel(text + (flips ? `  ${flips} flip${flips > 1 ? 's' : ''}!` : ''), clamp(d.x, 300, 900), 470, text === 'BELLY FLOP!' ? RED : INK, true);
-  miniSplash(d.x, DV.WY, Math.round(18 * big), AQUA); d.ripples.push({ x: d.x, t0: now, big });
-  if (text === 'BELLY FLOP!') SFX.crash(); else SFX.splash(Math.min(1.5, big));
-}
-function judgePerson(c, x, y, seed) { c.save(); c.translate(x, y); c.scale(2.4, 2.4); drawPerson(c, { suit: ['#118ab2', '#ef476f', '#06d6a0'][seed % 3], skin: ['#f1c27d', '#8d5524', '#e0ac69'][seed % 3], hair: '#3b2a1a', seed }, 0, 0, 'stand', now); c.restore(); }
-MINI_DRAW.dive = (c, d) => {
-  const WY = DV.WY;
-  c.fillStyle = '#ece6d4'; c.fillRect(0, WY, 200, H - WY); jline(c, 0, WY, 200, WY, 1801, GRAPH, 2, 1);
-  c.fillStyle = 'rgba(79,195,224,.42)'; c.fillRect(200, WY, W - 200, H - WY);
-  c.strokeStyle = 'rgba(29,141,176,.35)'; c.lineWidth = 1; c.beginPath(); for (let x = 220; x < W; x += 40) { c.moveTo(x, WY + 30); c.lineTo(x, H); } c.stroke();
-  for (const ly of [650, 700]) { c.setLineDash([10, 8]); c.strokeStyle = ly === 650 ? '#ef476f' : '#ffd166'; c.lineWidth = 4; c.beginPath(); c.moveTo(200, ly); c.lineTo(W, ly); c.stroke(); c.setLineDash([]); }
-  jline(c, 200, WY, W, WY, 1802, AQUA_DK, 2.4, 1);
-  for (const r of d.ripples) { const a = now - r.t0; if (a > 2) continue; c.strokeStyle = `rgba(255,255,255,${0.9 - a * 0.45})`; c.lineWidth = 2.5; c.beginPath(); c.ellipse(r.x, WY + 4, 20 + a * 90 * r.big, 5 + a * 12, 0, 0, 7); c.stroke(); }
-  // the tower and the springboard
-  for (const lx of [110, 180]) jline(c, lx, WY, lx + (lx < 150 ? 8 : -8), DV.BY + 8, 1810 + lx, INK, 3, 1);
-  for (let y = DV.BY + 40; y < WY; y += 36) jline(c, 116, y, 174, y, 1820 + y, GRAPH, 1.8, 1);
-  c.fillStyle = '#d8c3a5'; c.fillRect(96, DV.BY + 2, 100, 12); c.strokeStyle = INK; c.lineWidth = 1.8; c.strokeRect(96, DV.BY + 2, 100, 12);
-  const o = d.phase === 'bounce' ? Math.sin(d.bt * 5.2) : d.flex, tipY = DV.BY + o * 14;
-  c.strokeStyle = INK; c.lineWidth = 11; c.lineCap = 'round'; c.beginPath(); c.moveTo(150, DV.BY); c.quadraticCurveTo(250, DV.BY + o * 3, DV.TIP, tipY); c.stroke();
-  c.strokeStyle = '#ffd166'; c.lineWidth = 7; c.stroke();
-  htext(c, 'HIGH DIVE', 145, DV.BY - 120, 34, RED, { rot: -0.05 });
-  // judges
-  c.fillStyle = '#fffdf5'; c.fillRect(930, 330, 240, 44); c.strokeStyle = INK; c.lineWidth = 2; c.strokeRect(930, 330, 240, 44); htext(c, 'JUDGES', 1050, 362, 26, INK);
-  for (let k = 0; k < 3; k++) {
-    judgePerson(c, 970 + k * 80, 330, k);
-    if (d.judges && d.jt > 0.5) { const up = Math.min(1, (d.jt - 0.5) * 5), cx = 970 + k * 80, cy = 250 - up * 20; c.fillStyle = '#fff'; c.fillRect(cx - 26, cy - 34, 52, 40); c.strokeStyle = INK; c.lineWidth = 2; c.strokeRect(cx - 26, cy - 34, 52, 40); htext(c, String(d.judges[k]), cx, cy - 4, 32, d.judges[k] >= 7 ? '#2c8a3c' : d.judges[k] >= 4 ? INK : RED); jline(c, cx, cy + 6, cx, cy + 40, 1830 + k, GRAPH, 2, 1); }
-  }
-  // the diver
-  if (d.phase === 'bounce') {
-    drawTester(c, DV.TIP - 18, tipY - 5, -0.05, 'happy', 2.8, 1);
-    const lowest = o > 0.8; htext(c, lowest ? 'NOW!' : 'tap when the board dips', DV.TIP + 60, DV.BY + 70, lowest ? 34 : 22, lowest ? '#2c8a3c' : GRAPH, { font: lowest ? 'Caveat' : 'hand', align: 'left' });
-  } else if (d.phase === 'air') {
-    c.save(); c.translate(d.x, d.y); c.rotate(d.a); if (d.tuck) c.scale(0.78, 0.78); drawTester(c, 0, 22, 0, d.tuck ? 'whee' : 'air', 2.8, 1); c.restore();
-    if (d.tuck) htext(c, 'tuck!', d.x + 50, d.y - 40, 26, RED);
-  } else if (d.jt > 0.9) drawTester(c, d.x + 10, WY + 14 + Math.sin(now * 4) * 3, 0, 'whee', 2.4, 1);
-};
 
 // ===== Water Blasters =====
 const BL = { X0: 150, X1: 1150, ROWS: [260, 400, 540] };
@@ -3257,6 +3198,348 @@ function drawRescueArea(c, s) {
   c.fillStyle = '#f1c27d'; c.beginPath(); c.arc(sx, PG + 6, 6, 0, 7); c.fill(); c.stroke();
   htext(c, 'lifeguard tower', s.x + s.w / 2, PG - 160, 20, RED);
 }
+
+// ---------- High Dive: a whole diving meet ----------
+const DV_EV = [
+  { id: 'spring1', name: '1m Springboard', blurb: 'Bounce, flip and splash. The classic.', need: 0, kind: 'spring', hPx: 350, g: 980, z: 1, dives: 5, pool: [0, 1, 2, 3, 6], stars: [90, 140, 190] },
+  { id: 'cannon', name: 'Cannonball Contest', blurb: 'Forget style. Make the biggest splash and soak the judges!', need: 0, kind: 'cannon', hPx: 350, g: 980, z: 1, dives: 4, stars: [55, 75, 95] },
+  { id: 'spring3', name: '3m Springboard', blurb: 'A taller board. More air, more flips.', need: 2, kind: 'spring', hPx: 520, g: 900, z: 0.85, dives: 5, pool: [1, 2, 3, 4, 6, 7], stars: [110, 170, 230] },
+  { id: 'plat10', name: '10m Platform', blurb: 'The tall tower. Time your leap, then flip and twist all the way down.', need: 4, kind: 'platform', hPx: 1300, g: 800, z: 0.62, dives: 5, pool: [2, 3, 4, 5, 7, 8], stars: [130, 200, 270] },
+  { id: 'cliff', name: 'Cliff Dive', blurb: 'Leap off the rocks into the lagoon. Watch the wind and land in the ring!', need: 7, kind: 'cliff', hPx: 1900, g: 800, z: 0.5, dives: 4, pool: [3, 4, 5, 7, 8, 9], stars: [130, 200, 260] },
+];
+const DV_CALLS = [
+  { h: 1, tw: 0, dd: 1.2, name: 'Front dive' }, { h: 2, tw: 0, dd: 1.4, name: 'Front flip' }, { h: 3, tw: 0, dd: 1.8, name: '1½ flip' },
+  { h: 4, tw: 0, dd: 2.1, name: 'Double flip' }, { h: 5, tw: 0, dd: 2.6, name: '2½ flip' }, { h: 6, tw: 0, dd: 3.0, name: 'Triple flip' },
+  { h: 1, tw: 1, dd: 1.8, name: 'Dive + twist' }, { h: 3, tw: 1, dd: 2.5, name: '1½ + twist' }, { h: 5, tw: 1, dd: 3.2, name: '2½ + twist' },
+  { h: 7, tw: 0, dd: 3.5, name: '3½ flip' },
+];
+const DV_TUCK = 9.5, DV_OPEN = 1.6, DV_TWIST = 12.6, DV_TIP = 330, DV_WY = 600;
+const DVS = { ev: DV_EV[0] };
+function diveData() { if (!state.dive) state.dive = { medals: {}, best: {} }; return state.dive; }
+function diveStars() { const d = diveData(); return DV_EV.reduce((a, e) => a + (d.medals[e.id] || 0), 0); }
+const MEDAL = ['', '#cd7f32', '#b8c0c8', '#f6c945'], MEDAL_NAME = ['', 'Bronze', 'Silver', 'Gold'];
+
+MINI_INFO.dive = { name: 'High Dive', how: '', div: 10, stars: [90, 140, 190], unit: '', overText: ' ', stat: d => d.phase === 'podium' ? 'medal ceremony' : `dive ${Math.min(DVS.ev.dives, d.n + 1)} of ${DVS.ev.dives}`, onEnd: diveOnEnd };
+function diveChoices(ev) {
+  const pool = ev.pool.slice().sort(() => Math.random() - 0.5).slice(0, 3).map(i => DV_CALLS[i]);
+  return pool.sort((a, b) => a.dd - b.dd);
+}
+function diveReset(d) {
+  const ev = DVS.ev;
+  Object.assign(d, { phase: ev.kind === 'cannon' ? 'bounce' : 'pick', bt: 0, x: DV_TIP - 18, y: -ev.hPx, vx: 0, vy: 0, a: 0, tw: 0, twT: 0, tuck: false, tuckT: 0, perfect: false, judges: null, jt: 0, flex: 0, call: null,
+    choices: ev.kind === 'cannon' ? [] : diveChoices(ev), meter: 0, entryV: 0, splash: 0, result: null, wind: ev.kind === 'cliff' ? (Math.random() - 0.5) * 140 : 0, ring: 760 + Math.random() * 420, soak: d.soak || -99 });
+}
+MINI_INIT.dive = () => {
+  const ev = DVS.ev, d = { n: 0, total: 0, ripples: [], drops: [], cheer: -9, soak: -99, camUp: ev.hPx - 300 / ev.z, podT: 0, confetti: [] };
+  diveReset(d); d.camUp = Math.max(0, ev.hPx - 300 / ev.z); return d;
+};
+function diveTwist() {
+  const d = MINI.d; if (!d || MINI.type !== 'dive' || MINI.over || d.phase !== 'air' || DVS.ev.kind === 'cannon') return;
+  if (d.twT - d.tw < 3.5) { d.twT += Math.PI * 2; SFX.whee(); }
+}
+MINI_TAP.dive = p => {
+  const d = MINI.d, ev = DVS.ev;
+  if (d.phase === 'pick') {
+    const i = clamp(Math.floor((p.x - 240) / 240), 0, 2);
+    if (p.y > 120 && p.y < 290 && p.x > 240 && p.x < 960) { d.call = d.choices[i]; d.phase = ev.kind === 'spring' ? 'bounce' : 'ready'; d.bt = 0; SFX.pop(); }
+    return;
+  }
+  if (d.phase === 'judge' && d.jt > 1.4) { d.jt = 99; return; }
+  if (d.phase === 'podium') { if (now - d.podT > 0.8) miniEnd(); return; }
+  if (d.phase === 'bounce') {
+    const o = Math.sin(d.bt * 5.2), pw = (o + 1) / 2, big = ev.hPx > 400 ? 1.08 : 1;
+    d.perfect = pw > 0.88; d.phase = 'air'; d.vx = (170 + 70 * pw); d.vy = -(430 + 380 * pw) * big; d.y = -ev.hPx + o * 14; d.flex = o;
+    SFX.boing(); if (d.perfect) miniLabel('Perfect bounce!', 420, 180, '#2c8a3c'); else if (pw < 0.35) miniLabel('wobbly bounce', 420, 190, GRAPH);
+  } else if (d.phase === 'ready') {
+    const pw = 1 - Math.abs(1 - (d.bt * 1.3) % 2);
+    d.perfect = pw > 0.9; d.phase = 'air'; d.vx = ev.kind === 'cliff' ? 150 + 170 * pw : 150 + 110 * pw; d.vy = -(300 + 170 * pw);
+    SFX.boing(); if (d.perfect) miniLabel('Perfect leap!', 420, 180, '#2c8a3c'); else if (pw < 0.35) miniLabel('tiny hop', 420, 190, GRAPH);
+  }
+};
+MINI_STEP.dive = (dt, d) => {
+  const ev = DVS.ev;
+  d.flex *= Math.exp(-dt * 5);
+  const twBtn = $('#diveTwist'), showTw = ev.kind !== 'cannon' && (d.phase === 'air' || d.phase === 'bounce' || d.phase === 'ready') && !MINI.over;
+  if (twBtn.hidden === showTw) twBtn.hidden = !showTw;
+  // camera: start up at the board, follow the diver down to the water
+  const want = d.phase === 'air' ? Math.max(0, -d.y - 300 / ev.z) : d.phase === 'judge' || d.phase === 'podium' ? 0 : Math.max(0, ev.hPx - 300 / ev.z);
+  d.camUp += (want - d.camUp) * Math.min(1, dt * (d.phase === 'air' ? 9 : 2.2));
+  for (const r of d.drops) { r.vy += 900 * dt; r.x += r.vx * dt; r.y += r.vy * dt; } d.drops = d.drops.filter(r => r.y < 40);
+  if (d.phase === 'pick' || d.phase === 'bounce' || d.phase === 'ready') { d.bt += dt; return; }
+  if (d.phase === 'air') {
+    d.tuck = MINI.hold; if (d.tuck) d.tuckT += dt;
+    d.vy += ev.g * dt; d.vx += d.wind * dt; d.x += d.vx * dt; d.y += d.vy * dt;
+    d.a += (d.tuck ? DV_TUCK : DV_OPEN) * dt;
+    d.tw += clamp(d.twT - d.tw, -DV_TWIST * dt, DV_TWIST * dt);
+    if (d.y >= -12 && d.vy > 0) diveEnter(d);
+    return;
+  }
+  if (d.phase === 'judge') {
+    d.jt += dt;
+    if (d.jt > 3.4) {
+      d.n++;
+      if (d.n >= ev.dives) { d.phase = 'podium'; d.podT = now; const st = ev.stars.filter(s => MINI.score >= s).length; if (st) SFX.fanfare(); else SFX.pop(); $('#diveTwist').hidden = true; return; }
+      diveReset(d);
+    }
+    return;
+  }
+  if (d.phase === 'podium') {
+    if (Math.random() < 0.6) d.confetti.push({ x: Math.random() * W, y: -10, vy: 80 + Math.random() * 90, vx: (Math.random() - 0.5) * 40, c: pick(['#ef476f', '#ffd166', '#06d6a0', '#118ab2', '#9b5de5']), r: Math.random() * 6 });
+    for (const q of d.confetti) { q.y += q.vy * dt; q.x += q.vx * dt; q.r += dt * 4; }
+    d.confetti = d.confetti.filter(q => q.y < H + 10);
+    if (now - d.podT > 4.2) miniEnd();
+  }
+};
+function diveEnter(d) {
+  const ev = DVS.ev, TAU = Math.PI * 2, half = Math.round(d.a / Math.PI), dev = Math.abs(d.a - half * Math.PI);
+  const twists = Math.round(d.twT / TAU), twOff = Math.abs(d.tw - d.twT) > 0.7, flop = dev > 0.9 && !d.tuck;
+  d.entryV = d.vy; d.phase = 'judge'; d.jt = 0; d.y = 0;
+  let res;
+  if (ev.kind === 'cannon') {
+    const f = d.tuck ? 1 : flop ? 0.8 : 0.25, spin = d.tuck && d.a > TAU ? 2.5 : 0;
+    const ft = clamp(d.vy / 95 * f + spin + (d.perfect ? 1 : 0) + (Math.random() - 0.5), 1, 26);
+    const js = [0, 1, 2].map(() => clamp(Math.round((ft * 0.62 + (Math.random() - 0.5) * 0.8) * 2) / 2, 0, 10));
+    const text = d.tuck ? (spin ? 'SPINNING CANNONBALL!' : 'CANNONBALL!') : flop ? 'OUCH! Belly flop!' : "That's a dive, not a cannonball!";
+    res = { js, ft, text, score: js[0] + js[1] + js[2], dd: 1, big: ft >= 10 };
+    d.splash = ft;
+  } else {
+    let E = dev < 0.25 ? 9 : dev < 0.5 ? 7.5 : dev < 0.9 ? 5.5 : 2, text;
+    if (dev < 0.25) text = half % 2 ? 'Rip entry!' : 'Clean feet-first!';
+    else if (dev < 0.5) text = 'Nice dive!';
+    else if (dev < 0.9) text = d.a > half * Math.PI ? 'Over-rotated' : 'A little short';
+    else text = 'BELLY FLOP!';
+    if (d.tuck) { E -= 3; text = 'Still tucked!'; }
+    if (twOff) { E -= 1.5; text += '  (twisted sideways)'; }
+    if (d.perfect) E += 0.5;
+    const call = d.call || DV_CALLS[0], matched = half === call.h && twists === call.tw, dd = matched ? call.dd : 1;
+    const js = [0, 1, 2].map(() => clamp(Math.round((E + (Math.random() - 0.5) * 1.2) * 2) / 2, 0, 10));
+    let bonus = 0, ringText = '';
+    if (ev.kind === 'cliff') { const off = Math.abs(d.x - d.ring); if (off < 60) { bonus = 10; ringText = 'BULLSEYE! +10'; } else if (off < 130) { bonus = 5; ringText = 'In the ring! +5'; } }
+    res = { js, text, dd, matched, call, bonus, ringText, score: (js[0] + js[1] + js[2]) * dd + bonus, big: flop || d.tuck };
+    d.splash = d.tuck ? 11 : flop ? 13 : dev < 0.25 ? 1 : dev < 0.5 ? 3 : 6;
+  }
+  d.result = res; MINI.score = Math.round(MINI.score + res.score); d.total += res.score;
+  const sx = d.x, n = Math.round(8 + d.splash * 3);
+  for (let i = 0; i < n; i++) d.drops.push({ x: sx + (Math.random() - 0.5) * 30, y: -4, vx: (Math.random() - 0.5) * (120 + d.splash * 18), vy: -(160 + Math.random() * d.splash * 55) });
+  d.ripples.push({ x: sx, t0: now, big: 0.3 + d.splash / 8 });
+  if (d.splash >= 10) { d.soak = now; }
+  const good = res.js[0] + res.js[1] + res.js[2] >= 21 || (ev.kind === 'cannon' && res.ft >= 12);
+  if (good) { d.cheer = now; setTimeout(() => SFX.scribble(), 450); }
+  if (res.text.startsWith('BELLY') || res.text.startsWith('OUCH')) SFX.crash(); else SFX.splash(Math.min(1.6, 0.4 + d.splash / 9));
+}
+
+// ----- drawing -----
+function diveCam(c, ev, d) { c.translate(150, DV_WY + d.camUp * ev.z); c.scale(ev.z, ev.z); c.translate(-150, 0); }
+function diveWorld(c, d) {
+  const ev = DVS.ev, H = ev.hPx;
+  c.save(); diveCam(c, ev, d);
+  if (ev.kind === 'cliff') {
+    c.fillStyle = '#c9b79c'; c.strokeStyle = INK; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(-600, 400); c.lineTo(-600, -H - 10); c.lineTo(DV_TIP + 10, -H - 10);
+    const pts = [[DV_TIP, -H + 40], [DV_TIP - 30, -H + 160], [DV_TIP + 20, -H + 330], [DV_TIP - 20, -H * 0.62], [DV_TIP + 40, -H * 0.42], [DV_TIP - 10, -H * 0.22], [DV_TIP + 60, -40], [DV_TIP + 90, 0], [DV_TIP + 90, 400]];
+    for (const [x, y] of pts) c.lineTo(x, y); c.closePath(); c.fill(); c.stroke();
+    c.strokeStyle = 'rgba(122,90,50,.35)'; c.lineWidth = 3; for (let k = 1; k < 12; k++) { const y = -H + k * H / 12; c.beginPath(); c.moveTo(-500, y); c.lineTo(DV_TIP - 60 + (k % 3) * 30, y + 20); c.stroke(); }
+    c.fillStyle = LEAF; c.fillRect(-600, -H - 22, DV_TIP + 610, 14);
+    c.save(); c.translate(-80, -H - 10); c.scale(1.6, 1.6); drawPalm(c, 0, 51, 0); c.restore();
+    c.strokeStyle = INK; c.lineWidth = 3; c.beginPath(); c.moveTo(DV_TIP - 40, -H - 10); c.lineTo(DV_TIP - 40, -H - 110); c.stroke();
+    const wv = d.wind, sock = clamp(Math.abs(wv) / 70, 0.25, 1);
+    c.save(); c.translate(DV_TIP - 40, -H - 104); c.scale(Math.sign(wv) || 1, 1); c.rotate(0.9 - sock * 0.9 + Math.sin(now * 6) * 0.05);
+    for (let k = 0; k < 4; k++) { c.fillStyle = k % 2 ? '#fff' : '#ff8c42'; c.fillRect(k * 16, -8 + k, 16, 16 - k * 2); } c.strokeStyle = INK; c.lineWidth = 1.5; c.strokeRect(0, -8, 64, 16); c.restore();
+  } else if (ev.kind === 'platform') {
+    c.fillStyle = '#e7e2d6'; c.strokeStyle = INK; c.lineWidth = 3; c.beginPath(); c.rect(40, -H, 150, H + 200); c.fill(); c.stroke();
+    c.strokeStyle = 'rgba(74,74,79,.35)'; c.lineWidth = 2; for (let y = -H + 60; y < 0; y += 60) { c.beginPath(); c.moveTo(40, y); c.lineTo(190, y); c.stroke(); }
+    for (const f of [0.3, 0.55, 0.8]) { c.fillStyle = '#fffdf5'; c.fillRect(160, -H * f - 10, 120, 14); c.strokeStyle = INK; c.lineWidth = 2; c.strokeRect(160, -H * f - 10, 120, 14); htext(c, `${Math.round(f * 10)}m`, 220, -H * f + 26, 26, GRAPH); }
+    c.fillStyle = '#fffdf5'; c.fillRect(150, -H, DV_TIP - 150 + 10, 16); c.strokeStyle = INK; c.lineWidth = 2.4; c.strokeRect(150, -H, DV_TIP - 150 + 10, 16);
+    for (let y = -H + 30; y < 0; y += 34) jline(c, 20, y, 40, y, 2200 + y, GRAPH, 2, 1);
+    jline(c, 20, 0, 20, -H, 2201, INK, 2.4, 1);
+    htext(c, '10m', 100, -H + 60, 40, RED);
+  } else {
+    for (const lx of [110, 180]) jline(c, lx, 0, lx + (lx < 150 ? 8 : -8), -H + 8, 1810 + lx, INK, 3, 1);
+    for (let y = -H + 40; y < 0; y += 36) jline(c, 116, y, 174, y, 1820 + Math.round(y), GRAPH, 1.8, 1);
+    c.fillStyle = '#d8c3a5'; c.fillRect(96, -H + 2, 100, 12); c.strokeStyle = INK; c.lineWidth = 1.8; c.strokeRect(96, -H + 2, 100, 12);
+    const o = d.phase === 'bounce' ? Math.sin(d.bt * 5.2) : d.flex, tipY = -H + o * 14;
+    c.strokeStyle = INK; c.lineWidth = 11; c.lineCap = 'round'; c.beginPath(); c.moveTo(150, -H); c.quadraticCurveTo(250, -H + o * 3, DV_TIP, tipY); c.stroke();
+    c.strokeStyle = ev.kind === 'cannon' ? '#ef476f' : '#ffd166'; c.lineWidth = 7; c.stroke();
+    htext(c, ev.kind === 'cannon' ? 'CANNONBALL!' : ev.id === 'spring3' ? '3m' : '1m', 145, -H - 110, 34, RED, { rot: -0.05 });
+  }
+  // deck and water
+  if (ev.kind !== 'cliff') { c.fillStyle = '#ece6d4'; c.fillRect(-700, 0, 900, 900); jline(c, -700, 0, 200, 0, 1801, GRAPH, 2, 1); }
+  if (ev.kind === 'cliff') {
+    const rx = d.ring; c.lineWidth = 9; for (let q = 0; q < 12; q++) { c.strokeStyle = q % 2 ? '#fff' : '#ef476f'; c.beginPath(); c.ellipse(rx, 2, 130, 22, 0, q * Math.PI / 6, (q + 1) * Math.PI / 6); c.stroke(); }
+    c.strokeStyle = '#ffd166'; c.lineWidth = 6; c.beginPath(); c.ellipse(rx, 2, 60, 11, 0, 0, 7); c.stroke();
+  }
+  // the diver
+  const tipY = ev.kind === 'spring' || ev.kind === 'cannon' ? -H + (d.phase === 'bounce' ? Math.sin(d.bt * 5.2) : d.flex) * 14 : -H;
+  if (d.phase === 'pick' || d.phase === 'bounce' || d.phase === 'ready') {
+    const swing = d.phase === 'ready' ? Math.sin(d.bt * 8) * 0.12 : 0;
+    drawTester(c, DV_TIP - 18, tipY - 5, -0.05 + swing, 'happy', 2.8, 1);
+  } else if (d.phase === 'air') {
+    c.save(); c.translate(d.x, d.y); c.rotate(d.a); if (d.tuck) c.scale(0.78, 0.78);
+    const cs = Math.cos(d.tw); c.scale(Math.abs(cs) < 0.15 ? 0.15 * Math.sign(cs || 1) : cs, 1);
+    drawTester(c, 0, 22, 0, d.tuck ? 'whee' : 'air', 2.8, 1); c.restore();
+  } else if (d.phase === 'judge') {
+    if (d.jt > 1.0) { const bob = Math.sin(now * 4) * 3; drawTester(c, d.x + 10, 14 + bob, 0, d.result && d.result.big && !d.result.js.some(j => j > 6) ? 'dizzy' : 'whee', 2.4, 1); }
+    else { const dep = 30 + Math.sin(Math.min(1, d.jt) * Math.PI) * 70; c.save(); c.globalAlpha = 0.75; drawTester(c, d.x, dep, d.a, 'fast', 2.6, 1); c.restore(); for (let k = 0; k < 6; k++) { c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 2; c.beginPath(); c.arc(d.x + Math.sin(k * 2 + now * 3) * 20, dep - 20 - ((now * 90 + k * 30) % 90), 4 + k % 3, 0, 7); c.stroke(); } }
+  }
+  // water on top so the diver sinks into it
+  c.fillStyle = ev.kind === 'cliff' ? 'rgba(46,196,182,.42)' : 'rgba(79,195,224,.42)'; c.fillRect(ev.kind === 'cliff' ? DV_TIP + 60 : 200, 0, 4000, 900);
+  if (ev.kind !== 'cliff') { c.strokeStyle = 'rgba(29,141,176,.3)'; c.lineWidth = 1; c.beginPath(); for (let x = 220; x < 2600; x += 40) { c.moveTo(x, 30); c.lineTo(x, 400); } c.stroke(); for (const [ly, col] of [[50, '#ef476f'], [100, '#ffd166']]) { c.setLineDash([10, 8]); c.strokeStyle = col; c.lineWidth = 4; c.beginPath(); c.moveTo(200, ly); c.lineTo(2600, ly); c.stroke(); c.setLineDash([]); } }
+  jline(c, ev.kind === 'cliff' ? DV_TIP + 60 : 200, 0, 2600, 0, 1802, AQUA_DK, 2.4, 1);
+  for (const r of d.ripples) { const a = now - r.t0; if (a > 2) continue; c.strokeStyle = `rgba(255,255,255,${0.9 - a * 0.45})`; c.lineWidth = 2.5; c.beginPath(); c.ellipse(r.x, 4, 20 + a * 90 * r.big, 5 + a * 12, 0, 0, 7); c.stroke(); }
+  // the splash column
+  if (d.phase === 'judge' && d.jt < 1.4) { const k = Math.sin(Math.min(1, d.jt / 1.2) * Math.PI), hgt = d.splash * 16 * k; c.fillStyle = 'rgba(255,255,255,.85)'; c.beginPath(); c.moveTo(d.x - 14 - d.splash * 2, 0); c.quadraticCurveTo(d.x - 8, -hgt * 0.7, d.x, -hgt); c.quadraticCurveTo(d.x + 8, -hgt * 0.7, d.x + 14 + d.splash * 2, 0); c.closePath(); c.fill(); c.strokeStyle = 'rgba(29,141,176,.5)'; c.lineWidth = 2; c.stroke(); }
+  for (const r of d.drops) { c.fillStyle = 'rgba(127,211,239,.95)'; c.beginPath(); c.arc(r.x, r.y, 4, 0, 7); c.fill(); }
+  c.restore();
+}
+function diveJudges(c, d) {
+  const ev = DVS.ev, wS = DV_WY + d.camUp * ev.z, y0 = ev.kind === 'cliff' ? wS - 30 + Math.sin(now * 1.5) * 3 : wS - 270; if (y0 > H + 40) return;
+  if (ev.kind === 'cliff') {
+    c.fillStyle = '#b5773a'; c.strokeStyle = INK; c.lineWidth = 2.4; c.beginPath(); c.moveTo(915, y0); c.lineTo(1185, y0); c.lineTo(1160, y0 + 50); c.lineTo(940, y0 + 50); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#fff'; c.fillRect(990, y0 + 12, 120, 26); c.strokeRect(990, y0 + 12, 120, 26); htext(c, 'JUDGES', 1050, y0 + 32, 22, INK);
+  } else { c.fillStyle = '#fffdf5'; c.fillRect(930, y0, 240, 44); c.strokeStyle = INK; c.lineWidth = 2; c.strokeRect(930, y0, 240, 44); htext(c, 'JUDGES', 1050, y0 + 32, 26, INK); }
+  const soaked = now - d.soak < 2.5;
+  for (let k = 0; k < 3; k++) {
+    const cx = 970 + k * 80, happy = now - d.cheer < 1.6;
+    c.save(); c.translate(cx, y0 - (happy ? Math.abs(Math.sin(now * 10 + k)) * 6 : 0)); c.scale(2.4, 2.4); drawPerson(c, { suit: ['#118ab2', '#ef476f', '#06d6a0'][k], skin: ['#f1c27d', '#8d5524', '#e0ac69'][k], hair: '#3b2a1a', seed: k }, 0, 0, happy ? 'play' : 'stand', now); c.restore();
+    if (soaked) { c.fillStyle = ['#ffd166', '#9b5de5', '#ef476f'][k]; c.beginPath(); c.arc(cx, y0 - 66, 30, Math.PI, 0); c.closePath(); c.fill(); c.strokeStyle = INK; c.lineWidth = 1.6; c.stroke(); jline(c, cx, y0 - 66, cx, y0 - 30, 2300 + k, INK, 1.6, 1); for (let q = 0; q < 3; q++) { c.fillStyle = 'rgba(127,211,239,.9)'; c.beginPath(); c.arc(cx - 20 + q * 20, y0 - 50 + ((now * 120 + q * 30) % 50), 3, 0, 7); c.fill(); } }
+    if (d.result && d.phase === 'judge' && d.jt > 0.6) { const up = Math.min(1, (d.jt - 0.6) * 5), cy = y0 - 80 - up * 20, j = d.result.js[k]; c.fillStyle = '#fff'; c.fillRect(cx - 26, cy - 34, 52, 40); c.strokeStyle = INK; c.lineWidth = 2; c.strokeRect(cx - 26, cy - 34, 52, 40); htext(c, String(j), cx, cy - 4, 30, j >= 7 ? '#2c8a3c' : j >= 4 ? INK : RED); jline(c, cx, cy + 6, cx, cy + 40, 1830 + k, GRAPH, 2, 1); }
+  }
+  if (soaked) htext(c, 'The judges got soaked!', 1050, y0 + 76, 26, '#118ab2');
+}
+function diveCard(c, x, y, call, on) {
+  c.save(); c.translate(x, y); c.rotate(on ? -0.03 : 0.02);
+  c.fillStyle = on ? '#fff3b0' : '#fffdf5'; c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.roundRect(-100, -70, 200, 140, 10); c.fill(); c.stroke();
+  htext(c, call.name, 0, -30, 32, INK);
+  htext(c, `difficulty ${call.dd.toFixed(1)}`, 0, 0, 22, GRAPH, { font: 'hand' });
+  const n = call.h / 2; let s = n === Math.floor(n) ? `${n} flip${n === 1 ? '' : 's'}` : `${n} flips`; if (call.h === 1) s = '½ flip'; if (call.h === 3) s = '1½ flips';
+  htext(c, s + (call.tw ? ' + 1 twist' : '') + (call.h % 2 ? ' · head first' : ' · feet first'), 0, 28, 18, INK, { font: 'hand' });
+  htext(c, 'tap to pick', 0, 56, 18, RED, { font: 'hand' });
+  c.restore();
+}
+function diveHud(c, d) {
+  const ev = DVS.ev;
+  if (d.phase === 'pick') {
+    htext(c, `Dive ${d.n + 1}: pick your dive!`, 600, 110, 40, RED, { rot: -0.03 });
+    d.choices.forEach((call, i) => diveCard(c, 360 + i * 240, 205, call, false));
+    htext(c, 'Harder dives score more, if you pull them off', 600, 312, 24, GRAPH, { font: 'hand' });
+  }
+  if ((d.phase === 'bounce' || d.phase === 'ready' || d.phase === 'air') && d.call) {
+    c.fillStyle = '#fff3b0'; c.beginPath(); c.roundRect(900, 96, 270, 76, 8); c.fill(); c.strokeStyle = INK; c.lineWidth = 1.6; c.stroke();
+    htext(c, d.call.name, 1035, 128, 30, INK); htext(c, `difficulty ${d.call.dd.toFixed(1)}`, 1035, 158, 20, GRAPH, { font: 'hand' });
+  }
+  if (d.phase === 'bounce') { const lowest = Math.sin(d.bt * 5.2) > 0.8; htext(c, lowest ? 'NOW!' : ev.kind === 'cannon' ? 'tap when the board dips, then hold to tuck!' : 'tap when the board dips', 600, 250, lowest ? 60 : 30, lowest ? '#2c8a3c' : GRAPH, { font: lowest ? 'Caveat' : 'hand' }); }
+  if (d.phase === 'ready') {
+    const pw = 1 - Math.abs(1 - (d.bt * 1.3) % 2), x0 = 460, x1 = 740, y = 240;
+    c.fillStyle = '#fffdf5'; c.fillRect(x0, y - 16, x1 - x0, 32); c.fillStyle = '#2c8a3c'; c.fillRect(x1 - 28, y - 16, 28, 32); c.strokeStyle = INK; c.lineWidth = 2; c.strokeRect(x0, y - 16, x1 - x0, 32);
+    c.fillStyle = RED; c.beginPath(); c.moveTo(x0 + pw * (x1 - x0), y - 22); c.lineTo(x0 + pw * (x1 - x0) - 9, y - 36); c.lineTo(x0 + pw * (x1 - x0) + 9, y - 36); c.fill();
+    htext(c, pw > 0.9 ? 'LEAP!' : 'tap when the arrow hits green', 600, 205, pw > 0.9 ? 44 : 26, pw > 0.9 ? '#2c8a3c' : GRAPH, { font: pw > 0.9 ? 'Caveat' : 'hand' });
+    if (ev.kind === 'cliff') diveRadar(c, d, pw);
+    if (ev.kind === 'cliff') htext(c, `wind ${d.wind > 8 ? '→' : d.wind < -8 ? '←' : '~'} ${Math.abs(Math.round(d.wind / 10))}  ·  land in the ring!`, 600, 292, 26, '#ff8c42', { font: 'hand' });
+  }
+  if (d.phase === 'air' && ev.kind !== 'cannon') {
+    const half = Math.round(d.a / Math.PI), n = half / 2;
+    htext(c, half ? (n % 1 ? `${Math.floor(n) ? Math.floor(n) : ''}½` : `${n}`) + (half === 1 ? ' flip' : ' flips') : 'flip!', 180, 150, 40, INK, { align: 'left' });
+    if (d.twT > 0) htext(c, `${Math.round(d.twT / (Math.PI * 2))} twist${d.twT > 7 ? 's' : ''}`, 180, 186, 28, '#9b5de5', { align: 'left' });
+    if (d.n === 0 && ev.id === 'spring1') htext(c, 'hold to tuck and flip · let go to open up', 600, 690, 26, INK, { font: 'hand' });
+  }
+  if (d.phase === 'judge' && d.result) {
+    const r = d.result, a = Math.min(1, d.jt * 3);
+    htext(c, r.text, 600, 130, r.text.length > 20 ? 40 : 54, r.text.startsWith('BELLY') || r.text.startsWith('OUCH') || r.text.startsWith('Still') ? RED : INK, { alpha: a, rot: -0.04 });
+    if (d.jt > 1.2) {
+      c.fillStyle = '#fff3b0'; c.beginPath(); c.roundRect(360, 158, 480, 84, 8); c.fill(); c.strokeStyle = INK; c.lineWidth = 1.6; c.stroke();
+      const sum = r.js[0] + r.js[1] + r.js[2];
+      if (ev.kind === 'cannon') { htext(c, `Splash-o-meter: ${Math.round(r.ft)} feet!`, 600, 192, 32, '#118ab2'); htext(c, `judges: ${sum}`, 600, 228, 24, INK, { font: 'hand' }); }
+      else { htext(c, `${sum} × ${r.dd.toFixed(1)}${r.bonus ? ` + ${r.bonus}` : ''} = ${(Math.round(r.score * 10) / 10)}`, 600, 196, 34, INK); htext(c, r.matched ? `${r.call.name}: nailed it!` : `Not the ${r.call.name}, so no difficulty bonus`, 600, 230, 22, r.matched ? '#2c8a3c' : RED, { font: 'hand' }); }
+      if (r.ringText) htext(c, r.ringText, 600, 280, 34, '#ff8c42');
+    }
+  }
+  htext(c, `${MINI.score}`, 1160, 88, 34, INK, { align: 'right' });
+}
+// cliff helper: a little map of where this leap would land
+function diveRadar(c, d, pw) {
+  const ev = DVS.ev, x0 = 860, y0 = 330, w = 300, h = 210, s = (h - 70) / ev.hPx, sx = (w - 50) / 1150, ox = x0 + 26, oy = y0 + h - 30;
+  c.fillStyle = 'rgba(255,253,245,.92)'; c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.roundRect(x0, y0, w, h, 10); c.fill(); c.stroke();
+  htext(c, 'where you will land', x0 + w / 2, y0 + 24, 20, GRAPH, { font: 'hand' });
+  const X = x => ox + (x - DV_TIP) * sx, Y = y => oy + y * s;
+  c.fillStyle = '#c9b79c'; c.fillRect(x0 + 2, Y(-ev.hPx), X(DV_TIP) - x0 - 2, oy - Y(-ev.hPx)); c.fillStyle = 'rgba(46,196,182,.45)'; c.fillRect(X(DV_TIP), oy, x0 + w - 2 - X(DV_TIP), 22);
+  c.strokeStyle = '#ef476f'; c.lineWidth = 4; c.beginPath(); c.moveTo(X(d.ring - 130), oy); c.lineTo(X(d.ring + 130), oy); c.stroke(); c.strokeStyle = '#ffd166'; c.beginPath(); c.moveTo(X(d.ring - 60), oy); c.lineTo(X(d.ring + 60), oy); c.stroke();
+  const vx = 150 + 170 * pw, vy = -(300 + 170 * pw), g = ev.g, t = (-vy + Math.sqrt(vy * vy + 2 * g * ev.hPx)) / g;
+  c.strokeStyle = 'rgba(31,61,158,.5)'; c.setLineDash([4, 4]); c.lineWidth = 1.6; c.beginPath();
+  for (let k = 0; k <= 20; k++) { const tt = t * k / 20, x = DV_TIP - 18 + vx * tt + d.wind * tt * tt / 2, y = -ev.hPx + vy * tt + g * tt * tt / 2; k ? c.lineTo(X(x), Y(y)) : c.moveTo(X(x), Y(y)); }
+  c.stroke(); c.setLineDash([]);
+  const lx = DV_TIP - 18 + vx * t + d.wind * t * t / 2; c.fillStyle = RED; c.beginPath(); c.arc(X(lx), oy, 6, 0, 7); c.fill();
+}
+function divePodium(c, d) {
+  const ev = DVS.ev, stars = ev.stars.filter(s => MINI.score >= s).length, t = now - d.podT;
+  c.fillStyle = 'rgba(251,248,238,.94)'; c.fillRect(0, 58, W, H - 58);
+  const steps = [{ x: 470, h: 120, place: 2 }, { x: 600, h: 170, place: 1 }, { x: 730, h: 90, place: 3 }], base = 600;
+  for (const s of steps) { c.fillStyle = s.place === 1 ? '#fff3b0' : '#fffdf5'; c.fillRect(s.x - 64, base - s.h, 128, s.h); c.strokeStyle = INK; c.lineWidth = 2.4; c.strokeRect(s.x - 64, base - s.h, 128, s.h); htext(c, String(s.place), s.x, base - s.h + 60, 54, INK); }
+  jline(c, 200, base, 1000, base, 2401, INK, 2.4, 1);
+  const myPlace = stars === 3 ? 1 : stars === 2 ? 2 : stars === 1 ? 3 : 0;
+  for (const s of steps) {
+    const hop = Math.abs(Math.sin(now * 4 + s.place)) * 4;
+    if (s.place === myPlace) {
+      const rise = Math.min(1, t * 1.5);
+      drawTester(c, s.x, base - s.h - 8 - hop, 0, 'whee', 3.4 * rise + 0.01, 1);
+      if (t > 0.8) { c.strokeStyle = '#ef476f'; c.lineWidth = 3; c.beginPath(); c.moveTo(s.x - 12, base - s.h - 70); c.lineTo(s.x, base - s.h - 40); c.lineTo(s.x + 12, base - s.h - 70); c.stroke(); c.fillStyle = MEDAL[stars]; c.beginPath(); c.arc(s.x, base - s.h - 32, 12, 0, 7); c.fill(); c.strokeStyle = INK; c.lineWidth = 2; c.stroke(); }
+    } else { c.save(); c.translate(s.x, base - s.h - 4); c.rotate(Math.sin(now * 2 + s.place) * 0.05); pencilTarget(c, 0, 0, 1.3); c.restore(); }
+  }
+  if (!myPlace) { drawTester(c, 300, base - 8, 0, 'happy', 3.2, 1); htext(c, 'Keep practicing!', 300, base - 120, 34, INK); }
+  htext(c, myPlace ? `${MEDAL_NAME[stars]} medal!` : 'No medal this time', 600, 170, 72, myPlace ? (stars === 3 ? '#c9a227' : INK) : GRAPH, { rot: -0.04 });
+  htext(c, `${ev.name} · ${MINI.score} points`, 600, 222, 30, GRAPH, { font: 'hand' });
+  for (const q of d.confetti) { c.save(); c.translate(q.x, q.y); c.rotate(q.r); c.fillStyle = q.c; c.fillRect(-4, -2, 8, 4); c.restore(); }
+  if (t > 1) htext(c, 'tap to continue', 600, 680, 24, GRAPH, { font: 'hand', alpha: 0.7 });
+}
+MINI_DRAW.dive = (c, d) => {
+  const ev = DVS.ev;
+  if (ev.kind === 'cliff') {
+    c.fillStyle = 'rgba(127,211,239,.16)'; c.fillRect(0, 58, W, H - 58);
+    c.fillStyle = 'rgba(255,209,102,.6)'; c.beginPath(); c.arc(760, 130, 30, 0, 7); c.fill();
+    const wS = DV_WY + d.camUp * ev.z; if (wS < H + 60) { c.fillStyle = '#c9b79c'; c.beginPath(); c.ellipse(820, wS, 110, 26, 0, Math.PI, 0); c.fill(); c.strokeStyle = INK; c.lineWidth = 1.6; c.stroke(); c.save(); c.translate(800, wS - 22); c.globalAlpha = 0.7; drawPalm(c, 0, 77, 0); c.restore(); c.globalAlpha = 1; }
+  }
+  diveWorld(c, d);
+  diveJudges(c, d);
+  diveHud(c, d);
+  if (d.phase === 'podium') divePodium(c, d);
+};
+function diveOnEnd(stars) {
+  const ev = DVS.ev, dd = diveData(), before = diveStars(), prev = dd.medals[ev.id] || 0, notes = [];
+  if (stars > prev) dd.medals[ev.id] = stars;
+  dd.best[ev.id] = Math.max(dd.best[ev.id] || 0, MINI.score);
+  const after = diveStars();
+  if (stars === 3 && prev < 3) { setTickets(state.tickets + 10); notes.push('First gold in this event: +10 bonus tickets!'); }
+  for (const e of DV_EV) if (e.need > before && e.need <= after) notes.push(`New event unlocked: ${e.name}!`);
+  save();
+  return { title: stars ? `${MEDAL_NAME[stars]} medal!` : 'No medal this time', html: notes.length ? `<br>${notes.map(n => `<b style="color:#7a5b00">${esc(n)}</b>`).join('<br>')}` : '' };
+}
+function startDive(i) {
+  const ev = DV_EV[i]; if (!ev || diveStars() < ev.need) return;
+  DVS.ev = ev; Object.assign(MINI_INFO.dive, { name: `High Dive · ${ev.name}`, stars: ev.stars, div: ev.stars[2] / 20, bestKey: 'dive_' + ev.id });
+  startMini('dive');
+}
+
+// ----- the High Dive card: pick an event -----
+function showDiveCard() {
+  hidePanels(); SFX.pop();
+  const dd = diveData(), tot = diveStars(), el = $('#lotCard'), s = slotOf('dive');
+  const rows = DV_EV.map((e, i) => {
+    const m = dd.medals[e.id] || 0, locked = tot < e.need;
+    const medal = `<svg viewBox="0 0 30 30" width="30" height="30" aria-label="${m ? MEDAL_NAME[m] + ' medal' : 'no medal yet'}"><path d="M9 2l6 9 6-9" fill="none" stroke="${m ? '#ef476f' : '#c9c1a6'}" stroke-width="3"/><circle cx="15" cy="19" r="9" fill="${m ? MEDAL[m] : 'none'}" stroke="${m ? '#1f3d9e' : '#c9c1a6'}" stroke-width="2" stroke-dasharray="${m ? '' : '3 3'}"/></svg>`;
+    return `<div class="dvrow${locked ? ' locked' : ''}">${medal}<div class="dvn"><b>${esc(e.name)}</b><br><small>${esc(e.blurb)}${dd.best[e.id] ? ` Best ${dd.best[e.id]}.` : ''}</small></div>${locked ? `<span class="slock">🔒 ${e.need} ★</span>` : `<button class="primary" data-ev="${i}">Dive!</button>`}</div>`;
+  }).join('');
+  el.innerHTML = `<div class="eyebrow">Your park · ${tot} of 15 medal stars</div><h2>High Dive</h2><p style="font-size:16px;margin:4px 0">Win medals to unlock taller boards. Bronze is 1 star, silver 2, gold 3.</p><div class="dvlist">${rows}</div><div class="row smwho"><canvas id="dvRider"></canvas><span>Diver: <b id="dvRiderName">${esc(tester().name)}</b></span><button id="dvRiderBtn">Change diver</button><div class="grow"></div><button id="mnClose">Close</button></div>`;
+  el.style.left = (s ? clamp(s.x + s.w / 2 - PARK.camX - 230, 16, W - 476) : 360) + 'px'; el.style.top = '70px'; el.style.width = '460px'; el.hidden = false;
+  el.querySelectorAll('[data-ev]').forEach(b => b.onclick = () => { el.style.width = ''; startDive(+b.dataset.ev); });
+  const rc = $('#dvRider'), k = 2, c = rc.getContext('2d'); rc.width = 60 * k; rc.height = 44 * k; c.setTransform(k, 0, 0, k, 0, 0); drawTester(c, 30, 36, 0, 'happy', 1.3, 1);
+  $('#dvRiderBtn').onclick = () => { openTesters(); };
+  $('#mnClose').onclick = () => { el.hidden = true; el.style.width = ''; };
+}
+addEventListener('keydown', e => {
+  if (!alive() || scene !== 'mini' || MINI.type !== 'dive' || MINI.over) return;
+  const d = MINI.d;
+  if (e.key === 't' || e.key === 'T' || e.key === 'Shift') { diveTwist(); e.preventDefault(); }
+  if (d.phase === 'pick' && ['1', '2', '3'].includes(e.key)) { const i = +e.key - 1; MINI_TAP.dive({ x: 360 + i * 240, y: 205 }); }
+});
 
 // ---------- Snack Shack Rush: run the counter ----------
 const SNK_UP = [
@@ -4612,6 +4895,7 @@ function showScene(name) {
   $('#povBar').hidden = name !== 'pov'; if (name !== 'pov') $('#povEnd').hidden = true;
   $('#btnTester').hidden = name !== 'ws'; $('#testerCard').hidden = true;
   $('#miniBar').hidden = name !== 'mini'; if (name !== 'mini') $('#miniEnd').hidden = true;
+  $('#diveTwist').hidden = true;
   $('#surfBar').hidden = name !== 'surf'; if (name !== 'surf') { $('#surfMenu').hidden = true; $('#surfEnd').hidden = true; SURF.hold = false; }
   $('#navL').hidden = $('#navR').hidden = name !== 'park';
   if (name === 'park') { closeReport(); WS.play = null; SFX.ride(0, 0); SFX.pen(0); $('#tix').textContent = state.tickets; }
@@ -4654,6 +4938,8 @@ $('#prizeOk').onclick = () => { $('#prizeCard').hidden = true; SFX.pop(); };
 $('#miniBack').onclick = () => { SFX.pop(); showScene('park'); };
 $('#miniBackEnd').onclick = () => { SFX.pop(); showScene('park'); };
 $('#miniAgain').onclick = () => startMini(MINI.type);
+$('#diveTwist').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); diveTwist(); });
+$('#diveTwist').onclick = e => e.preventDefault();
 $('#surfBack').onclick = () => { SFX.pop(); if (SURF.mode === 'ride' && SURF.kind === 'surf') openSurfShack(); else showScene('park'); };
 $('#seAgain').onclick = () => SURF.kind === 'pool' ? poolStart() : surfStart(SURF.wi);
 $('#seNext').onclick = () => surfStart(SURF.wi + 1);
