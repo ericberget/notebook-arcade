@@ -103,6 +103,7 @@
   .item .ds { font-size: 16px; color: var(--graphite); }
   .item button { min-width: 96px; }
   .item.owned button { border-style: dashed; }
+  .item.hl { background: rgba(255,216,77,.28); border-radius: 8px; }
   /* lot card, welcome, toast */
   #lotCard { width: 420px; }
   #welcome { position: absolute; left: 404px; top: 412px; width: 392px; box-sizing: border-box; padding: 14px 20px 16px; background: var(--card); box-shadow: 3px 8px 22px var(--shadow); transform: rotate(-1.2deg); display: grid; gap: 8px; justify-items: start; }
@@ -175,6 +176,15 @@
   .dvrow { display: flex; align-items: center; gap: 10px; border-bottom: 1.5px dashed rgba(31,61,158,.3); padding: 4px 0; }
   .dvrow .dvn { flex: 1; font-size: 16px; line-height: 1.15; } .dvrow b { font-family: Caveat, cursive; font-size: 25px; } .dvrow small { color: var(--graphite); font-size: 14px; }
   .dvrow.locked { opacity: .55; } .dvrow svg { flex: none; }
+  #qkCard { left: 150px; top: 120px; width: 900px; display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: center; transform: rotate(-.5deg); }
+  #qkFace { width: 180px; height: 180px; }
+  .qkbubble { position: relative; background: #fff; border: 2px solid var(--ink); border-radius: 18px; padding: 14px 18px; font-family: Caveat, cursive; font-size: 30px !important; line-height: 1.15 !important; color: var(--ink) !important; min-height: 76px; margin: 6px 0 14px !important; }
+  .qkbubble::before { content: ''; position: absolute; left: -14px; top: 28px; border: 8px solid transparent; border-right: 14px solid var(--ink); }
+  .qkopts { display: grid; gap: 10px; }
+  .qkopts button { display: flex; align-items: center; gap: 12px; text-align: left; font-size: 20px; padding: 8px 14px; }
+  .qkopts button b { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: #fff; font-family: Caveat, cursive; font-size: 24px; }
+  .qkopts button:hover b { background: var(--red); }
+  #balEnd { left: 640px; top: 170px; width: 460px; transform: rotate(-1deg); }
   #mute { position: absolute; top: 12px; right: 18px; }
   .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 10px 0 16px; }
   .steps div { font-size: 17px; line-height: 1.25; }
@@ -290,6 +300,19 @@
     <div class="row"><button class="primary" id="seAgain">Surf again</button><button id="seNext">Next wave &rarr;</button><button id="seShack">Surf Shack</button><button id="sePark">Park</button></div>
   </div>
   <button id="diveTwist" hidden aria-label="Twist">TWIST &#8635;</button>
+  <div id="qkCard" class="card" hidden>
+    <canvas id="qkFace"></canvas>
+    <div class="qkr">
+      <div class="eyebrow" id="qkWho">Quackers the mascot</div>
+      <p id="qkText" class="qkbubble"></p>
+      <div class="qkopts"><button id="qkA"><b>A</b><span></span></button><button id="qkB"><b>B</b><span></span></button></div>
+    </div>
+  </div>
+  <div id="balBar" class="bar" hidden><button id="balBack">&larr; Park</button><div class="order"><b>Hot air balloon</b><br><span id="balStat"></span></div></div>
+  <div id="balEnd" class="card" hidden>
+    <div class="eyebrow">Hot air balloon</div><h2>What a view!</h2><p id="balEndText"></p>
+    <div class="row"><button class="primary" id="balAgain">Fly again</button><button id="balPark">Back to the park</button></div>
+  </div>
   <div id="testerCard" class="card" hidden>
     <div class="row"><div><div class="eyebrow">The test crew</div><h2>Pick your test rider</h2></div><div class="grow"></div><button id="testerClose">Close</button></div>
     <p style="margin:4px 0 0">Every rider weighs the same, so Lifeguard Lou's rules don't change. They just scream differently.</p>
@@ -1666,7 +1689,7 @@ function guestPos(g) {
   const pose = g.state === 'swim' || g.state === 'wave' || g.state === 'river' || g.state === 'tub' ? 'swim' : g.state === 'play' ? 'play' : moving ? 'walk' : 'stand';
   return { x: g.x, y: g.y, pose };
 }
-function maxGuests() { if (!state.rides.length) return 3; const stars = state.rides.reduce((a, r) => a + r.stars, 0); return Math.min(44, 5 + stars * 2 + attractions() * 3 + (state.owned.mascot ? 4 : 0)); }
+function maxGuests() { if (!state.rides.length) return 3; const stars = state.rides.reduce((a, r) => a + r.stars, 0); return Math.min(44, 5 + stars * 2 + attractions() * 3 + (state.owned.mascot && !(state.quackers && state.quackers.quit) ? 4 : 0)); }
 function parkUpdate(dt) {
   PARK.camX = lerp(PARK.camX, PARK.camTarget, 1 - Math.exp(-dt * 9));
   PARK.spawnT -= dt;
@@ -1830,10 +1853,16 @@ function drawPark(c) {
   const cam = PARK.camX;
   const sx = 1010 - cam * 0.06; c.fillStyle = 'rgba(246,213,92,.5)'; c.beginPath(); c.arc(sx, 150, 26, 0, 7); c.fill(); jcircle(c, sx, 150, 27, 40, '#c9a227', 1.6);
   for (let k = 0; k < 10; k++) { const a = k / 10 * 6.28 + now * 0.1; jline(c, sx + Math.cos(a) * 34, 150 + Math.sin(a) * 34, sx + Math.cos(a) * 44, 150 + Math.sin(a) * 44, 50 + k, '#c9a227', 1.4, 1); }
+  qkDrawHeat(c, cam);
   drawSkyLife(c, cam, state.owned.banner ? state.name : null); drawFireworks(c);
   for (let i = 0; i < 8; i++) { const span = PW * 0.35 + 1500, wx = i * 520 + now * 5; const x = ((wx - cam * 0.35) % span + span) % span - 200; drawCloud(c, x, 120 + rnd(i) * 150, 0.9 + rnd(i + 4) * 0.5, i); }
+  drawParkWorld(c, cam, W);
+  drawMinimap(c);
+}
+// the park itself (ground, rides, guests), seen from camera x = cam across viewW pixels of park
+function drawParkWorld(c, cam, viewW) {
   c.save(); c.translate(-cam, 0);
-  const a = cam - 60, b = cam + W + 60;
+  const a = cam - 60, b = cam + viewW + 60;
   c.fillStyle = 'rgba(160,130,80,.12)'; c.fillRect(a, PG, b - a, BW0 - PG);
   for (let x = Math.floor(a / 120) * 120; x < b; x += 120) jline(c, x, PG, x + 122, PG, 500 + x, GRAPH, 1.6, 1, 0.8);
   const PSP = palmSpots(); for (let i = 0; i < state.palms && i < PSP.length; i++) if (PSP[i] > a - 60 && PSP[i] < b + 60) drawPalm(c, PSP[i], i * 13 + 5);
@@ -1863,7 +1892,6 @@ function drawPark(c) {
     else { c.globalAlpha = al; ticketIcon(c, p.x - 10, p.y - t * 30 - 6, 0.8); c.globalAlpha = 1; htext(c, p.text, p.x + 12, p.y - t * 30, 22, '#7a5b00', { alpha: al }); }
   }
   c.restore();
-  drawMinimap(c);
 }
 const MM = { x: W - 338, y: 66, w: 320, h: 26 };
 function drawMinimap(c) {
@@ -1893,13 +1921,14 @@ function parkUp(p) {
   const d = PARK.drag; PARK.drag = null; cv.classList.remove('grab');
   if (!d || d.moved || !p) return;
   if (p.x >= MM.x && p.x <= MM.x + MM.w && p.y >= MM.y && p.y <= MM.y + MM.h) { PARK.camTarget = clamp((p.x - MM.x) / MM.w * PW - W / 2, 0, PW - W); SFX.pop(); return; }
+  if (qkTap(p)) return;
   const wx = p.x + PARK.camX, y = p.y;
   const s = SLOTS.find(q => wx >= q.x && wx <= q.x + q.w);
-  if (y > RIV0 && y < RIV1) { if (state.owned.river) showMiniCard('river'); else openShop(); return; }
+  if (y > RIV0 && y < RIV1) { if (state.owned.river) showMiniCard('river'); else openShop('river'); return; }
   if (!s || y > BW1) return;
   if (s.type === 'lot' && y > 200) lotClick(s.lot);
   else if (s.type === 'gate' && y > 230 && y < BW0) renameCard();
-  else if (ATTRACTIONS.includes(s.type) && y > 300) { if (state.owned[s.type]) { if (s.type === 'surf') openSurfShack(); else if (s.type === 'wave') openWavePool(); else showMiniCard(s.type); } else openShop(); }
+  else if (ATTRACTIONS.includes(s.type) && y > 300) { if (state.owned[s.type]) { if (s.type === 'surf') openSurfShack(); else if (s.type === 'wave') openWavePool(); else if (s.type === 'balloon') openBalloonCard(); else showMiniCard(s.type); } else openShop(s.type); }
 }
 function lotClick(lot) {
   SFX.pop();
@@ -2605,9 +2634,9 @@ function drawSkyLife(c, cam, banner, planeY = 112) {
 }
 
 // ---------- new attractions ----------
-const LAYOUT = ['gate', 0, 1, 'snack', 2, 3, 'fountain', 4, 5, 'wave', 'volley', 'hottub', 'surf', 'gift', 'dive', 'blaster', 'bumper', 'rescue'];
-const SLOT_W = { gate: 240, snack: 220, fountain: 220, wave: 460, volley: 300, hottub: 200, surf: 330, gift: 230, dive: 280, blaster: 280, bumper: 330, rescue: 250 };
-const ATTRACTIONS = ['snack', 'fountain', 'river', 'wave', 'volley', 'hottub', 'surf', 'gift', 'dive', 'blaster', 'bumper', 'rescue'];
+const LAYOUT = ['gate', 0, 1, 'snack', 2, 3, 'fountain', 4, 5, 'wave', 'volley', 'hottub', 'surf', 'gift', 'dive', 'blaster', 'bumper', 'rescue', 'balloon'];
+const SLOT_W = { gate: 240, snack: 220, fountain: 220, wave: 460, volley: 300, hottub: 200, surf: 330, gift: 230, dive: 280, blaster: 280, bumper: 330, rescue: 250, balloon: 260 };
+const ATTRACTIONS = ['snack', 'fountain', 'river', 'wave', 'volley', 'hottub', 'surf', 'gift', 'dive', 'blaster', 'bumper', 'rescue', 'balloon'];
 function salePlaceholder(c, s, w, h, label, price, id) {
   c.setLineDash([6, 6]); c.strokeStyle = 'rgba(74,74,79,.5)'; c.lineWidth = 1.5; c.strokeRect(s.x + (s.w - w) / 2, PG - h, w, h); c.setLineDash([]);
   saleSign(c, s.x + s.w / 2, PG - h / 2 - 6, label, price, id);
@@ -2665,7 +2694,7 @@ function drawAttraction(c, s) {
   switch (s.type) {
     case 'gate': return drawGate(c); case 'lot': return drawLot(c, s); case 'snack': return drawSnack(c, s); case 'fountain': return drawFountain(c, s); case 'wave': return drawWave(c, s);
     case 'volley': return drawVolley(c, s); case 'hottub': return drawHotTub(c, s); case 'surf': return drawSurf(c, s); case 'gift': return drawGift(c, s);
-    case 'dive': return drawDiveArea(c, s); case 'blaster': return drawBlasterArea(c, s); case 'bumper': return drawBumperArea(c, s); case 'rescue': return drawRescueArea(c, s);
+    case 'dive': return drawDiveArea(c, s); case 'blaster': return drawBlasterArea(c, s); case 'bumper': return drawBumperArea(c, s); case 'rescue': return drawRescueArea(c, s); case 'balloon': return drawBalloonPad(c, s);
   }
 }
 function palmSpots() { return SLOTS.filter(s => s.type !== 'gate').map(s => s.x - 10); }
@@ -2674,25 +2703,36 @@ function palmSpots() { return SLOTS.filter(s => s.type !== 'gate').map(s => s.x 
 const MASCOT = { x: 400, dir: 1, wave: 0 };
 function mascotUpdate(dt) {
   if (!state.owned.mascot) return;
-  MASCOT.x += MASCOT.dir * 34 * dt;
+  const q = qkData(); qkUpdate(dt);
+  if (q.mood === 'upset' && !q.quit) return;
+  MASCOT.x += MASCOT.dir * (q.mood === 'raised' ? 48 : q.quit ? 44 : 34) * dt;
   if (MASCOT.x > PW - 200 || (Math.random() < dt * 0.05 && MASCOT.x > 600)) MASCOT.dir = -1;
   if (MASCOT.x < 280 || (Math.random() < dt * 0.05 && MASCOT.x < PW - 600)) MASCOT.dir = 1;
-  for (const g of PARK.guests) if (g.state === 'walk' && Math.abs(g.x - MASCOT.x) < 30 && (!g.bubble || now - g.bubble.t0 > 4)) g.bubble = { text: ':D', t0: now };
+  for (const g of PARK.guests) if (g.state === 'walk' && Math.abs(g.x - MASCOT.x) < 30 && (!g.bubble || now - g.bubble.t0 > 4)) {
+    if (q.quit) { g.bubble = { text: '!', t0: now }; g.x += (g.x < MASCOT.x ? -14 : 14); continue; }
+    g.bubble = { text: ':D', t0: now };
+    if (q.mood === 'raised' && Math.random() < 0.3) earn(g, 1, g.x, g.y - 40);
+  }
 }
 function drawMascot(c) {
   if (!state.owned.mascot) return;
-  const x = MASCOT.x, y = LANE + 4, step = Math.sin(now * 6) * 3, d = MASCOT.dir;
-  c.save(); c.translate(x, y); c.scale(d, 1);
+  const q = qkData(), x = MASCOT.x, y = LANE + 4, upset = q.mood === 'upset', step = upset ? 0 : Math.sin(now * 6) * 3, d = MASCOT.dir;
+  if (q.quit) return qkDrawHonks(c, x, y, d);
+  const dance = q.mood === 'raised' ? Math.abs(Math.sin(now * 8)) : 0;
+  c.save(); c.translate(x, y - dance * 8); c.scale(d, 1); if (dance) c.rotate(Math.sin(now * 8) * 0.12);
   c.strokeStyle = INK; c.lineWidth = 2.4; c.beginPath(); c.moveTo(-5, -10); c.lineTo(-7 + step, 0); c.moveTo(5, -10); c.lineTo(7 - step, 0); c.stroke();
   c.fillStyle = '#ff9f1c'; c.beginPath(); c.ellipse(-8 + step, 0, 6, 2.5, 0, 0, 7); c.ellipse(8 - step, 0, 6, 2.5, 0, 0, 7); c.fill(); c.stroke();
   c.fillStyle = '#ffd84d'; c.beginPath(); c.ellipse(0, -24, 15, 18, 0, 0, 7); c.fill(); c.lineWidth = 1.8; c.stroke();
   c.beginPath(); c.arc(3, -48, 12, 0, 7); c.fill(); c.stroke();
   c.fillStyle = '#ff9f1c'; c.beginPath(); c.moveTo(13, -50); c.lineTo(24, -47); c.lineTo(13, -43); c.closePath(); c.fill(); c.stroke();
   c.fillStyle = INK; c.beginPath(); c.arc(7, -51, 2, 0, 7); c.fill();
+  if (upset) { c.lineWidth = 2; c.beginPath(); c.moveTo(3, -57); c.lineTo(11, -53); c.stroke(); c.lineWidth = 1.8; }
+  if (q.raises > 0) { c.fillStyle = '#2b2d42'; c.beginPath(); c.roundRect(1, -55, 12, 6, 2); c.fill(); }
   c.fillStyle = '#d8342c'; c.beginPath(); c.arc(3, -56, 12, Math.PI * 1.05, Math.PI * 1.95); c.closePath(); c.fill();
   const wv = Math.sin(now * 5) * 0.6; c.save(); c.translate(-10, -30); c.rotate(-1.2 + wv); c.fillStyle = '#ffd84d'; c.beginPath(); c.ellipse(0, -10, 5, 12, 0, 0, 7); c.fill(); c.strokeStyle = INK; c.stroke(); c.restore();
   c.restore();
   htext(c, 'Quackers', x, y - 76, 16, GRAPH, { font: 'Patrick', alpha: 0.8 });
+  qkDrawExtras(c, x, y, d);
 }
 function drawFlamingo(c, x, y, id) {
   c.save(); c.translate(x, y + Math.sin(now * 2 + id) * 1.5);
@@ -4769,10 +4809,291 @@ function fpText(c, str, x, y, size, color, alpha = 1) {
   c.strokeStyle = 'rgba(255,253,245,.92)'; c.lineWidth = size * 0.2; c.strokeText(str, 0, 0); c.fillStyle = color; c.fillText(str, 0, 0); c.restore();
 }
 
+// ---------- Quackers has had enough: heat wave, a pay dispute, and A-or-B choices ----------
+const QK = { heat: false, heatT: 0, parkT: 0, taps: [], quip: null, quipT: 0, node: null, typer: 0, cone: 0 };
+function qkData() { if (!state.quackers) state.quackers = { mood: 'ok', quit: false, raises: 0, owed: false, lastHeat: 0 }; return state.quackers; }
+const QK_QUIPS = ['Quack.', 'No autographs, please.', "I'm on break.", 'Do you know how hot this suit is?', 'Stop poking the duck.'];
+// who: 'q' is Quackers, 'h' is Honks the Goose. mood picks the face.
+const QK_TREE = {
+  start: { who: 'q', mood: 'mad', text: () => qkData().owed ? "Boss. You still owe me from last time. And now it's 98 degrees in a FEATHER SUIT. I want a raise, or I quit." : "Boss. BOSS. It's 98 degrees and I'm wearing a whole duck. I want a raise, or I quit.",
+    a: { label: 'You’re right. Here’s a raise. (10 tickets)', go: () => state.tickets >= 10 ? 'raise' : 'broke' }, b: { label: 'How about a cold treat instead?', go: 'treat' } },
+  poke: { who: 'q', mood: 'mad', text: "Okay, since you keep poking me: we need to talk about my pay. I want a raise, or I quit.",
+    a: { label: 'Fine. Here’s a raise. (10 tickets)', go: () => state.tickets >= 10 ? 'raise' : 'broke' }, b: { label: 'How about a cold treat instead?', go: 'treat' } },
+  broke: { who: 'q', mood: 'shock', text: () => `You only have ${state.tickets} tickets?! You can't even afford a duck?`,
+    a: { label: 'Okay, okay. How about a cold treat?', go: 'treat' }, b: { label: 'I’ll pay you in compliments. You’re a great duck.', go: 'compliment' } },
+  treat: { who: 'q', mood: 'think', text: '...What kind of treat?',
+    a: { label: 'A giant blue snow cone. (3 tickets)', go: () => state.tickets >= 3 ? 'snowcone' : 'broke2' }, b: { label: 'A job interview. For your replacement.', go: 'threat' } },
+  broke2: { who: 'q', mood: 'shock', text: "You can't even buy a SNOW CONE? What kind of park is this?",
+    a: { label: 'I’ll pay you in compliments. You’re a great duck.', go: 'compliment' }, b: { label: 'A job interview. For your replacement.', go: 'threat' } },
+  threat: { who: 'q', mood: 'mad', text: 'You wouldn’t.',
+    a: { label: 'I would. Meet Honks the Goose.', go: 'quit' }, b: { label: 'Kidding! Snow cone? (3 tickets)', go: () => state.tickets >= 3 ? 'snowcone' : 'compliment' } },
+  raise: { who: 'q', mood: 'joy', end: 'raise', text: 'TEN TICKETS?! You are the best boss in the whole pond. I’m going to dance so hard. Guests might even tip me.' },
+  snowcone: { who: 'q', mood: 'cone', end: 'cone', text: 'Mmm. Brain freeze. Okay, I’ll stay. But tomorrow I want the BIG one.' },
+  compliment: { who: 'q', mood: 'think', end: 'owed', text: '...I AM a great duck. Fine. I’ll keep working. But you owe me.' },
+  quit: { who: 'q', mood: 'sad', end: 'quit', text: 'FINE. I’m going to work at the Snack Shack across town. They have AIR CONDITIONING. Goodbye forever!' },
+  honks: { who: 'h', mood: 'honk', text: 'HONK.',
+    a: { label: 'Call Quackers and ask him back. (15 tickets)', go: () => state.tickets >= 15 ? 'back' : 'honkbroke' }, b: { label: 'Honk?', go: 'honk2' } },
+  honk2: { who: 'h', mood: 'honk', end: 'none', text: 'HONK HONK. (Honks is not a people person.)' },
+  honkbroke: { who: 'h', mood: 'honk', end: 'none', text: 'HONK. (You need 15 tickets to call Quackers back.)' },
+  back: { who: 'q', mood: 'cool', end: 'back', text: 'Did you miss me? Of course you did. I brought my own fan this time.' },
+};
+function qkMascotPos() { return { x: MASCOT.x - PARK.camX, y: LANE + 4 }; }
+function qkTap(p) {
+  if (!state.owned.mascot) return false;
+  const m = qkMascotPos(); if (Math.abs(p.x - m.x) > 34 || p.y < m.y - 84 || p.y > m.y + 10) return false;
+  const q = qkData();
+  if (q.quit) { qkOpen('honks'); return true; }
+  if (QK.heat && q.mood === 'upset') { qkOpen('start'); return true; }
+  QK.taps = QK.taps.filter(t => now - t < 4); QK.taps.push(now);
+  if (QK.taps.length >= 5 && q.mood !== 'upset') { QK.taps = []; q.mood = 'upset'; qkOpen('poke'); return true; }
+  QK.quip = QK_QUIPS[(QK.taps.length - 1) % QK_QUIPS.length]; QK.quipT = now; SFX.voice('squeak');
+  return true;
+}
+function qkHeatStart() {
+  const q = qkData(); QK.heat = true; QK.heatT = now; q.mood = 'upset'; q.lastHeat = Date.now(); save();
+  PARK.camTarget = clamp(MASCOT.x - W / 2, 0, PW - W);
+  toast('Heat wave! It’s 98° in the park, and Quackers looks upset. Tap him.', 4200); SFX.fail();
+}
+// called every park frame from mascotUpdate
+function qkUpdate(dt) {
+  const q = qkData();
+  if (!QK.heat && !q.quit && q.mood !== 'upset') { QK.parkT += dt; if (QK.parkT > 70 && Date.now() - (q.lastHeat || 0) > 6 * 60e3 && Math.random() < dt / 45) qkHeatStart(); }
+  if (QK.heat && q.mood !== 'upset' && now - QK.heatT > 150) { QK.heat = false; toast('The heat wave is over. Phew.'); }
+  if (q.mood === 'cone' && now - QK.cone > 60) { q.mood = 'ok'; save(); }
+  if (QK.heat && Math.random() < dt * 0.6) { const g = pick(PARK.guests); if (g && g.state === 'walk' && (!g.bubble || now - g.bubble.t0 > 3)) g.bubble = { text: 'phew', t0: now }; }
+}
+function qkOpen(id) { hidePanels(); SFX.pop(); $('#qkCard').hidden = false; qkShow(id); }
+function qkShow(id) {
+  const n = QK_TREE[id]; QK.node = n;
+  const text = typeof n.text === 'function' ? n.text() : n.text;
+  $('#qkWho').textContent = n.who === 'h' ? 'Honks the Goose' : 'Quackers the mascot';
+  const el = $('#qkText'); el.textContent = ''; clearInterval(QK.typer);
+  let i = 0; QK.typer = setInterval(() => { i += 2; el.textContent = text.slice(0, i); if (i % 8 === 0) SFX.voice(n.who === 'h' ? 'honk' : 'squeak'); if (i >= text.length) { clearInterval(QK.typer); el.textContent = text; } }, 28);
+  const A = $('#qkA'), B = $('#qkB');
+  if (n.end) {
+    qkEffect(n.end);
+    A.querySelector('b').textContent = '✓'; A.querySelector('span').textContent = n.end === 'quit' ? 'Bye, Quackers...' : n.end === 'back' ? 'Welcome back!' : 'Back to work, everyone!'; B.hidden = true;
+    A.onclick = () => { $('#qkCard').hidden = true; clearInterval(QK.typer); SFX.pop(); };
+  } else {
+    B.hidden = false;
+    A.querySelector('b').textContent = 'A'; A.querySelector('span').textContent = n.a.label;
+    B.querySelector('b').textContent = 'B'; B.querySelector('span').textContent = n.b.label;
+    const go = o => { const nx = typeof o.go === 'function' ? o.go() : o.go; qkShow(nx); };
+    A.onclick = () => go(n.a); B.onclick = () => go(n.b);
+  }
+  qkFace();
+}
+function qkEffect(end) {
+  const q = qkData();
+  if (end === 'raise') { setTickets(state.tickets - 10); q.mood = 'raised'; q.raises++; q.owed = false; SFX.fanfare(); }
+  else if (end === 'cone') { setTickets(state.tickets - 3); q.mood = 'cone'; QK.cone = now; q.owed = false; SFX.cash(); }
+  else if (end === 'owed') { q.mood = 'ok'; q.owed = true; }
+  else if (end === 'quit') { q.quit = true; q.mood = 'ok'; QK.leave = now; SFX.fail(); }
+  else if (end === 'back') { setTickets(state.tickets - 15); q.quit = false; q.mood = 'ok'; q.raises = Math.max(1, q.raises); SFX.fanfare(); }
+  save();
+}
+// ----- faces for the dialogue card -----
+function qkFace() {
+  const cv2 = $('#qkFace'), c = cv2.getContext('2d'), n = QK.node; cv2.width = 360; cv2.height = 360;
+  c.setTransform(2, 0, 0, 2, 0, 0); c.clearRect(0, 0, 180, 180);
+  c.lineJoin = 'round'; c.lineCap = 'round'; c.strokeStyle = INK; c.lineWidth = 2.4;
+  if (n.who === 'h') {
+    c.fillStyle = '#fff'; c.beginPath(); c.ellipse(90, 140, 50, 32, 0, 0, 7); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(78, 118); c.quadraticCurveTo(70, 70, 92, 58); c.lineTo(108, 60); c.quadraticCurveTo(96, 80, 100, 118); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.arc(98, 52, 20, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = '#ff9f1c'; c.beginPath(); c.moveTo(114, 48); c.lineTo(146, 56); c.lineTo(114, 62); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(84, 38); c.lineTo(100, 44); c.stroke(); c.fillStyle = INK; c.beginPath(); c.arc(98, 49, 3, 0, 7); c.fill();
+    htext(c, 'HONK', 46, 36, 28, RED, { rot: -0.2 }); return;
+  }
+  const mood = n.mood, sweat = mood === 'mad' || mood === 'shock';
+  c.fillStyle = '#ffd84d'; c.beginPath(); c.ellipse(90, 150, 54, 36, 0, 0, 7); c.fill(); c.stroke();
+  c.beginPath(); c.arc(90, 84, 46, 0, 7); c.fill(); c.stroke();
+  c.fillStyle = '#d8342c'; c.beginPath(); c.arc(90, 70, 46, Math.PI * 1.08, Math.PI * 1.92); c.closePath(); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(124, 46); c.quadraticCurveTo(150, 44, 156, 56); c.lineTo(126, 58); c.closePath(); c.fill(); c.stroke();
+  const ex = [72, 108], ey = 82;
+  if (mood === 'cool') { c.fillStyle = '#2b2d42'; c.beginPath(); c.roundRect(56, 72, 30, 20, 7); c.roundRect(94, 72, 30, 20, 7); c.fill(); c.beginPath(); c.moveTo(86, 80); c.lineTo(94, 80); c.stroke(); }
+  else if (mood === 'joy' || mood === 'cone') { for (const x of ex) { c.beginPath(); c.arc(x, ey + 3, 7, Math.PI * 1.1, Math.PI * 1.9); c.stroke(); } }
+  else {
+    const r = mood === 'shock' ? 10 : 8; for (const x of ex) { c.fillStyle = '#fff'; c.beginPath(); c.arc(x, ey, r, 0, 7); c.fill(); c.stroke(); c.fillStyle = INK; c.beginPath(); c.arc(x + 2, ey + (mood === 'sad' ? 3 : 1), mood === 'shock' ? 3 : 4, 0, 7); c.fill(); }
+    if (mood === 'mad') { c.lineWidth = 4; c.beginPath(); c.moveTo(58, 64); c.lineTo(82, 72); c.moveTo(122, 64); c.lineTo(98, 72); c.stroke(); c.lineWidth = 2.4; }
+    if (mood === 'think') { c.lineWidth = 3.4; c.beginPath(); c.moveTo(60, 66); c.lineTo(82, 66); c.moveTo(98, 70); c.quadraticCurveTo(110, 58, 122, 66); c.stroke(); c.lineWidth = 2.4; }
+    if (mood === 'sad') { c.lineWidth = 3.4; c.beginPath(); c.moveTo(60, 70); c.lineTo(82, 64); c.moveTo(98, 64); c.lineTo(120, 70); c.stroke(); c.lineWidth = 2.4; c.fillStyle = '#7fd3ef'; c.beginPath(); c.ellipse(64, 100, 4, 7, 0, 0, 7); c.fill(); }
+  }
+  // beak: open when shocked or joyful
+  c.fillStyle = '#ff9f1c';
+  if (mood === 'shock' || mood === 'joy') { c.beginPath(); c.moveTo(78, 98); c.quadraticCurveTo(90, 92, 104, 98); c.lineTo(92, 104); c.closePath(); c.fill(); c.stroke(); c.beginPath(); c.moveTo(80, 106); c.quadraticCurveTo(92, 122, 102, 106); c.closePath(); c.fill(); c.stroke(); }
+  else { c.beginPath(); c.moveTo(76, 100); c.quadraticCurveTo(92, 92, 108, 100); c.quadraticCurveTo(92, mood === 'mad' || mood === 'sad' ? 104 : 112, 76, 100); c.closePath(); c.fill(); c.stroke(); }
+  if (sweat) { c.fillStyle = '#7fd3ef'; for (const [x, y] of [[40, 70], [140, 90], [34, 96]]) { c.beginPath(); c.moveTo(x, y - 8); c.quadraticCurveTo(x + 6, y + 2, x, y + 5); c.quadraticCurveTo(x - 6, y + 2, x, y - 8); c.fill(); c.stroke(); } }
+  if (mood === 'mad') { c.strokeStyle = RED; c.lineWidth = 2.4; for (const s of [-1, 1]) { const x = 90 + s * 58; c.beginPath(); c.moveTo(x, 30); c.quadraticCurveTo(x + s * 8, 22, x, 14); c.quadraticCurveTo(x - s * 8, 6, x, -2); c.stroke(); } }
+  if (mood === 'cone') { c.fillStyle = '#e8b36b'; c.strokeStyle = INK; c.beginPath(); c.moveTo(128, 124); c.lineTo(152, 124); c.lineTo(140, 164); c.closePath(); c.fill(); c.stroke(); c.fillStyle = '#5bc0eb'; c.beginPath(); c.arc(140, 118, 14, Math.PI, 0); c.lineTo(154, 124); c.lineTo(126, 124); c.closePath(); c.fill(); c.stroke(); }
+  if (mood === 'joy') { const cols = ['#ef476f', '#06d6a0', '#118ab2', '#ffd166']; for (let k = 0; k < 10; k++) { c.fillStyle = cols[k % 4]; c.fillRect(14 + (k * 37) % 150, 10 + (k * 23) % 40, 6, 3); } }
+  if (mood === 'cool') { c.save(); c.translate(144, 128); c.rotate(-0.3); c.fillStyle = '#9b5de5'; for (let k = 0; k < 3; k++) { c.save(); c.rotate(k * 2.1 + now * 8); c.beginPath(); c.ellipse(0, -10, 5, 10, 0, 0, 7); c.fill(); c.stroke(); c.restore(); } c.restore(); }
+}
+// ----- Quackers in the park, by mood -----
+function qkDrawExtras(c, x, y, d) {
+  const q = qkData();
+  if (q.quit) return;
+  if (q.mood === 'upset') {
+    // protest sign and sweat
+    c.save(); c.translate(x - d * 68, y - 6); c.rotate(Math.sin(now * 3) * 0.05);
+    jline(c, 0, 0, 0, -46, 7701, GRAPH, 2.4, 1);
+    c.fillStyle = '#fffdf5'; c.strokeStyle = INK; c.lineWidth = 1.6; c.fillRect(-34, -82, 68, 38); c.strokeRect(-34, -82, 68, 38);
+    htext(c, 'MORE PAY', 0, -66, 15, RED); htext(c, 'OR I QUIT', 0, -50, 15, RED);
+    c.restore();
+    c.fillStyle = '#7fd3ef'; for (let k = 0; k < 2; k++) { const yy = y - 60 + ((now * 40 + k * 20) % 30); c.beginPath(); c.ellipse(x + 18 - k * 34, yy, 2.4, 4, 0, 0, 7); c.fill(); }
+    if (Math.floor(now * 2) % 2) { c.fillStyle = '#fff'; c.strokeStyle = RED; c.lineWidth = 2; c.beginPath(); c.arc(x + d * 30, y - 104, 12, 0, 7); c.fill(); c.stroke(); htext(c, '!', x + d * 30, y - 97, 22, RED); }
+  }
+  if (q.mood === 'cone') { c.fillStyle = '#e8b36b'; c.strokeStyle = INK; c.lineWidth = 1.2; c.beginPath(); c.moveTo(x - d * 14 - 4, y - 36); c.lineTo(x - d * 14 + 4, y - 36); c.lineTo(x - d * 14, y - 24); c.closePath(); c.fill(); c.stroke(); c.fillStyle = '#5bc0eb'; c.beginPath(); c.arc(x - d * 14, y - 38, 5, 0, 7); c.fill(); c.stroke(); }
+  if (QK.quip && now - QK.quipT < 1.8) { c.fillStyle = '#fff'; c.strokeStyle = INK; c.lineWidth = 1.4; const w = Math.max(60, QK.quip.length * 8); c.beginPath(); c.roundRect(x - w / 2, y - 120, w, 26, 10); c.fill(); c.stroke(); htext(c, QK.quip, x, y - 101, 17, INK, { font: 'hand' }); }
+}
+function qkDrawHonks(c, x, y, d) {
+  const step = Math.sin(now * 7) * 3;
+  c.save(); c.translate(x, y); c.scale(d, 1); c.strokeStyle = INK; c.lineWidth = 1.8;
+  c.fillStyle = '#ff9f1c'; c.beginPath(); c.ellipse(-6 + step, 0, 6, 2.4, 0, 0, 7); c.ellipse(6 - step, 0, 6, 2.4, 0, 0, 7); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(-4, -8); c.lineTo(-6 + step, 0); c.moveTo(4, -8); c.lineTo(6 - step, 0); c.stroke();
+  c.fillStyle = '#fff'; c.beginPath(); c.ellipse(0, -20, 18, 13, 0, 0, 7); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(8, -26); c.quadraticCurveTo(10, -44, 16, -52); c.lineTo(22, -50); c.quadraticCurveTo(16, -40, 16, -24); c.closePath(); c.fill(); c.stroke();
+  c.beginPath(); c.arc(19, -54, 7, 0, 7); c.fill(); c.stroke();
+  c.fillStyle = '#ff9f1c'; c.beginPath(); c.moveTo(25, -56); c.lineTo(36, -53); c.lineTo(25, -50); c.closePath(); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(15, -60); c.lineTo(22, -57); c.stroke(); c.fillStyle = INK; c.beginPath(); c.arc(20, -55, 1.4, 0, 7); c.fill();
+  c.restore();
+  htext(c, 'Honks', x, y - 76, 16, GRAPH, { font: 'Patrick', alpha: 0.8 });
+  if (Math.sin(now * 1.3) > 0.94) htext(c, 'HONK!', x + d * 40, y - 64, 20, RED, { rot: -0.1 });
+}
+// heat wave: a big orange sun, wavy air and a thermometer
+function qkDrawHeat(c, cam) {
+  if (!QK.heat) return;
+  const sx = 1010 - cam * 0.06, pulse = 1 + Math.sin(now * 3) * 0.05;
+  c.fillStyle = 'rgba(255,140,66,.28)'; c.beginPath(); c.arc(sx, 150, 70 * pulse, 0, 7); c.fill();
+  c.fillStyle = 'rgba(255,120,40,.55)'; c.beginPath(); c.arc(sx, 150, 34, 0, 7); c.fill();
+  c.strokeStyle = 'rgba(255,140,66,.35)'; c.lineWidth = 2;
+  for (let k = 0; k < 9; k++) { const x = 130 + k * 120, y0 = 200 + (k % 3) * 40; c.beginPath(); for (let j = 0; j <= 10; j++) { const yy = y0 + j * 12, xx = x + Math.sin(now * 4 + j * 0.9 + k) * 5; j ? c.lineTo(xx, yy) : c.moveTo(xx, yy); } c.stroke(); }
+  const tx = W - 70, ty = 110;
+  c.fillStyle = '#fffdf5'; c.strokeStyle = INK; c.lineWidth = 1.8; c.beginPath(); c.roundRect(tx - 12, ty, 24, 92, 12); c.fill(); c.stroke();
+  c.fillStyle = RED; c.fillRect(tx - 5, ty + 12, 10, 64); c.beginPath(); c.arc(tx, ty + 82, 11, 0, 7); c.fill(); c.stroke();
+  htext(c, '98°', tx - 22, ty + 40, 26, RED, { align: 'right' });
+}
+
+// ---------- Hot air balloon ride over your whole park ----------
+const BAL = { x: 0, alt: 0.1, va: 0, t: 0, got: 0, items: [], birds: [], done: false, endT: 0, wob: 0, parts: [], labels: [], nextItem: 0, nextBird: 0, shown: false };
+const BAL_COLS = ['#ef476f', '#ffd166', '#118ab2', '#ffd166'];
+function balWorldY(alt) { return PG - 150 - alt * 820 + (BAL.land || 0) * 122; }
+function balPadX() { const s = slotOf('balloon'); return s ? s.x + s.w / 2 : PW - 150; }
+function balZoom() { return lerp(0.95, 0.42, BAL.alt); }
+function balWind() { return Math.max(90, (PW - 600) / 70); }
+function drawHotAirBalloon(c, x, y, s = 1, fire = false, rider = true) {
+  c.save(); c.translate(x, y); c.scale(s, s); c.lineJoin = 'round'; c.strokeStyle = INK; c.lineWidth = 2.2;
+  // envelope: a rounded teardrop made of stripes
+  const env = new Path2D(); env.moveTo(0, -150); env.bezierCurveTo(64, -150, 78, -92, 58, -60); env.quadraticCurveTo(38, -30, 20, -18); env.lineTo(-20, -18); env.quadraticCurveTo(-38, -30, -58, -60); env.bezierCurveTo(-78, -92, -64, -150, 0, -150); env.closePath();
+  c.save(); c.clip(env);
+  for (let k = -4; k < 4; k++) { c.fillStyle = BAL_COLS[(k + 8) % 4]; c.beginPath(); c.moveTo(0, -160); c.quadraticCurveTo(k * 26, -90, k * 7, -10); c.lineTo((k + 1) * 7, -10); c.quadraticCurveTo((k + 1) * 26, -90, 0, -160); c.closePath(); c.fill(); }
+  c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(-26, -110, 10, 26, 0.3, 0, 7); c.fill();
+  c.restore(); c.stroke(env);
+  c.strokeStyle = GRAPH; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-20, -18); c.lineTo(-14, 6); c.moveTo(20, -18); c.lineTo(14, 6); c.moveTo(-6, -18); c.lineTo(-5, 6); c.moveTo(6, -18); c.lineTo(5, 6); c.stroke();
+  if (fire) { c.fillStyle = '#ff8c42'; c.beginPath(); c.moveTo(-7, -2); c.quadraticCurveTo(0, -38 - Math.random() * 10, 7, -2); c.closePath(); c.fill(); c.fillStyle = '#ffd166'; c.beginPath(); c.moveTo(-3.5, -2); c.quadraticCurveTo(0, -22 - Math.random() * 6, 3.5, -2); c.closePath(); c.fill(); }
+  if (rider) drawTester(c, 0, 8, 0, fire ? 'whee' : 'happy', 1.1, 1);
+  c.fillStyle = '#b5773a'; c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.moveTo(-16, 6); c.lineTo(16, 6); c.lineTo(13, 28); c.lineTo(-13, 28); c.closePath(); c.fill(); c.stroke();
+  c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = 1.2; c.beginPath(); for (let k = -1; k <= 1; k++) { c.moveTo(-14, 13 + k * 6 + 4); c.lineTo(14, 13 + k * 6 + 4); } c.stroke();
+  c.restore();
+}
+function drawBalloonPad(c, s) {
+  if (!state.owned.balloon) return salePlaceholder(c, s, 200, 220, 'balloon rides', 150, 2101);
+  const away = scene === 'balloon';
+  const cx = s.x + s.w / 2, bob = Math.sin(now * 1.2) * 4;
+  c.strokeStyle = GRAPH; c.lineWidth = 1.2; c.beginPath(); if (!away) { c.moveTo(cx - 60, PG); c.lineTo(cx - 12, PG - 64 + bob); c.moveTo(cx + 60, PG); c.lineTo(cx + 12, PG - 64 + bob); } else { c.moveTo(cx - 60, PG); c.lineTo(cx - 40, PG - 8); c.moveTo(cx + 60, PG); c.lineTo(cx + 40, PG - 8); } c.stroke();
+  if (!away) drawHotAirBalloon(c, cx, PG - 92 + bob, 0.95, Math.sin(now * 2) > 0.8, false);
+  c.fillStyle = '#fffdf5'; c.fillRect(s.x + 16, PG - 44, 92, 30); c.strokeStyle = INK; c.lineWidth = 1.4; c.strokeRect(s.x + 16, PG - 44, 92, 30);
+  htext(c, 'BALLOON', s.x + 62, PG - 32, 15, RED); htext(c, 'RIDES', s.x + 62, PG - 18, 15, RED);
+}
+function openBalloonCard() {
+  hidePanels(); SFX.pop();
+  const el = $('#lotCard'), s = slotOf('balloon'), best = (state.best || {}).balloon || 0;
+  el.innerHTML = `<div class="eyebrow">Your park</div><h2>Hot Air Balloon</h2><p>Float over your whole park. Hold down to fire the burner and rise. Let go to drift down. Grab the tickets in the sky and steer around the seagulls.</p><p style="font-size:16px;color:#4a4a4f">Best flight: <b>${best}</b> tickets.</p><div class="row"><button class="primary" id="balGo">Take off!</button><button id="balClose">Close</button></div>`;
+  el.style.left = (s ? clamp(s.x + s.w / 2 - PARK.camX - 210, 16, W - 436) : 380) + 'px'; el.style.top = '96px'; el.hidden = false;
+  $('#balGo').onclick = () => startBalloon(); $('#balClose').onclick = () => { el.hidden = true; };
+}
+function startBalloon() {
+  hidePanels();
+  const s = slotOf('balloon');
+  Object.assign(BAL, { x: 260, alt: 0.05, va: 0, t: 0, got: 0, items: [], birds: [], done: false, endT: 0, wob: 0, land: 0, parts: [], labels: [], nextItem: 500, nextBird: 1400, shown: false, fire: false, hold: false });
+  showScene('balloon'); $('#balEnd').hidden = true; balStat(); SFX.resume(); SFX.whee();
+}
+function balStat() { $('#balStat').textContent = `${BAL.got} ticket${BAL.got === 1 ? '' : 's'} · hold to rise, let go to drift down`; }
+function balScreen(wx, alt) { const z = balZoom(), cam = BAL.x - (W * 0.38) / z, oy = H - 720 * z; return { x: (wx - cam) * z, y: balWorldY(alt) * z + oy, z }; }
+function balUpdate(dt) {
+  parkUpdate(dt);
+  const fire = BAL.hold && !BAL.done;
+  BAL.t += dt; BAL.fire = fire;
+  BAL.va += (fire ? 0.6 : -0.3) * dt; BAL.va *= Math.exp(-dt * 0.9); BAL.alt += BAL.va * dt;
+  if (BAL.alt < 0) { BAL.alt = 0; BAL.va = Math.max(0, BAL.va); }
+  if (BAL.alt > 1) { BAL.alt = 1; BAL.va = Math.min(0, BAL.va); }
+  BAL.wob *= Math.exp(-dt * 3);
+  if (!BAL.done) BAL.x += balWind() * dt * (1 - BAL.wob * 0.6);
+  else { const pad = balPadX(); BAL.x += (pad - BAL.x) * Math.min(1, dt * 1.2); BAL.va = Math.min(BAL.va, -0.25); if (BAL.alt <= 0.001 && Math.abs(pad - BAL.x) < 30) BAL.land = Math.min(1, BAL.land + dt * 0.8); }
+  SFX.ride(fire ? 0.55 : 0.08, fire ? 14 : 4);
+  // spawn tickets and seagulls ahead of the balloon
+  const ahead = BAL.x + 2600;
+  while (BAL.nextItem < ahead && BAL.nextItem < balPadX() - 500) {
+    const a = Math.random(), n = Math.random() < 0.3 ? 3 : 1;
+    for (let k = 0; k < n; k++) BAL.items.push({ x: BAL.nextItem + k * 70, alt: clamp(a + (k - 1) * 0.06, 0.02, 0.98), gold: Math.random() < 0.08, ph: Math.random() * 6 });
+    BAL.nextItem += 260 + Math.random() * 280;
+  }
+  while (BAL.nextBird < ahead && BAL.nextBird < balPadX() - 700) { const a = 0.15 + Math.random() * 0.8; for (let k = 0; k < 3; k++) BAL.birds.push({ x: BAL.nextBird + k * 34, alt: a + (k % 2) * 0.03, ph: Math.random() * 6 }); BAL.nextBird += 1100 + Math.random() * 900; }
+  for (const b of BAL.birds) b.x -= 70 * dt;
+  // catch things near the basket
+  const me = balScreen(BAL.x, BAL.alt);
+  for (const it of BAL.items) {
+    if (it.got) continue; const p = balScreen(it.x, it.alt);
+    if (Math.abs(p.x - me.x) < 42 && p.y > me.y - 150 && p.y < me.y + 40) { it.got = true; const n = it.gold ? 5 : 1; BAL.got += n; BAL.labels.push({ text: '+' + n, x: p.x, y: p.y, t0: now, gold: it.gold }); SFX.ding(); balStat(); }
+  }
+  for (const b of BAL.birds) {
+    if (b.hit) continue; const p = balScreen(b.x, b.alt);
+    if (Math.abs(p.x - me.x) < 50 && p.y > me.y - 150 && p.y < me.y + 30) { b.hit = true; BAL.wob = 1; const lost = Math.min(2, BAL.got); BAL.got -= lost; BAL.labels.push({ text: lost ? `Squawk! -${lost}` : 'Squawk!', x: me.x + 40, y: me.y - 80, t0: now, bad: true }); SFX.voice('honk'); balStat(); }
+  }
+  BAL.items = BAL.items.filter(it => !it.got && it.x > BAL.x - 1600); BAL.birds = BAL.birds.filter(b => b.x > BAL.x - 1600);
+  // guests wave when you float low
+  if (BAL.alt < 0.3) for (const g of PARK.guests) if (Math.abs(g.x - BAL.x) < 160 && g.state === 'walk' && (!g.bubble || now - g.bubble.t0 > 5) && Math.random() < dt * 2) g.bubble = { text: 'Hi!', t0: now };
+  BAL.labels = BAL.labels.filter(l => now - l.t0 < 1.3);
+  if (!BAL.done && BAL.x >= balPadX() - 420) { BAL.done = true; BAL.endT = now; BAL.hold = false; }
+  if (BAL.done && !BAL.shown && (BAL.land >= 1 || now - BAL.endT > 9)) { BAL.shown = true; balFinish(); }
+}
+function balFinish() {
+  state.best = state.best || {}; const best = state.best.balloon || 0; if (BAL.got > best) state.best.balloon = BAL.got;
+  if (BAL.got) setTickets(state.tickets + BAL.got); else save();
+  const rides = state.rides.length;
+  $('#balEndText').innerHTML = `${rides ? `You floated over ${rides} ride${rides === 1 ? '' : 's'} and your whole park.` : 'You floated over your whole park.'} <b>+${BAL.got}</b> ticket${BAL.got === 1 ? '' : 's'} from the sky.${BAL.got > best && best ? ' New best!' : ''}`;
+  $('#balEnd').hidden = false; SFX.fanfare();
+}
+function balRender(c) {
+  const z = balZoom(), cam = BAL.x - (W * 0.38) / z, oy = H - 720 * z;
+  c.fillStyle = 'rgba(127,211,239,.14)'; c.fillRect(0, 0, W, H);
+  const sx = 1010 - BAL.x * 0.02; c.fillStyle = 'rgba(246,213,92,.55)'; c.beginPath(); c.arc(sx, 130, 30, 0, 7); c.fill();
+  for (let i = 0; i < 9; i++) { const span = W + 500, x = ((i * 360 - BAL.x * (0.08 + (i % 3) * 0.05)) % span + span) % span - 250; drawCloud(c, x, 90 + (i * 53) % 260 + (1 - BAL.alt) * 60, 1 + (i % 3) * 0.3, 90 + i); }
+  c.save(); c.translate(0, oy); c.scale(z, z); drawParkWorld(c, cam, W / z); c.restore();
+  // sky things
+  for (const it of BAL.items) { const p = balScreen(it.x, it.alt); if (p.x < -40 || p.x > W + 40) continue; const bob = Math.sin(now * 3 + it.ph) * 4; if (it.gold) starShape(c, p.x, p.y + bob, 16, '#f6c945'); else ticketIcon(c, p.x - 14, p.y + bob - 10, 1.4); }
+  for (const b of BAL.birds) { const p = balScreen(b.x, b.alt); if (p.x < -40 || p.x > W + 40) continue; drawGull(c, p.x, p.y, b.hit ? 1.1 : 1.6, Math.sin(now * 9 + b.ph)); }
+  const me = balScreen(BAL.x, BAL.alt);
+  drawHotAirBalloon(c, me.x + Math.sin(now * 20) * 6 * BAL.wob, me.y, 0.9, BAL.fire, true);
+  for (const l of BAL.labels) { const a = now - l.t0; htext(c, l.text, l.x, l.y - a * 40, 30, l.bad ? RED : l.gold ? '#b8860b' : '#7a5b00', { alpha: Math.min(1, (1.3 - a) * 2.5) }); }
+  // altitude meter and trip progress
+  c.fillStyle = 'rgba(255,253,245,.9)'; c.fillRect(W - 60, 140, 26, 300); c.strokeStyle = INK; c.lineWidth = 1.6; c.strokeRect(W - 60, 140, 26, 300);
+  c.fillStyle = BAL_COLS[0]; c.beginPath(); c.arc(W - 47, 440 - BAL.alt * 300, 9, 0, 7); c.fill(); c.stroke();
+  htext(c, 'up', W - 47, 122, 18, GRAPH, { font: 'hand' });
+  const px0 = 600, px1 = 900, pp = clamp((BAL.x - 260) / (balPadX() - 680), 0, 1);
+  jline(c, px0, 62, px1, 62, 7801, GRAPH, 2, 1, 0.6); c.fillStyle = BAL_COLS[0]; c.beginPath(); c.arc(px0 + pp * (px1 - px0), 60, 7, 0, 7); c.fill(); c.strokeStyle = INK; c.lineWidth = 1.4; c.stroke();
+  htext(c, 'landing', px1 + 44, 68, 20, GRAPH, { font: 'hand' });
+  if (BAL.t < 5) htext(c, 'Hold down to fire the burner and rise. Let go to drift down.', W / 2, 690, 28, INK, { font: 'hand', alpha: Math.min(1, (5 - BAL.t) * 1.5) });
+  if (BAL.done && !BAL.shown) htext(c, 'Coming in for a landing!', W / 2, 180, 50, RED, { rot: -0.04 });
+}
+function balDown() { BAL.hold = true; }
+function balUp() { BAL.hold = false; }
+function balKey(e, down) { if (scene !== 'balloon' || e.key !== ' ') return false; BAL.hold = down; return true; }
+
 // ---------- panels ----------
 const PANELS = ['#orders', '#shop', '#lotCard', '#report'];
 function anyPanel() { return ['#orders', '#shop', '#lotCard', '#styleCard', '#prizeCard'].some(s => !$(s).hidden); }
-function hidePanels() { for (const s of ['#orders', '#shop', '#lotCard', '#styleCard', '#prizeCard']) $(s).hidden = true; }
+function hidePanels() { for (const s of ['#orders', '#shop', '#lotCard', '#styleCard', '#prizeCard', '#qkCard']) $(s).hidden = true; }
 function miniScene(canvas, kit) {
   const k = 2, s = 0.26, c = canvas.getContext('2d');
   canvas.width = 300 * k; canvas.height = 150 * k;
@@ -4801,6 +5122,7 @@ function openOrders(lot) {
   $('#orders').hidden = false;
 }
 const ICONS = {
+  balloon: '<path d="M25 4c10 0 15 8 11 17l-7 9h-8l-7-9C10 12 15 4 25 4z" fill="#ef476f" stroke="#1f3d9e" stroke-width="1.8"/><path d="M25 4q-4 12 0 26M25 4q5 12 0 26" fill="none" stroke="#ffd166" stroke-width="2.4"/><path d="M21 30l1 4M29 30l-1 4" stroke="#4a4a4f"/><rect x="20" y="34" width="10" height="5" fill="#b5773a" stroke="#1f3d9e" stroke-width="1.2"/>',
   dive: '<path d="M10 38V8M18 38V8" stroke="#1f3d9e" stroke-width="2"/><path d="M10 16h8M10 26h8" stroke="#4a4a4f" stroke-width="1.4"/><path d="M8 8h30" stroke="#ffd166" stroke-width="4" stroke-linecap="round"/><path d="M8 8h30" stroke="#1f3d9e" stroke-width="1.2"/><path d="M22 38h26" stroke="#4fc3e0" stroke-width="5"/><circle cx="38" cy="20" r="4" fill="#f1c27d" stroke="#1f3d9e" stroke-width="1.4"/>',
   blaster: '<path d="M6 12l4-8h30l4 8z" fill="#ef476f" stroke="#1f3d9e" stroke-width="1.6"/><path d="M8 12v24h34V12" fill="#fff3b066" stroke="#1f3d9e" stroke-width="1.8"/><path d="M8 26h34" stroke="#c9a26b" stroke-width="3"/><ellipse cx="18" cy="21" rx="5" ry="3.5" fill="#ffd84d" stroke="#1f3d9e"/><path d="M25 36q2-12 12-16" fill="none" stroke="#4fc3e0" stroke-width="2.6"/>',
   bumper: '<ellipse cx="25" cy="30" rx="22" ry="8" fill="#4fc3e066" stroke="#1f3d9e" stroke-width="1.8"/><ellipse cx="17" cy="28" rx="8" ry="4" fill="#ef476f" stroke="#1f3d9e" stroke-width="1.4"/><ellipse cx="33" cy="31" rx="8" ry="4" fill="#ffd166" stroke="#1f3d9e" stroke-width="1.4"/><circle cx="17" cy="22" r="3" fill="#f1c27d" stroke="#1f3d9e"/><circle cx="33" cy="25" r="3" fill="#f1c27d" stroke="#1f3d9e"/>',
@@ -4837,6 +5159,7 @@ const SHOP = [
   { id: 'rescue', icon: 'rescue', name: 'Lifeguard Tower', price: 35, desc: 'Toss ring buoys to swimmers who need help. +1 ticket per shift.' },
   { id: 'dive', icon: 'dive', name: 'High Dive', price: 40, desc: 'Bounce, flip and splash for the judges. +2 tickets per dive.' },
   { id: 'bumper', icon: 'bumper', name: 'Bumper Boats', price: 45, desc: 'Bump the pencil boats and scoop up duckies. +1 ticket per ride.' },
+  { id: 'balloon', icon: 'balloon', name: 'Hot Air Balloon', price: 150, desc: 'Float over your whole park and grab tickets in the sky. Rides are free once you own it.' },
   { sec: 'Fun extras' },
   { id: 'flamingo', icon: 'flamingo', name: 'Flamingo floats', price: 8, desc: 'Pink floaties in the lazy river and wave pool.', needs: ['river', 'wave'] },
   { id: 'fireworks', icon: 'fireworks', name: 'Fireworks', price: 15, desc: 'Launch a show any time. The crowd tips 1 ticket each.' },
@@ -4853,9 +5176,9 @@ const SHOP = [
 function shopItem(it) { if (it.id !== 'land') return it; const n = nextLotForSale(); return { ...it, name: `Land for lot ${n + 1}`, price: lotPrice(n) }; }
 const DECO_KEY = { palm: 'palms', umbrella: 'umbrellas', flowers: 'flowers', lamp: 'lamps' };
 function shopOwned(it) { return it.max ? (state[DECO_KEY[it.id]] || 0) >= it.max : !!state.owned[it.id]; }
-function openShop() {
+function openShop(focus) {
   hidePanels(); SFX.pop();
-  const box = $('#items'); box.innerHTML = '';
+  const box = $('#items'); box.innerHTML = ''; let hl = null;
   for (const it0 of SHOP) {
     if (it0.sec) { const h = document.createElement('h3'); h.textContent = it0.sec; h.style.margin = '10px 0 0'; box.appendChild(h); continue; }
     const it = shopItem(it0), owned = shopOwned(it), count = it.max ? (state[DECO_KEY[it.id]] || 0) : 0;
@@ -4866,9 +5189,10 @@ function openShop() {
     else if (it.needs && !it.needs.some(k => state.owned[k])) { b.textContent = 'Needs water'; b.disabled = true; b.title = 'Build the Lazy River or Wave Pool first'; }
     else { b.innerHTML = `Buy &middot; ${it.price}`; b.disabled = state.tickets < it.price; if (!b.disabled) b.className = 'primary'; b.onclick = () => buy(it); }
     row.appendChild(b); box.appendChild(row);
+    if (focus && it.id === focus) { hl = row; row.classList.add('hl'); }
   }
   if (state.tickets < 4) { const p = document.createElement('p'); p.textContent = 'Every rider pays tickets. Open more rides (and earn bonus stars) to earn faster.'; box.appendChild(p); }
-  $('#shop').hidden = false;
+  const sh = $('#shop'); sh.hidden = false; sh.scrollTop = hl ? Math.max(0, hl.offsetTop - 160) : 0;
 }
 function buy(it) {
   if (it.id === 'land') { buyLot(nextLotForSale()); return; }
@@ -4961,6 +5285,7 @@ function showScene(name) {
   $('#btnTester').hidden = name !== 'ws'; $('#testerCard').hidden = true;
   $('#miniBar').hidden = name !== 'mini'; if (name !== 'mini') $('#miniEnd').hidden = true;
   $('#diveTwist').hidden = true;
+  $('#balBar').hidden = name !== 'balloon'; if (name !== 'balloon') $('#balEnd').hidden = true;
   $('#surfBar').hidden = name !== 'surf'; if (name !== 'surf') { $('#surfMenu').hidden = true; $('#surfEnd').hidden = true; SURF.hold = false; }
   $('#navL').hidden = $('#navR').hidden = name !== 'park';
   if (name === 'park') { closeReport(); WS.play = null; SFX.ride(0, 0); SFX.pen(0); $('#tix').textContent = state.tickets; }
@@ -4970,7 +5295,7 @@ function firstFreeLot() { for (let l = 0; l < lotCountShown(); l++) if (lotOwned
 
 // ---------- input ----------
 let downId = null;
-function endStroke(p) { downId = null; if (scene === 'ws') wsUp(); else if (scene === 'pov') povUp(); else if (scene === 'mini') miniUp(); else if (scene === 'surf') surfUp(); else if (scene === 'park') parkUp(p); }
+function endStroke(p) { downId = null; if (scene === 'ws') wsUp(); else if (scene === 'pov') povUp(); else if (scene === 'mini') miniUp(); else if (scene === 'surf') surfUp(); else if (scene === 'balloon') balUp(); else if (scene === 'park') parkUp(p); }
 cv.addEventListener('pointerdown', e => {
   if (!alive()) return;
   SFX.resume();
@@ -4978,17 +5303,17 @@ cv.addEventListener('pointerdown', e => {
   downId = e.pointerId;
   try { cv.setPointerCapture(e.pointerId); } catch (_) { }
   if (scene === 'title') return;
-  const p = toStage(e); if (scene === 'ws') wsDown(p); else if (scene === 'pov') povDown(p); else if (scene === 'mini') miniDown(p); else if (scene === 'surf') surfDown(p); else parkDown(p);
+  const p = toStage(e); if (scene === 'ws') wsDown(p); else if (scene === 'pov') povDown(p); else if (scene === 'mini') miniDown(p); else if (scene === 'surf') surfDown(p); else if (scene === 'balloon') balDown(p); else parkDown(p);
 });
 cv.addEventListener('pointermove', e => { if (alive() && scene === 'surf') { surfMove(toStage(e)); return; } if (alive() && scene === 'mini' && downId === null) { miniMove(toStage(e)); return; } if (!alive() || e.pointerId !== downId || scene === 'title') return; const p = toStage(e); if (scene === 'ws') wsMove(p); else if (scene === 'pov') povMove(p); else if (scene === 'mini') miniMove(p); else parkMove(p); });
 const endPtr = e => { if (!alive() || e.pointerId !== downId) return; endStroke(e.type === 'pointerup' ? toStage(e) : null); };
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr); cv.addEventListener('lostpointercapture', endPtr);
 cv.addEventListener('wheel', e => { if (scene !== 'park') return; e.preventDefault(); PARK.camTarget = clamp(PARK.camTarget + (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY), 0, PW - W); }, { passive: false });
-addEventListener('keyup', e => { if (alive()) { miniKey(e, false); surfKey(e, false); } });
+addEventListener('keyup', e => { if (alive()) { miniKey(e, false); surfKey(e, false); balKey(e, false); } });
 addEventListener('keydown', e => {
   if (!alive() || e.target.tagName === 'INPUT') return;
   if (miniKey(e, true)) { e.preventDefault(); return; }
-  if (surfKey(e, true)) { e.preventDefault(); return; }
+  if (surfKey(e, true) || balKey(e, true)) { e.preventDefault(); return; }
   if (scene === 'ws' && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); wsUndo(); }
   if (e.key === 'Escape') { hidePanels(); $('#testerCard').hidden = true; if (scene === 'ws' && !$('#report').hidden && WS.play && WS.play.done) closeReport(); }
   if (scene === 'park' && e.key === 'ArrowRight') PARK.camTarget = clamp(PARK.camTarget + 300, 0, PW - W);
@@ -5003,6 +5328,9 @@ $('#prizeOk').onclick = () => { $('#prizeCard').hidden = true; SFX.pop(); };
 $('#miniBack').onclick = () => { SFX.pop(); showScene('park'); };
 $('#miniBackEnd').onclick = () => { SFX.pop(); showScene('park'); };
 $('#miniAgain').onclick = () => startMini(MINI.type);
+$('#balBack').onclick = () => { SFX.pop(); SFX.ride(0, 0); showScene('park'); };
+$('#balPark').onclick = () => { SFX.pop(); showScene('park'); };
+$('#balAgain').onclick = () => startBalloon();
 $('#diveTwist').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); diveTwist(); });
 $('#diveTwist').onclick = e => e.preventDefault();
 $('#surfBack').onclick = () => { SFX.pop(); if (SURF.mode === 'ride' && SURF.kind === 'surf') openSurfShack(); else showScene('park'); };
@@ -5045,10 +5373,10 @@ let lastT = performance.now();
 function frame(t) {
   if (!alive()) { SFX.close(); return; }
   const dt = Math.min(0.05, Math.max(0, (t - lastT) / 1000)); lastT = t; now += dt; frameN++;
-  if (scene === 'ws') wsUpdate(dt); else if (scene === 'park') parkUpdate(dt); else if (scene === 'pov') povUpdate(dt); else if (scene === 'mini') miniUpdate(dt); else if (scene === 'surf') surfUpdate(dt);
+  if (scene === 'ws') wsUpdate(dt); else if (scene === 'park') parkUpdate(dt); else if (scene === 'pov') povUpdate(dt); else if (scene === 'mini') miniUpdate(dt); else if (scene === 'surf') surfUpdate(dt); else if (scene === 'balloon') balUpdate(dt);
   ctx.setTransform(K, 0, 0, K, 0, 0);
   ctx.drawImage(paper, 0, 0, W, H);
-  if (scene === 'ws') wsRender(ctx); else if (scene === 'park') drawPark(ctx); else if (scene === 'pov') povRender(ctx); else if (scene === 'mini') miniRender(ctx); else if (scene === 'surf') surfRender(ctx); else renderTitle(ctx);
+  if (scene === 'ws') wsRender(ctx); else if (scene === 'park') drawPark(ctx); else if (scene === 'pov') povRender(ctx); else if (scene === 'mini') miniRender(ctx); else if (scene === 'surf') surfRender(ctx); else if (scene === 'balloon') balRender(ctx); else renderTitle(ctx);
   if (scene === 'park' && !$('#styleCard').hidden) drawStylePreview();
   requestAnimationFrame(frame);
 }
