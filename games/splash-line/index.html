@@ -111,6 +111,13 @@
   #nameLabel { font-family: Caveat, cursive; font-size: 32px; color: var(--red); line-height: 1; }
   #welcome .row { width: 100%; flex-wrap: nowrap; }
   #welcome input { font-size: 34px; }
+  #saveNote { font-size: 16px; color: var(--graphite); line-height: 1.3; }
+  #saveNote:empty { display: none; }
+  #saveNote b { color: #2c8a3c; }
+  #savedTag { font-family: 'Patrick Hand', cursive; font-size: 17px; color: #2c8a3c; padding: 2px 8px; border-radius: 12px; }
+  #savedTag.pulse { animation: savedPulse 1.6s ease; }
+  @keyframes savedPulse { 0% { background: rgba(44,138,60,.22); } 100% { background: transparent; } }
+  #startBtn:disabled { opacity: .6; }
   #parkDice { font-size: 22px; padding: 4px 8px; line-height: 1; }
   #startBtn { font-size: 24px; padding: 5px 22px; margin-top: 4px; }
   #povEnd { left: 370px; top: 380px; width: 460px; transform: rotate(-1deg); }
@@ -205,6 +212,7 @@
   <div id="parkBar" class="bar">
     <!--ARCADE-->
     <div class="tickets" id="tixBox" title="Tickets"><svg viewBox="0 0 30 22" aria-hidden="true"><path d="M2 3h26v5a3 3 0 0 0 0 6v5H2v-5a3 3 0 0 0 0-6z" fill="#f6c945" stroke="#7a5b00" stroke-width="1.6"/><path d="M11 4v14" stroke="#7a5b00" stroke-dasharray="2 2"/></svg><b id="tix">0</b></div>
+    <div id="savedTag" hidden title="Your park saves by itself as you play">&#10003; park saved</div>
     <div class="grow"></div>
     <button id="btnFireworks" hidden>Fireworks!</button>
     <button id="btnShop">Park shop</button>
@@ -279,6 +287,7 @@
     <label for="parkName" id="nameLabel">First, name your park</label>
     <div class="row nowrap"><input type="text" id="parkName" maxlength="28" autocomplete="off" placeholder="My Water Park"><button id="parkDice" class="icon-btn" title="Random name" aria-label="Random park name">&#127922;</button></div>
     <button id="startBtn" class="primary">Open the gates!</button>
+    <div id="saveNote"></div>
   </div>
 
   <button id="btnTester" hidden><canvas id="testerIcon" width="112" height="68"></canvas><span>Test rider<br><b id="testerName">Sandy</b></span></button>
@@ -1249,17 +1258,21 @@ function drawKid(c, g, x, y, pose, size = 90, t = now, o = {}) {
     c.restore(); c.restore(); return;
   }
   const ph = pose === 'walk' ? Math.sin(t * 9 + seed) : pose === 'climb' ? Math.sin(t * 10) : 0;
-  const bob = pose === 'walk' ? -Math.abs(Math.cos(t * 9 + seed)) * 3 : pose === 'play' ? -Math.abs(Math.sin(t * 6 + seed)) * 8 : pose === 'surf' ? 7 : Math.sin(t * 2 + seed) * 0.8;
+  const bob = pose === 'walk' ? -Math.abs(Math.cos(t * 9 + seed)) * 3 : pose === 'play' ? -Math.abs(Math.sin(t * 6 + seed)) * 8 : pose === 'surf' ? 7 : pose === 'bump' ? 6 : pose === 'spike' ? -4 : Math.sin(t * 2 + seed) * 0.8;
   const hip = -30 + bob, sh = -60 + bob;
   const legs = pose === 'walk' ? [[[-6, hip], [-6 + ph * 8, hip + 15], [-6 + ph * 14, -Math.max(0, ph) * 5]], [[6, hip], [6 - ph * 8, hip + 15], [6 - ph * 14, -Math.max(0, -ph) * 5]]]
     : pose === 'play' ? [[[-6, hip], [-15, hip + 13], [-13, hip + 28]], [[6, hip], [15, hip + 13], [13, hip + 28]]]
     : pose === 'climb' ? [[[-6, hip], [-9, hip + 12 + ph * 4], [-7, hip + 27 + ph * 5]], [[6, hip], [9, hip + 12 - ph * 4], [7, hip + 27 - ph * 5]]]
     : pose === 'surf' ? [[[-7, hip], [-17, hip + 12], [-21, 0]], [[7, hip], [17, hip + 12], [21, 0]]]
+    : pose === 'bump' ? [[[-6, hip], [-17, hip + 13], [-12, 0]], [[6, hip], [17, hip + 13], [12, 0]]]
+    : pose === 'spike' ? [[[-6, hip], [-14, hip + 11], [-9, hip + 25]], [[6, hip], [13, hip + 8], [15, hip + 22]]]
     : [[[-6, hip], [-7, hip + 15], [-8, 0]], [[6, hip], [7, hip + 15], [8, 0]]];
   const arms = pose === 'walk' ? [[[-13, sh + 3], [-17 - ph * 4, sh + 14], [-14 - ph * 9, sh + 25]], [[13, sh + 3], [17 + ph * 4, sh + 14], [14 + ph * 9, sh + 25]]]
     : pose === 'play' ? [[[-12, sh + 2], [-22, sh - 10], [-27, sh - 26]], [[12, sh + 2], [22, sh - 10], [27, sh - 26]]]
     : pose === 'climb' ? [[[-12, sh + 2], [-15, sh - 12], [-10, sh - 28 - ph * 7]], [[12, sh + 2], [15, sh - 12], [10, sh - 28 + ph * 7]]]
     : pose === 'surf' ? [[[-12, sh + 3], [-24, sh + 1], [-35, sh + 5]], [[12, sh + 3], [24, sh], [35, sh - 4]]]
+    : pose === 'bump' ? [[[-12, sh + 3], [-11, sh + 16], [-3, sh + 27]], [[12, sh + 3], [11, sh + 16], [3, sh + 27]]]
+    : pose === 'spike' ? [[[-12, sh + 3], [-24, sh + 4], [-32, sh - 6]], [[12, sh + 2], [17, sh - 16], [19, sh - 36]]]
     : [[[-13, sh + 3], [-17, sh + 14], [-18, sh + 25]], [[13, sh + 3], [17, sh + 14], [18, sh + 25]]];
   for (const L of legs) { kidLimb(c, L, 9, skin, lw); const f = L[2]; c.fillStyle = skin; c.strokeStyle = INK; c.lineWidth = lw; c.beginPath(); c.ellipse(f[0] + (f[0] < 0 ? -3 : 3), f[1] - 1, 7, 4, 0, 0, 7); c.fill(); c.stroke(); }
   c.strokeStyle = INK; c.lineWidth = lw;
@@ -1286,9 +1299,50 @@ function drawRider(c, g, x, y, r, tube) {
 // ---------- saved game ----------
 const SAVE_KEY = 'splash-line-park-v1';
 const state = { name: 'Splash Line Water Park', tickets: 5, rides: [], owned: {}, palms: 0, umbrellas: 0, unlocked: 0, riders: 0, welcomed: false, tester: 'sandy' };
+const SAVED = { local: false, cloud: false, at: 0, shownAt: 0 };
 function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.rides) Object.assign(state, s); } catch (e) { } }
 let saveTimer = 0;
-function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { } }, 400); }
+function save() { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 400); }
+function saveNow() {
+  clearTimeout(saveTimer); state.savedAt = Date.now(); const j = JSON.stringify(state);
+  try { localStorage.setItem(SAVE_KEY, j); SAVED.local = localStorage.getItem(SAVE_KEY) === j; } catch (e) { SAVED.local = false; }
+  cloudSave(j); SAVED.at = Date.now(); savedTag();
+}
+// When the page runs on claude.ai it also keeps a private copy of each player's park there,
+// because browser storage inside claude.ai can come back empty.
+const CLOUD = { db: null, uid: null, pending: null, last: '', timer: 0, busy: false };
+function cloudSave(j) { if (!CLOUD.db) return; CLOUD.pending = j; if (!CLOUD.timer) CLOUD.timer = setTimeout(cloudFlush, 2500); }
+async function cloudFlush() {
+  CLOUD.timer = 0; const j = CLOUD.pending; if (!j || j === CLOUD.last) return;
+  if (CLOUD.busy) { CLOUD.timer = setTimeout(cloudFlush, 1500); return; }
+  CLOUD.busy = true;
+  try {
+    const base = 'data/users/' + CLOUD.uid + '/', size = 150000, n = Math.ceil(j.length / size);
+    for (let k = 0; k < n; k++) await CLOUD.db.doc(base + 'park' + k).set({ s: j.slice(k * size, (k + 1) * size) });
+    await CLOUD.db.doc(base + 'save').set({ n, savedAt: state.savedAt || Date.now(), v: 1 });
+    CLOUD.last = j; SAVED.cloud = true; savedTag();
+  } catch (e) { SAVED.cloud = false; }
+  CLOUD.busy = false;
+}
+async function cloudInit() {
+  try {
+    if (!(window.claude && typeof window.claude.use === 'function')) return null;
+    const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    if (!db || !user) return null;
+    const uid = await user.id(); if (!uid) return null;
+    CLOUD.db = db; CLOUD.uid = uid;
+    const base = 'data/users/' + uid + '/', h = await db.doc(base + 'save').get();
+    if (!h.exists) return null;
+    const { n } = h.data(); let j = '';
+    for (let k = 0; k < n; k++) { const d = await db.doc(base + 'park' + k).get(); if (!d.exists) return null; j += d.data().s; }
+    const s = JSON.parse(j); CLOUD.last = j; SAVED.cloud = true; return s && s.rides ? s : null;
+  } catch (e) { return null; }
+}
+function savedTag() {
+  const el = document.getElementById('savedTag'); if (!el) return;
+  el.hidden = !(SAVED.local || SAVED.cloud);
+  if (Date.now() - SAVED.shownAt > 12000) { SAVED.shownAt = Date.now(); el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+}
 function unlockedCount() { return Math.max(state.unlocked, state.rides.length); }
 
 // ---------- UI helpers ----------
@@ -2641,7 +2695,7 @@ function drawSkyLife(c, cam, banner, planeY = 112) {
 
 // ---------- new attractions ----------
 const LAYOUT = ['gate', 0, 1, 'snack', 2, 3, 'fountain', 4, 5, 'wave', 'volley', 'hottub', 'surf', 'gift', 'dive', 'blaster', 'bumper', 'rescue', 'balloon'];
-const SLOT_W = { gate: 240, snack: 220, fountain: 220, wave: 460, volley: 300, hottub: 200, surf: 330, gift: 230, dive: 280, blaster: 280, bumper: 330, rescue: 250, balloon: 260 };
+const SLOT_W = { gate: 240, snack: 220, fountain: 220, wave: 460, volley: 300, hottub: 200, surf: 330, gift: 280, dive: 280, blaster: 280, bumper: 330, rescue: 250, balloon: 260 };
 const ATTRACTIONS = ['snack', 'fountain', 'river', 'wave', 'volley', 'hottub', 'surf', 'gift', 'dive', 'blaster', 'bumper', 'rescue', 'balloon'];
 function salePlaceholder(c, s, w, h, label, price, id) {
   c.setLineDash([6, 6]); c.strokeStyle = 'rgba(74,74,79,.5)'; c.lineWidth = 1.5; c.strokeRect(s.x + (s.w - w) / 2, PG - h, w, h); c.setLineDash([]);
@@ -2682,19 +2736,65 @@ function drawSurf(c, s) {
   htext(c, 'SURF', x1 - 26, PG - 118, 22, '#118ab2');
 }
 function drawGift(c, s) {
-  if (!state.owned.gift) return salePlaceholder(c, s, 180, 110, 'gift shop', 30, 1001);
-  const x = s.x + 35, w = s.w - 70;
-  c.fillStyle = 'rgba(155,93,229,.25)'; c.fillRect(x, PG - 84, w, 84);
-  jline(c, x, PG, x, PG - 84, 1002, INK, 2, 1); jline(c, x + w, PG, x + w, PG - 84, 1003, INK, 2, 1);
-  c.fillStyle = '#ffd166'; c.beginPath(); c.moveTo(x - 12, PG - 84); c.lineTo(x + w / 2, PG - 120); c.lineTo(x + w + 12, PG - 84); c.closePath(); c.fill(); c.strokeStyle = INK; c.lineWidth = 2; c.stroke();
-  htext(c, 'GIFTS', x + w / 2, PG - 92, 20, INK);
-  c.fillStyle = '#fffdf5'; c.fillRect(x + 16, PG - 64, w - 32, 30); c.strokeStyle = INK; c.lineWidth = 1.4; c.strokeRect(x + 16, PG - 64, w - 32, 30);
-  const cols = ['#ef476f', '#118ab2', '#06d6a0', '#ffd166', '#9b5de5'];
-  for (let k = 0; k < 5; k++) { c.fillStyle = cols[k]; c.fillRect(x + 22 + k * ((w - 44) / 5), PG - 52, 10, 12); }
-  c.strokeStyle = GRAPH; c.lineWidth = 1.2; c.beginPath(); c.moveTo(x + w + 2, PG - 74); c.quadraticCurveTo(x + w + 22, PG - 68, x + w + 42, PG - 76); c.stroke();
-  c.save(); c.strokeStyle = INK; c.lineWidth = 2.4; for (const [k, col] of [[0, '#ef476f'], [1, '#118ab2']]) { c.save(); c.translate(x + w + 12 + k * 20, PG - 62 + Math.sin(now * 2 + k) * 1.5); c.scale(0.32, 0.32); giftTee(c, col); c.restore(); } c.restore();
-  if (giftHas('plush')) drawGiftItem(c, 'flamingo', x + w / 2 - 20, PG - 18, 0.36);
-  if (giftHas('globes')) drawGiftItem(c, 'globe', x + w / 2 + 18, PG - 16, 0.36);
+  if (!state.owned.gift) return salePlaceholder(c, s, 200, 120, 'gift shop', 30, 1001);
+  const x = s.x + 24, w = 190, top = PG - 110, peak = PG - 160, L = x - 16, R = x + w + 16;
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  // walls with painted siding
+  c.fillStyle = '#e7d9fb'; c.fillRect(x, top, w, 110);
+  c.strokeStyle = 'rgba(155,93,229,.28)'; c.lineWidth = 1; c.beginPath(); for (let k = 1; k < 12; k++) { c.moveTo(x + k * w / 12, top + 4); c.lineTo(x + k * w / 12, PG); } c.stroke();
+  jline(c, x, PG, x, top, 1002, INK, 2, 1); jline(c, x + w, PG, x + w, top, 1003, INK, 2, 1);
+  // shingled roof
+  const roof = new Path2D(); roof.moveTo(L, top + 2); roof.lineTo(x + w / 2, peak); roof.lineTo(R, top + 2); roof.closePath();
+  c.fillStyle = '#ef6f8f'; c.fill(roof);
+  c.save(); c.clip(roof); c.strokeStyle = 'rgba(160,30,70,.45)'; c.lineWidth = 1.3;
+  for (let y = peak + 10; y < top + 4; y += 10) { const off = ((y - peak) / 10) % 2 ? 7 : 0; c.beginPath(); for (let xx = L - 14 + off; xx < R + 14; xx += 14) { c.moveTo(xx, y); c.arc(xx + 7, y, 7, Math.PI, 0, true); } c.stroke(); }
+  c.restore(); c.strokeStyle = INK; c.lineWidth = 2.2; c.stroke(roof);
+  // sign on the gable
+  c.save(); c.translate(x + w / 2, top - 18); c.rotate(-0.02);
+  c.fillStyle = '#fffdf5'; c.fillRect(-52, -14, 104, 26); c.strokeStyle = INK; c.lineWidth = 1.6; c.strokeRect(-52, -14, 104, 26);
+  htext(c, 'GIFT SHOP', 0, 7, 22, RED); c.restore();
+  // big present on the roof
+  const bob = Math.sin(now * 2) * 1.5;
+  c.save(); c.translate(x + w / 2, peak + 4 + bob); c.rotate(Math.sin(now * 1.3) * 0.04);
+  c.fillStyle = '#4fc3e0'; c.strokeStyle = INK; c.lineWidth = 2; c.fillRect(-22, -34, 44, 32); c.strokeRect(-22, -34, 44, 32);
+  c.fillStyle = '#5fd0ec'; c.fillRect(-25, -42, 50, 10); c.strokeRect(-25, -42, 50, 10);
+  c.fillStyle = '#ffd166'; c.fillRect(-4, -42, 8, 40); c.strokeRect(-4, -42, 8, 40);
+  c.beginPath(); c.ellipse(-10, -48, 10, 6, -0.4, 0, 7); c.fill(); c.stroke(); c.beginPath(); c.ellipse(10, -48, 10, 6, 0.4, 0, 7); c.fill(); c.stroke();
+  c.beginPath(); c.arc(0, -45, 4, 0, 7); c.fill(); c.stroke(); c.restore();
+  // string lights along the roof
+  for (let k = 0; k <= 12; k++) {
+    const t = k / 12, lx = t < 0.5 ? lerp(L + 4, x + w / 2, t * 2) : lerp(x + w / 2, R - 4, (t - 0.5) * 2), ly = (t < 0.5 ? lerp(top + 6, peak + 12, t * 2) : lerp(peak + 12, top + 6, (t - 0.5) * 2)) + 5;
+    const on = Math.floor(now * 2 + k) % 3 !== 0; c.fillStyle = on ? ['#ffd166', '#ef476f', '#06d6a0', '#118ab2'][k % 4] : '#ddd'; c.beginPath(); c.arc(lx, ly, 3, 0, 7); c.fill(); c.strokeStyle = INK; c.lineWidth = 0.8; c.stroke();
+  }
+  // striped awning over the display window
+  const ax = x + 8, aw = 112, ay = top + 16;
+  for (let k = 0; k < 7; k++) { const x0 = ax + k * aw / 7, x1 = ax + (k + 1) * aw / 7; c.fillStyle = k % 2 ? '#fff' : '#9b5de5'; c.beginPath(); c.moveTo(x0, ay); c.lineTo(x1, ay); c.lineTo(x1, ay + 14); c.quadraticCurveTo((x0 + x1) / 2, ay + 21, x0, ay + 14); c.closePath(); c.fill(); c.strokeStyle = INK; c.lineWidth = 1.1; c.stroke(); }
+  // display window with shelves of souvenirs
+  const wx = x + 14, wy = ay + 24, ww = 100, wh = 56;
+  c.fillStyle = '#eaf7fb'; c.fillRect(wx, wy, ww, wh);
+  c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 5; c.beginPath(); c.moveTo(wx + 14, wy + wh); c.lineTo(wx + 40, wy); c.moveTo(wx + 58, wy + wh); c.lineTo(wx + 74, wy); c.stroke();
+  c.strokeStyle = '#b5773a'; c.lineWidth = 2; c.beginPath(); c.moveTo(wx, wy + 27); c.lineTo(wx + ww, wy + 27); c.moveTo(wx, wy + wh - 2); c.lineTo(wx + ww, wy + wh - 2); c.stroke();
+  drawGiftItem(c, 'ducky', wx + 18, wy + 17, 0.28); drawGiftItem(c, 'shades', wx + 50, wy + 19, 0.26); drawGiftItem(c, 'ball', wx + 82, wy + 16, 0.26);
+  drawGiftItem(c, 'cap', wx + 20, wy + 45, 0.26); drawGiftItem(c, giftHas('plush') ? 'flamingo' : 'mug', wx + 50, wy + 43, 0.28); drawGiftItem(c, giftHas('globes') ? 'globe' : 'bucket', wx + 81, wy + 44, 0.28);
+  c.strokeStyle = INK; c.lineWidth = 2; c.strokeRect(wx, wy, ww, wh);
+  // door with an OPEN sign
+  const dx = x + 128, dw = 46;
+  c.fillStyle = '#06d6a0'; c.fillRect(dx, PG - 80, dw, 80); c.strokeStyle = INK; c.lineWidth = 2; c.strokeRect(dx, PG - 80, dw, 80);
+  c.fillStyle = '#eaf7fb'; c.beginPath(); c.arc(dx + dw / 2, PG - 60, 11, 0, 7); c.fill(); c.stroke();
+  c.fillStyle = '#ffd166'; c.beginPath(); c.arc(dx + dw - 8, PG - 38, 3, 0, 7); c.fill(); c.stroke();
+  c.save(); c.translate(dx + dw / 2, PG - 46); c.rotate(Math.sin(now * 1.7) * 0.08);
+  c.strokeStyle = GRAPH; c.lineWidth = 1; c.beginPath(); c.moveTo(-8, -2); c.lineTo(0, -8); c.lineTo(8, -2); c.stroke();
+  c.fillStyle = '#fff'; c.fillRect(-15, -2, 30, 14); c.strokeStyle = INK; c.lineWidth = 1.2; c.strokeRect(-15, -2, 30, 14); htext(c, 'OPEN', 0, 9, 12, '#2c8a3c', { font: 'Patrick' }); c.restore();
+  c.fillStyle = '#ef476f'; c.fillRect(dx - 4, PG - 4, dw + 8, 5);
+  // wrapped presents by the door once gift wrap is bought
+  if (giftHas('wrap')) for (const [ox, oy, sz, col] of [[-16, 0, 14, '#ef476f'], [-30, 0, 11, '#ffd166'], [-22, -14, 10, '#118ab2']]) { c.fillStyle = col; c.strokeStyle = INK; c.lineWidth = 1.2; c.fillRect(dx + ox, PG + oy - sz, sz, sz); c.strokeRect(dx + ox, PG + oy - sz, sz, sz); c.strokeStyle = '#fff'; c.beginPath(); c.moveTo(dx + ox + sz / 2, PG + oy - sz); c.lineTo(dx + ox + sz / 2, PG + oy); c.stroke(); }
+  // bin of beach balls and a spinning postcard rack outside
+  const bx = x + w + 20;
+  for (const [ox, oy, col] of [[-8, -29, '#ef476f'], [8, -29, '#118ab2'], [0, -39, '#ffd166']]) { c.fillStyle = col; c.strokeStyle = INK; c.lineWidth = 1.3; c.beginPath(); c.arc(bx + ox, PG + oy, 8, 0, 7); c.fill(); c.stroke(); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.arc(bx + ox, PG + oy, 5, 0.3, 1.6); c.stroke(); }
+  c.fillStyle = '#d9b98c'; c.strokeStyle = INK; c.lineWidth = 1.6; c.beginPath(); c.moveTo(bx - 17, PG - 24); c.lineTo(bx + 17, PG - 24); c.lineTo(bx + 13, PG); c.lineTo(bx - 13, PG); c.closePath(); c.fill(); c.stroke();
+  const rx = x + w + 48; jline(c, rx, PG, rx, PG - 82, 1004, GRAPH, 2, 1);
+  const spin = Math.cos(now * 1.2);
+  for (let k = 0; k < 3; k++) { const pw = 22 * Math.abs(spin), py = PG - 78 + k * 22; c.fillStyle = ['#fff3b0', '#d6f1fa', '#fde2ea'][(k + (spin < 0 ? 1 : 0)) % 3]; c.strokeStyle = INK; c.lineWidth = 1.1; c.fillRect(rx - pw / 2, py, pw, 16); c.strokeRect(rx - pw / 2, py, pw, 16); if (pw > 12) { c.strokeStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.moveTo(rx - pw / 2 + 3, py + 6); c.lineTo(rx + pw / 2 - 3, py + 6); c.moveTo(rx - pw / 2 + 3, py + 10); c.lineTo(rx + pw / 4, py + 10); c.stroke(); } }
 }
 function drawAttraction(c, s) {
   switch (s.type) {
@@ -2854,13 +2954,13 @@ function miniEnd() {
   setTimeout(() => { if (scene === 'mini') $('#miniEnd').hidden = false; }, 700);
   if (isBest && MINI.score > 0) SFX.fanfare(); else SFX.pop();
 }
-function miniDown(p) { MINI.hold = true; MINI.px = p.x; MINI.py = p.y; if (!MINI.over && MINI_TAP[MINI.type]) MINI_TAP[MINI.type](p); }
+function miniDown(p) { MINI.hold = true; MINI.px = p.x; MINI.py = p.y; MINI.downT = now; MINI.downX = p.x; if (!MINI.over && MINI_TAP[MINI.type]) MINI_TAP[MINI.type](p); }
 function miniMove(p) { MINI.px = p.x; MINI.py = p.y; }
-function miniUp() { MINI.hold = false; }
+function miniUp() { MINI.hold = false; if (MINI.type === 'volley' && now - (MINI.downT || -9) < 0.35) vbJump(); }
 function miniKey(e, down) {
   if (scene !== 'mini' || MINI.over) return false;
   if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-    if (down && !e.repeat) { MINI.hold = true; const d = MINI.d; if (MINI.type === 'river') MINI_TAP.river({ x: 300, y: e.key === 'ArrowUp' ? 0 : e.key === 'ArrowDown' ? H : 0 }, e.key === 'ArrowDown' ? 1 : -1); else if (MINI_TAP[MINI.type]) MINI_TAP[MINI.type]({ x: MINI.px, y: MINI.py }); }
+    if (down && !e.repeat) { MINI.hold = true; const d = MINI.d; if (MINI.type === 'volley') vbJump(); else if (MINI.type === 'river') MINI_TAP.river({ x: 300, y: e.key === 'ArrowUp' ? 0 : e.key === 'ArrowDown' ? H : 0 }, e.key === 'ArrowDown' ? 1 : -1); else if (MINI_TAP[MINI.type]) MINI_TAP[MINI.type]({ x: MINI.px, y: MINI.py }); }
     if (!down) MINI.hold = false;
     return true;
   }
@@ -3309,6 +3409,260 @@ function drawRescueArea(c, s) {
   c.fillStyle = '#f1c27d'; c.beginPath(); c.arc(sx, PG + 6, 6, 0, 7); c.fill(); c.stroke();
   htext(c, 'lifeguard tower', s.x + s.w / 2, PG - 160, 20, RED);
 }
+
+// ---------- Beach Volleyball: you vs. the pencils, first to 7 ----------
+const VB = { G: 900, GROUND: 600, NET: 600, NETTOP: 398, IN0: 110, IN1: 1090, WIN: 7 };
+const VB_TAUNT = ["We're #2!", 'Sharp!', 'Pencils rule!', 'Write that down.', 'Too easy.', 'Point for the pencils!'];
+const VB_OUCH = ['Snap!', 'My tip!', 'Not again...', 'I need a sharpener.'];
+Object.assign(MINI_INFO.volley, {
+  how: 'Move under the ball to bump it over the net. Tap (or press space) to jump. Jump near the net to SPIKE it! First to 7 points wins.',
+  lives: 0, div: 1, stars: [12, 25, 40],
+  stat: () => 'first to 7 points wins',
+  onEnd: () => { const d = MINI.d; return { title: d.you >= VB.WIN ? 'You beat the pencils!' : 'The pencils win this one', html: `<br><small style="color:#4a4a4f">Final score: you ${d.you}, pencils ${d.them}${d.spikes ? ` · ${d.spikes} spike${d.spikes === 1 ? '' : 's'}` : ''}</small>` }; },
+});
+MINI_INIT.volley = () => ({
+  px: 300, py: 0, pvy: 0, face: 1, cool: 0, hitAt: -9, pose: 'stand', mood: null, moodT: 0,
+  you: 0, them: 0, total: 0, rally: 0, spikes: 0, last: null, touches: 0, plan: null, spikeLive: false,
+  server: 'them', serveIn: 1.6, trail: [],
+  ball: { x: 960, y: 480, vx: 0, vy: 0, live: false, fast: false, spin: 0 },
+  pens: [{ x: 760, home: 760, y: 0, vy: 0, cool: 0, hitAt: -9, knock: 0, broken: false, sharp: 0, say: null, band: '#ef476f' },
+    { x: 970, home: 970, y: 0, vy: 0, cool: 0, hitAt: -9, knock: 0, broken: false, sharp: 0, say: null, band: '#118ab2' }],
+});
+function vbLand(b, yl) { const disc = b.vy * b.vy + 2 * VB.G * (yl - b.y); if (disc < 0) return null; const t = (-b.vy + Math.sqrt(disc)) / VB.G; return { x: b.x + b.vx * t, t }; }
+function vbAim(b, tx, T) { b.vx = (tx - b.x) / T; b.vy = ((VB.GROUND - 14 - b.y) - 0.5 * VB.G * T * T) / T; }
+// fast shot toward tx that still clears the net
+function vbSmash(b, tx, speed) {
+  const vx = Math.sign(tx - b.x) * speed, T = (tx - b.x) / vx; b.vx = vx; b.vy = ((VB.GROUND - 14 - b.y) - 0.5 * VB.G * T * T) / T;
+  const tn = (VB.NET - b.x) / vx;
+  if (tn > 0) { const yn = b.y + b.vy * tn + 0.5 * VB.G * tn * tn; if (yn > VB.NETTOP - 14) b.vy = ((VB.NETTOP - 22 - b.y) - 0.5 * VB.G * tn * tn) / tn; }
+}
+function vbSay(p, text) { p.say = { text, t0: now }; }
+function vbJump() { const d = MINI.d; if (!d || MINI.type !== 'volley' || MINI.over) return; if (d.py <= 0.5) { d.pvy = 660; SFX.boing(); } }
+function vbPoint(d, who) {
+  const b = d.ball; b.live = false; d.rally = 0;
+  if (who === 'you') {
+    d.you++; const bonus = d.spikeLive ? 2 : 0; MINI.score += 3 + bonus;
+    miniLabel(d.spikeLive ? 'SPIKED! +5' : 'POINT! +3', clamp(b.x, 160, 1040), 470, '#2c8a3c', true); SFX.cash();
+    const p = d.pens[Math.abs(d.pens[0].x - b.x) < Math.abs(d.pens[1].x - b.x) ? 0 : 1]; if (!p.knock) { p.broken = true; vbSay(p, pick(VB_OUCH)); }
+    d.mood = 'joy'; d.moodT = now;
+  } else {
+    d.them++; miniLabel('Pencils score', clamp(b.x, 200, 1000), 470, RED, true); SFX.thud();
+    vbSay(d.pens[Math.random() < 0.5 ? 0 : 1], pick(VB_TAUNT)); d.mood = 'ouch'; d.moodT = now;
+  }
+  d.total = d.you + d.them; d.spikeLive = false; d.plan = null; d.touches = 0;
+  if (d.you >= VB.WIN || d.them >= VB.WIN) {
+    const won = d.you >= VB.WIN; if (won) MINI.score += 10;
+    MINI_INFO.volley.overText = won ? 'You win!' : 'The pencils win!';
+    if (won) for (let i = 0; i < 40; i++) MINI.parts.push({ x: 300 + Math.random() * 600, y: 300, vx: (Math.random() - 0.5) * 500, vy: -300 - Math.random() * 300, life: 1.6, c: pick(['#ef476f', '#ffd166', '#118ab2', '#06d6a0']) });
+    setTimeout(() => { if (MINI.type === 'volley' && !MINI.over) miniEnd(); }, 900);
+  }
+  d.server = who; d.serveIn = 1.7;
+}
+function vbServe(d) {
+  const b = d.ball; d.touches = 0; d.plan = null; d.spikeLive = false; d.trail = []; b.fast = false; b.live = true;
+  if (d.server === 'you') { Object.assign(b, { x: d.px + 20, y: VB.GROUND - 120 }); vbAim(b, 700 + Math.random() * 340, 1.55); d.last = 'you'; d.hitAt = now; SFX.boing(); miniLabel('Serve!', d.px, 420, INK); }
+  else { const p = d.pens[1]; Object.assign(b, { x: p.x - 16, y: VB.GROUND - 125 }); vbAim(b, 170 + Math.random() * 360, 1.55); d.last = 'them'; p.hitAt = now; SFX.boing(); }
+}
+MINI_TAP.volley = () => { };
+MINI_STEP.volley = function (dt, d) {
+  const b = d.ball, G = VB.G, GR = VB.GROUND, lvl = d.total;
+  // you: run and jump
+  const target = MINI.keyDir ? d.px + MINI.keyDir * 700 * dt : MINI.px, ox0 = d.px;
+  d.px += clamp(target - d.px, -680 * dt, 680 * dt); d.px = clamp(d.px, 120, 568);
+  if (Math.abs(d.px - ox0) > 0.5) d.face = d.px > ox0 ? 1 : -1;
+  d.moving = Math.abs(d.px - ox0) > 60 * dt;
+  if (d.py > 0 || d.pvy > 0) { d.pvy -= 1700 * dt; d.py += d.pvy * dt; if (d.py <= 0) { d.py = 0; d.pvy = 0; } }
+  d.cool -= dt;
+  // the pencils
+  const live = b.live, theirs = live && (b.x > VB.NET || b.vx > 0);
+  let lx = null; if (theirs) { const L = vbLand(b, GR - 90); lx = L ? L.x : b.x; }
+  const chaser = lx === null ? -1 : (d.touches === 1 || lx < 845) ? 0 : 1, spd = 300 + lvl * 14;
+  d.pens.forEach((p, i) => {
+    p.cool -= dt; p.knock = Math.max(0, p.knock - dt * 0.8);
+    const tx = i === chaser && !p.knock ? clamp(lx, 650, 1050) : p.home;
+    if (!p.knock) p.x += clamp(tx - p.x, -spd * dt, spd * dt);
+    if (p.y > 0 || p.vy > 0) { p.vy -= 1600 * dt; p.y += p.vy * dt; if (p.y <= 0) { p.y = 0; p.vy = 0; } }
+    if (p.sharp > 0) { p.sharp -= dt; if (Math.random() < dt * 30) MINI.parts.push({ x: p.x, y: GR - 150, vx: (Math.random() - 0.5) * 160, vy: -120 - Math.random() * 120, life: 0.7, c: Math.random() < 0.5 ? '#e9c46a' : '#b5773a' }); if (p.sharp <= 0) { p.broken = false; SFX.pop(); } }
+  });
+  // serving
+  if (d.serveIn > 0) {
+    d.serveIn -= dt;
+    for (const p of d.pens) if (p.broken && p.sharp <= 0 && d.serveIn < 1.2 && d.serveIn > 0.5) p.sharp = 0.7;
+    if (!live) { b.vy += G * dt; b.x += b.vx * dt; b.y += b.vy * dt; if (b.y > GR - 14) { b.y = GR - 14; b.vy = -b.vy * 0.35; b.vx *= 0.6; if (Math.abs(b.vy) < 40) b.vy = 0; } }
+    if (d.serveIn <= 0 && !MINI.over && d.you < VB.WIN && d.them < VB.WIN) vbServe(d);
+    return;
+  }
+  if (!live) return;
+  // ball flight
+  b.vy += G * dt; const ox = b.x; b.x += b.vx * dt; b.y += b.vy * dt; b.spin += (b.vx / 60) * dt;
+  if (b.fast) { d.trail.push({ x: b.x, y: b.y }); if (d.trail.length > 7) d.trail.shift(); } else if (d.trail.length) d.trail.shift();
+  if ((ox - VB.NET) * (b.x - VB.NET) < 0 && b.y > VB.NETTOP - 12) { b.x = ox; b.vx = -b.vx * 0.25; b.vy = Math.max(b.vy * 0.3, 40); b.fast = false; miniLabel('Net!', VB.NET, VB.NETTOP - 30, RED); SFX.thud(); }
+  // your hits
+  if (d.cool <= 0 && b.x < VB.NET) {
+    const dx = Math.abs(b.x - d.px), top = GR - d.py;
+    if (d.py > 25 && d.px > 330 && dx < 80 && b.y > top - 240 && b.y < top - 70) {
+      vbSmash(b, 720 + Math.random() * 330, 940); b.fast = true; d.spikeLive = true; d.spikes++; d.cool = 0.3; d.hitAt = now; d.last = 'you'; d.touches = 0;
+      MINI.score += 2; d.rally++; miniLabel('SPIKE!', b.x, b.y - 40, '#d11f66', true); SFX.voice(tester().voice); miniSplash(b.x, b.y, 10, '#ffd166'); d.shake = now;
+    } else if (b.vy > 0 && dx < 70 && b.y > top - 172 && b.y < top - 26) {
+      d.cool = 0.3; d.hitAt = now; d.last = 'you'; d.spikeLive = false; SFX.boing(); miniSplash(b.x, b.y, 6, '#e9c46a');
+      if (b.fast) { vbAim(b, clamp(d.px + 90, 380, 520), 1.3); b.fast = false; miniLabel('Dig!', b.x, b.y - 40, INK); }
+      else { vbAim(b, 700 + Math.random() * 360, 1.3 - Math.min(0.25, lvl * 0.02)); d.rally++; MINI.score++; }
+    }
+  }
+  // pencil hits
+  d.pens.forEach((p, i) => {
+    if (p.cool > 0 || p.knock || b.x <= VB.NET || !b.live) return;
+    // front pencil jumps for a planned spike
+    if (i === 0 && d.plan === 'spike' && b.vy > 0 && Math.abs(b.x - p.x) < 90 && b.y > 300 && p.y === 0) p.vy = 540;
+    if (!(Math.abs(b.x - p.x) < 62 && b.y > GR - 186 - p.y && b.y < GR - 34 - p.y && (b.vy > 0 || p.y > 20))) return;
+    p.cool = 0.3; p.hitAt = now; d.last = 'them';
+    if (b.fast) {
+      if (Math.random() < 0.28 + lvl * 0.02) { vbAim(b, 770, 1.4); b.fast = false; d.touches = 1; d.plan = Math.random() < 0.5 ? 'spike' : null; d.spikeLive = false; miniLabel('dig!', p.x, GR - 210, GRAPH); SFX.boing(); }
+      else { p.knock = 1; p.broken = true; for (const q of d.pens) q.cool = 1.5; b.vx = 140; b.vy = -240; b.fast = false; miniLabel('BONK!', Math.min(p.x, 1020), GR - 210, RED, true); SFX.thud(); }
+      return;
+    }
+    if (d.touches === 0 && Math.random() < Math.max(0.02, 0.09 - lvl * 0.008)) { p.cool = 1; d.last = 'you'; miniLabel('whiff!', p.x, GR - 210, GRAPH); return; }
+    if (d.plan === 'spike' && i === 0) {
+      vbSmash(b, 170 + Math.random() * 360, 580 + lvl * 18); b.fast = true; d.plan = null; d.touches = 0; vbSay(p, 'Hi-yah!'); SFX.voice('honk'); return;
+    }
+    if (d.touches === 0 && Math.random() < 0.3 + lvl * 0.02) { vbAim(b, 760, 1.4); d.touches = 1; d.plan = Math.random() < Math.min(0.8, 0.35 + lvl * 0.05) ? 'spike' : null; SFX.boing(); return; }
+    const out = Math.random() < 0.1; vbAim(b, out ? 40 + Math.random() * 50 : 170 + Math.random() * 370, 1.35); d.touches = 0; d.plan = null; SFX.boing();
+  });
+  // landing
+  if (b.y >= GR - 14 || b.x < -60 || b.x > W + 60) {
+    const inb = b.x >= VB.IN0 && b.x <= VB.IN1;
+    let who = inb ? (b.x < VB.NET ? 'them' : 'you') : (d.last === 'you' ? 'them' : 'you');
+    if (!inb) miniLabel('OUT!', clamp(b.x, 80, W - 80), 540, RED, true);
+    b.y = Math.min(b.y, GR - 14); b.vy = -Math.abs(b.vy) * 0.3; b.vx *= 0.5; b.fast = false;
+    miniSplash(clamp(b.x, 20, W - 20), GR, 12, '#e9c46a');
+    vbPoint(d, who);
+  }
+};
+
+function vbDrawPencil(c, p, i, ballX) {
+  const GR = VB.GROUND, hit = now - p.hitAt < 0.25 || p.y > 5;
+  c.save(); c.translate(p.x, GR - p.y); c.scale(1.25, 1.25);
+  if (p.knock) c.rotate(Math.sin(p.knock * Math.PI) * 1.1 + p.knock * 0.2);
+  if (p.sharp > 0) c.scale(Math.cos(now * 30), 1);
+  c.strokeStyle = INK; c.lineWidth = 2; c.lineCap = 'round'; c.lineJoin = 'round';
+  // legs and shoes
+  const run = Math.abs(p.x - p.home) > 4 && !p.y ? Math.sin(now * 14 + i) * 5 : 0;
+  c.beginPath(); c.moveTo(-6, -24); c.lineTo(-7 + run, -2); c.moveTo(6, -24); c.lineTo(7 - run, -2); c.stroke();
+  c.fillStyle = '#fff'; c.beginPath(); c.ellipse(-10 + run, -2, 7, 3.4, 0, 0, 7); c.ellipse(10 - run, -2, 7, 3.4, 0, 0, 7); c.fill(); c.stroke();
+  // eraser, metal band, yellow body
+  c.fillStyle = '#f7a1c4'; c.beginPath(); c.roundRect(-14, -36, 28, 14, [2, 2, 7, 7]); c.fill(); c.stroke();
+  c.fillStyle = '#c9ccd3'; c.fillRect(-14, -46, 28, 10); c.strokeRect(-14, -46, 28, 10);
+  c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = 1; c.beginPath(); c.moveTo(-14, -42); c.lineTo(14, -42); c.moveTo(-14, -39); c.lineTo(14, -39); c.stroke();
+  c.strokeStyle = INK; c.lineWidth = 2;
+  c.fillStyle = '#ffd23f'; c.fillRect(-14, -104, 28, 58); c.strokeRect(-14, -104, 28, 58);
+  c.strokeStyle = 'rgba(180,120,0,.45)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-5, -104); c.lineTo(-5, -46); c.moveTo(5, -104); c.lineTo(5, -46); c.stroke();
+  // sharpened top (or a snapped one)
+  c.strokeStyle = INK; c.lineWidth = 2; c.fillStyle = '#e9c9a0';
+  if (p.broken) { c.beginPath(); c.moveTo(-14, -104); c.lineTo(-9, -113); c.lineTo(-4, -108); c.lineTo(1, -115); c.lineTo(6, -109); c.lineTo(10, -114); c.lineTo(14, -104); c.closePath(); c.fill(); c.stroke(); }
+  else { c.beginPath(); c.moveTo(-14, -104); c.lineTo(0, -134); c.lineTo(14, -104); c.closePath(); c.fill(); c.stroke(); c.fillStyle = '#3a3a40'; c.beginPath(); c.moveTo(-4.5, -124.5); c.lineTo(0, -134); c.lineTo(4.5, -124.5); c.closePath(); c.fill(); }
+  // sweatband and face
+  c.fillStyle = p.band; c.fillRect(-14.5, -100, 29, 7); c.strokeRect(-14.5, -100, 29, 7);
+  const look = clamp((ballX - p.x) / 200, -1, 1) * 2.2;
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(-6, -84, 4.6, 0, 7); c.arc(6, -84, 4.6, 0, 7); c.fill(); c.lineWidth = 1.4; c.beginPath(); c.arc(-6, -84, 4.6, 0, 7); c.stroke(); c.beginPath(); c.arc(6, -84, 4.6, 0, 7); c.stroke();
+  c.fillStyle = INK; c.beginPath(); c.arc(-6 + look, -83.5, 2, 0, 7); c.arc(6 + look, -83.5, 2, 0, 7); c.fill();
+  c.lineWidth = 1.8; c.beginPath();
+  if (p.knock || p.broken) { c.moveTo(-5, -71); c.quadraticCurveTo(0, -75, 5, -71); } else if (hit) { c.ellipse(0, -72, 3.2, 3.6, 0, 0, 7); } else { c.moveTo(-5, -74); c.quadraticCurveTo(0, -69, 5, -74); }
+  c.stroke();
+  htext(c, '#2', 0, -54, 13, 'rgba(90,60,0,.7)', { font: 'Patrick' });
+  // arms
+  c.lineWidth = 2; c.beginPath();
+  if (hit) { c.moveTo(-14, -66); c.lineTo(-24, -92); c.moveTo(14, -66); c.lineTo(24, -92); }
+  else { const w = Math.sin(now * 3 + i) * 3; c.moveTo(-14, -66); c.lineTo(-24, -50 + w); c.moveTo(14, -66); c.lineTo(24, -50 - w); }
+  c.stroke(); c.fillStyle = '#fff';
+  const hy = hit ? -94 : -48; c.beginPath(); c.arc(-25, hy, 3.6, 0, 7); c.arc(25, hy, 3.6, 0, 7); c.fill(); c.lineWidth = 1.4; c.beginPath(); c.arc(-25, hy, 3.6, 0, 7); c.stroke(); c.beginPath(); c.arc(25, hy, 3.6, 0, 7); c.stroke();
+  c.restore();
+  if (p.say && now - p.say.t0 < 1.8) { const t = p.say.text, w = Math.max(60, t.length * 9 + 16), bx = clamp(p.x, w / 2 + 620, W - w / 2 - 10), by = GR - 225 - p.y; c.fillStyle = '#fff'; c.strokeStyle = INK; c.lineWidth = 1.5; c.beginPath(); c.roundRect(bx - w / 2, by - 16, w, 30, 12); c.fill(); c.stroke(); c.beginPath(); c.moveTo(p.x - 6, by + 14); c.lineTo(p.x, by + 26); c.lineTo(p.x + 6, by + 14); c.fill(); htext(c, t, bx, by + 6, 19, INK, { font: 'hand' }); }
+}
+function vbBackdrop(c) {
+  const GR = VB.GROUND;
+  c.fillStyle = 'rgba(127,211,239,.13)'; c.fillRect(0, 0, W, 520);
+  c.fillStyle = 'rgba(255,209,102,.5)'; c.beginPath(); c.arc(1060, 120, 42, 0, 7); c.fill();
+  drawCloud(c, 180 + Math.sin(now * 0.1) * 20, 150, 1.1, 71); drawCloud(c, 470 - Math.sin(now * 0.08) * 30, 200, 0.9, 72); c.save(); c.translate(70, 612); c.scale(1.9, 1.9); drawPalm(c, 0, 5, 0); c.restore(); c.save(); c.translate(1120, 612); c.scale(-1.7, 1.7); drawPalm(c, 0, 9, 0); c.restore();
+  // ocean behind the court
+  c.fillStyle = 'rgba(79,195,224,.32)'; c.fillRect(0, 505, W, GR - 505); jline(c, 0, 505, W, 505, 61, AQUA_DK, 1.6, 1, 0.7);
+  c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 2;
+  for (let r = 0; r < 3; r++) { const y = 525 + r * 24, off = (now * (18 + r * 10) + r * 40) % 150; c.beginPath(); for (let x = -150 + off; x < W; x += 150) { c.moveTo(x, y); c.quadraticCurveTo(x + 12, y - 5, x + 24, y); } c.stroke(); }
+  // a little sailboat drifting by
+  const sx = ((now * 14) % (W + 200)) - 100; c.fillStyle = '#fff'; c.strokeStyle = INK; c.lineWidth = 1.4; c.beginPath(); c.moveTo(sx, 500); c.lineTo(sx, 466); c.lineTo(sx + 20, 498); c.closePath(); c.fill(); c.stroke(); c.fillStyle = '#ef476f'; c.beginPath(); c.moveTo(sx - 16, 500); c.lineTo(sx + 22, 500); c.lineTo(sx + 16, 508); c.lineTo(sx - 12, 508); c.closePath(); c.fill(); c.stroke();
+  // sand
+  c.fillStyle = 'rgba(240,210,140,.62)'; c.fillRect(0, GR, W, H - GR); jline(c, 0, GR, W, GR, 3, '#b08850', 2, 1);
+  c.fillStyle = 'rgba(176,136,80,.35)'; for (let k = 0; k < 90; k++) { c.beginPath(); c.arc(rnd(k) * W, GR + 8 + rnd(k + 50) * (H - GR - 12), 1.3, 0, 7); c.fill(); }
+  // court rope with corner stakes
+  c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 3; c.beginPath(); c.moveTo(VB.IN0, GR + 6); c.lineTo(VB.IN1, GR + 6); c.stroke();
+  for (const x of [VB.IN0, VB.IN1]) { c.fillStyle = '#ef476f'; c.strokeStyle = INK; c.lineWidth = 1.4; c.beginPath(); c.moveTo(x, GR + 10); c.lineTo(x, GR - 22); c.stroke(); c.beginPath(); c.moveTo(x, GR - 22); c.lineTo(x + 14, GR - 17); c.lineTo(x, GR - 12); c.closePath(); c.fill(); c.stroke(); }
+  // towel, cooler and an umbrella off to the sides
+  c.save(); c.translate(150, 676); c.rotate(-0.05); c.fillStyle = '#9b5de5'; c.fillRect(-30, -10, 110, 26); c.strokeStyle = INK; c.lineWidth = 1.4; c.strokeRect(-30, -10, 110, 26); c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(-30, -2, 110, 5); c.fillRect(-30, 8, 110, 3); c.restore();
+  c.fillStyle = '#4fc3e0'; c.strokeStyle = INK; c.lineWidth = 1.6; c.beginPath(); c.roundRect(1128, 640, 50, 32, 6); c.fill(); c.stroke(); c.fillStyle = '#fff'; c.fillRect(1128, 640, 50, 9); c.strokeRect(1128, 640, 50, 9);
+  jline(c, 1170, GR + 20, 1170, 430, 62, '#8a6b4a', 3, 1);
+  const cols = ['#ef476f', '#fff', '#ffd166', '#fff', '#ef476f', '#fff'];
+  for (let k = 0; k < 6; k++) { c.fillStyle = cols[k]; c.beginPath(); c.moveTo(1170, 412); c.lineTo(1110 + k * 20, 450); c.lineTo(1130 + k * 20, 450); c.closePath(); c.fill(); }
+  c.strokeStyle = INK; c.lineWidth = 1.8; c.beginPath(); c.moveTo(1170, 412); c.lineTo(1106, 450); c.quadraticCurveTo(1170, 442, 1234, 450); c.closePath(); c.stroke();
+}
+function vbDrawNet(c) {
+  const GR = VB.GROUND, N = VB.NET, T = VB.NETTOP;
+  c.fillStyle = 'rgba(0,0,0,.1)'; c.beginPath(); c.ellipse(N + 30, GR + 5, 40, 5, 0, 0, 7); c.fill();
+  c.fillStyle = '#c49a6c'; c.strokeStyle = INK; c.lineWidth = 1.8; c.fillRect(N - 5, T - 16, 10, GR - T + 16); c.strokeRect(N - 5, T - 16, 10, GR - T + 16);
+  c.fillStyle = '#ef476f'; c.beginPath(); c.arc(N, T - 18, 6, 0, 7); c.fill(); c.stroke();
+  // mesh panel seen from the side, leaning into the page
+  const x0 = N - 13, x1 = N + 13, y0 = T, y1 = T + 82;
+  c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+  c.strokeStyle = 'rgba(31,61,158,.55)'; c.lineWidth = 1; c.beginPath();
+  for (let y = y0 + 8; y <= y1; y += 8) { c.moveTo(x0, y); c.lineTo(x1, y); } for (let x = x0; x <= x1; x += 6.5) { c.moveTo(x, y0); c.lineTo(x, y1); } c.stroke();
+  c.strokeStyle = INK; c.lineWidth = 1.4; c.strokeRect(x0, y0, x1 - x0, y1 - y0);
+  c.fillStyle = '#fff'; c.fillRect(x0 - 2, y0 - 5, x1 - x0 + 4, 7); c.strokeRect(x0 - 2, y0 - 5, x1 - x0 + 4, 7);
+}
+function vbDrawBall(c, b, trail) {
+  const GR = VB.GROUND, hgt = clamp((GR - b.y) / 400, 0, 1);
+  c.fillStyle = `rgba(0,0,0,${0.18 - hgt * 0.1})`; c.beginPath(); c.ellipse(b.x, GR + 4, 18 - hgt * 8, 5 - hgt * 2, 0, 0, 7); c.fill();
+  trail.forEach((t, k) => { c.globalAlpha = (k + 1) / trail.length * 0.35; c.fillStyle = '#ffd166'; c.beginPath(); c.arc(t.x, t.y, 6 + k * 1.4, 0, 7); c.fill(); }); c.globalAlpha = 1;
+  c.save(); c.translate(b.x, b.y); c.rotate(b.spin);
+  c.fillStyle = '#fff'; c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.arc(0, 0, 16, 0, 7); c.fill();
+  c.save(); c.clip();
+  c.fillStyle = '#ffd166'; c.beginPath(); c.moveTo(-16, -4); c.quadraticCurveTo(0, -18, 16, -4); c.lineTo(16, -16); c.lineTo(-16, -16); c.closePath(); c.fill();
+  c.fillStyle = '#118ab2'; c.beginPath(); c.moveTo(-6, 16); c.quadraticCurveTo(-2, 0, 16, 4); c.lineTo(16, 16); c.closePath(); c.fill();
+  c.strokeStyle = INK; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-16, -4); c.quadraticCurveTo(0, -18, 16, -4); c.moveTo(-6, 16); c.quadraticCurveTo(-2, 0, 16, 4); c.moveTo(-16, 6); c.quadraticCurveTo(-6, 2, -2, -10); c.stroke();
+  c.restore(); c.beginPath(); c.arc(0, 0, 16, 0, 7); c.lineWidth = 2; c.stroke(); c.restore();
+}
+MINI_DRAW.volley = function (c, d) {
+  const GR = VB.GROUND, b = d.ball;
+  const shake = now - (d.shake || -9) < 0.15 ? (Math.random() - 0.5) * 6 : 0;
+  c.save(); c.translate(shake, 0);
+  vbBackdrop(c);
+  // where the ball will land on your side
+  if (b.live && (b.x < VB.NET || b.vx < 0)) {
+    const L = vbLand(b, GR - 14);
+    if (L && L.x < VB.NET) { const out = L.x < VB.IN0, pul = 1 + Math.sin(now * 12) * 0.1; c.save(); c.setLineDash([5, 5]); c.strokeStyle = out ? RED : '#1f3d9e'; c.lineWidth = 2; c.beginPath(); c.ellipse(L.x, GR + 6, 24 * pul, 7 * pul, 0, 0, 7); c.stroke(); c.restore(); if (out) htext(c, 'out', L.x + 36, GR + 30, 22, RED, { font: 'hand' }); }
+  }
+  vbDrawNet(c);
+  d.pens.forEach((p, i) => { c.fillStyle = 'rgba(0,0,0,.12)'; c.beginPath(); c.ellipse(p.x, GR + 3, 24 - Math.min(10, p.y / 10), 4, 0, 0, 7); c.fill(); });
+  vbDrawPencil(c, d.pens[1], 1, b.x); vbDrawPencil(c, d.pens[0], 0, b.x);
+  // you
+  c.fillStyle = 'rgba(0,0,0,.14)'; c.beginPath(); c.ellipse(d.px, GR + 3, 24 - Math.min(12, d.py / 9), 5, 0, 0, 7); c.fill();
+  const pose = d.py > 5 ? 'spike' : now - d.hitAt < 0.3 ? 'bump' : d.moving ? 'walk' : 'stand';
+  const mood = now - d.moodT < 1.2 ? d.mood : pose === 'spike' ? 'wow' : undefined;
+  c.save(); c.translate(d.px, GR - d.py); c.scale(pose === 'spike' ? 1 : d.face, 1);
+  drawKid(c, { suit: '#ef476f', skin: '#f1c27d', hair: '#3b2a1a', seed: 1 }, 0, 0, pose, 138, now, { mood });
+  c.restore();
+  vbDrawBall(c, b, d.trail);
+  // fans along the bottom cheer when you score
+  const cheer = d.mood === 'joy' && now - d.moodT < 1.4;
+  [[300, 11, '#118ab2'], [372, 23, '#06d6a0'], [880, 37, '#ffd166'], [955, 44, '#9b5de5']].forEach(([fx, sd, suit], k) => {
+    drawKid(c, { suit, skin: ['#f1c27d', '#c68642', '#e0ac69', '#8d5524'][k], hair: ['#3b2a1a', '#111', '#a0522d', '#222'][k], seed: sd }, fx, 752, cheer ? 'play' : 'stand', 92, now + k, { mood: cheer ? 'joy' : d.mood === 'ouch' && now - d.moodT < 1.2 ? 'ouch' : undefined });
+  });
+  c.restore();
+  // scoreboard
+  const sx = 820, sy = 30; c.fillStyle = '#fffdf5'; c.strokeStyle = INK; c.lineWidth = 1.8; c.beginPath(); c.roundRect(sx - 150, sy, 300, 64, 8); c.fill(); c.stroke();
+  jline(c, sx, sy + 8, sx, sy + 56, 63, GRAPH, 1.2, 1, 0.6);
+  htext(c, 'you', sx - 110, sy + 40, 22, INK, { font: 'hand' }); htext(c, String(d.you), sx - 42, sy + 48, 46, '#1f3d9e');
+  htext(c, String(d.them), sx + 42, sy + 48, 46, GRAPH); htext(c, 'pencils', sx + 106, sy + 40, 22, GRAPH, { font: 'hand' });
+    if (MINI.t < 6 && !MINI.over) htext(c, 'Tap (or space) to jump. Jump near the net to SPIKE!', W / 2, 250, 32, INK, { font: 'hand', alpha: Math.min(1, (6 - MINI.t) * 1.5) });
+  if (d.serveIn > 0 && !MINI.over && (d.you || d.them) && d.you < VB.WIN && d.them < VB.WIN) htext(c, d.server === 'you' ? 'your serve' : "pencils' serve", W / 2, 330, 30, GRAPH, { font: 'hand', alpha: 0.85 });
+};
 
 // ---------- High Dive: a whole diving meet ----------
 const DV_EV = [
@@ -5398,12 +5752,34 @@ function start() {
   $('#tix').textContent = state.tickets;
   if (IN_ARCADE) for (const bar of ['#parkBar', '#titleBar']) { const a = document.createElement('a'); a.className = 'back'; a.href = '../../index.html'; a.innerHTML = '&larr; arcade'; $(bar).prepend(a); }
   showScene('title');
-  if (state.welcomed) { $('#parkName').value = state.name; $('#nameLabel').textContent = 'Welcome back to'; } else $('#parkName').placeholder = state.name;
-  if (state.rides.length) for (let i = 0; i < Math.min(10, maxGuests()); i++) { const g = newGuest(200 + Math.random() * 2400); PARK.guests.push(g); }
+  titleSaveInfo(); spawnStartGuests();
+  if (window.claude && typeof window.claude.use === 'function') {
+    const btn = $('#startBtn'); btn.disabled = true; btn.textContent = 'Loading your park...';
+    Promise.race([cloudInit(), new Promise(r => setTimeout(() => r(null), 8000))]).then(cloud => {
+      if (cloud && (cloud.savedAt || 0) > (state.savedAt || 0) && !TITLE.zoomAt) applyLoadedPark(cloud);
+      else if (CLOUD.db && state.welcomed) cloudSave(JSON.stringify(state));
+      btn.disabled = false; btn.textContent = 'Open the gates!'; titleSaveInfo();
+    });
+  }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => rideCache.clear());
   requestAnimationFrame(frame);
 }
 addEventListener('pagehide', () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { } });
+function spawnStartGuests() { PARK.guests = []; if (state.rides.length) for (let i = 0; i < Math.min(10, maxGuests()); i++) PARK.guests.push(newGuest(200 + Math.random() * 2400)); }
+function applyLoadedPark(s) {
+  Object.assign(state, s); buildSlots(); updateFireworksBtn();
+  for (const r of state.rides) prepRide(r);
+  $('#tix').textContent = state.tickets; spawnStartGuests(); rideCache.clear();
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { }
+}
+function titleSaveInfo() {
+  const note = $('#saveNote');
+  if (state.welcomed) {
+    $('#parkName').value = state.name; $('#nameLabel').textContent = 'Welcome back to';
+    const n = state.rides.length;
+    note.innerHTML = `<b>&#10003; Your park is saved.</b> ${n ? `${n} ride${n === 1 ? '' : 's'} and ` : ''}${state.tickets} ticket${state.tickets === 1 ? '' : 's'}.`;
+  } else { $('#parkName').placeholder = state.name; $('#nameLabel').textContent = 'First, name your park'; note.textContent = 'Your park saves by itself as you play.'; }
+}
 const HOT = window.claude && window.claude.hot;
 try { if (HOT && typeof HOT.ready === 'function') { HOT.ready(start); setTimeout(start, 1500); } else start(); } catch (e) { start(); }
 
