@@ -597,7 +597,7 @@ function simulate(T, kit) {
   const stats = {
     outcome, topMph: topV * MPH, maxG, maxGAt, airTime: air, longestAir, airLanded,
     loops: Math.floor((cmax - cmin + 0.4) / (2 * Math.PI)), hills, bigHillFt: bigRise * FT, turns, hops, rideTime: t,
-    dropFt: (lowestY - T.pts[0].y) * FT, splashMph: splashV, lengthFt: T.L * FT,
+    dropFt: (lowestY - T.pts[0].y) * FT, splashMph: splashV, lengthFt: T.L * FT, distFt: (outcome === 'splash' ? T.L : maxSReached) * FT,
     squishAt, launchAt, hardAt, hardV, end: { x, y }
   };
   return { frames, events, stats };
@@ -611,7 +611,13 @@ function inspect(sim, kit, T) {
   checks.push({ label: 'Splashed into the pool', ok: madeIt, got: madeIt ? `${s.splashMph.toFixed(0)} mph splash` : ({ stuck: 'got stuck', crash: 'missed the pool', gone: 'flew out of the park' })[s.outcome] });
   if (!madeIt) {
     safe = false;
-    if (s.outcome === 'stuck') { tip = "Sandy ran out of speed before a hill. Hills have to be lower than the tower, and long flat parts slow riders down."; marks.push({ x: s.end.x, y: s.end.y, note: 'stuck here' }); }
+    if (s.outcome === 'stuck' && s.distFt < 5) {
+      const n = Math.round(s.distFt), ft = n === 1 ? '1 foot' : `${n} feet`;
+      const jokes = [`Sandy slid ${ft}, looked around and said "meh."`, `Sandy went ${ft}. A snail zoomed past.`, `That ride was ${ft} long. Sandy wants a refund.`, `Sandy went ${ft} and then fell asleep.`];
+      tip = jokes[Math.floor(Math.random() * jokes.length)] + " Make the slide go downhill right away from the tower.";
+      marks.push({ x: s.end.x, y: s.end.y, note: 'meh.' });
+    }
+    else if (s.outcome === 'stuck') { tip = "Sandy ran out of speed before a hill. Hills have to be lower than the tower, and long flat parts slow riders down."; marks.push({ x: s.end.x, y: s.end.y, note: 'stuck here' }); }
     else if (s.outcome === 'crash' || s.outcome === 'gone') {
       const endT = T.pts[T.n - 1];
       if (s.launchAt && s.launchAt.t < s.rideTime - 0.05 && !(Math.abs(s.launchAt.x - endT.x) < 6 && Math.abs(s.launchAt.y - endT.y) < 6)) {
@@ -1403,7 +1409,7 @@ function wsUpdate(dt) {
   P.t += dt * P.rate;
   const sim = WS.sim, fr = sim.frames, idx = Math.min(fr.length - 1, Math.floor(P.t * 60)), f = fr[idx];
   while (P.fired < sim.events.length && sim.events[P.fired].t <= P.t) {
-    const e = sim.events[P.fired++], L = EVENT_LABEL[e.type];
+    const e = sim.events[P.fired++], L = e.type === 'stuck' && sim.stats.distFt < 5 ? ['meh.', GRAPH] : EVENT_LABEL[e.type];
     if (L) WS.labels.push({ text: L[0], color: L[1], x: e.x, y: e.y - 30, t0: now, big: e.type === 'splash' || e.type === 'loop' || e.type === 'squish' });
     if (e.type === 'splash') { SFX.splash(1 + Math.min(1, sim.stats.splashMph / 40)); for (let i = 0; i < 46; i++) WS.parts.push({ x: e.x + (Math.random() - 0.5) * 20, y: GY, vx: (Math.random() - 0.5) * 320, vy: -200 - Math.random() * (220 + sim.stats.splashMph * 9), life: 1.4 }); }
     else if (e.type === 'whee') SFX.voice(tester().voice);
@@ -1491,7 +1497,7 @@ function showReport() {
   $('#stats').innerHTML = stat('Top speed', `${s.topMph.toFixed(0)} mph`) + stat('Biggest jump', `${s.longestAir.toFixed(1)} s`) + stat('Max force', `${s.maxG.toFixed(1)} g`) + stat('Ride time', `${s.rideTime.toFixed(1)} s`) + stat('Drop', `${Math.max(0, s.dropFt).toFixed(0)} ft`) + stat(...kitStat(kit, { loops: s.loops, hills: s.hills, turns: s.turns, hops: s.hops, big: Math.round(s.bigHillFt) }));
   const note = WS.crashNote && s.outcome !== 'splash' ? WS.crashNote + ' ' : '';
   $('#tip').innerHTML = (r.approved ? `<div class="stars">${starStr(r.stars)}</div>` : '') + `<b>Lou says:</b> ${esc(tName(note + r.tip))}`;
-  const st = $('#stamp'); st.textContent = r.approved ? 'APPROVED' : 'TRY AGAIN'; st.className = 'stamp' + (r.approved ? '' : ' blue');
+  const st = $('#stamp'); st.textContent = r.approved ? 'APPROVED' : WS.sim && WS.sim.stats.outcome === 'stuck' && WS.sim.stats.distFt < 5 ? 'MEH.' : 'TRY AGAIN'; st.className = 'stamp' + (r.approved ? '' : ' blue');
   const acts = $('#repActions'); acts.innerHTML = '';
   const btn = (label, fn, primary) => { const b = document.createElement('button'); b.textContent = label; if (primary) b.className = 'primary'; b.onclick = () => { SFX.pop(); fn(); }; acts.appendChild(b); return b; };
   const ride = () => openPOV({ kit: WS.kit, T: WS.track, sim: WS.sim, name: `${WS.kit.name} (test ride)`, stars: 0, from: 'ws', style: WS.style });
