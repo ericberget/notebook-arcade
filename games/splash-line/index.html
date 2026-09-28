@@ -105,6 +105,24 @@
   .item.owned button { border-style: dashed; }
   .item.mystery .nm { color: #4a4a4f; letter-spacing: 4px; }
   .mysteryNote { font-size: 16px; color: var(--graphite); margin: 2px 0 4px; }
+  #reqNote { font-family: 'Patrick Hand', cursive; font-size: 16px; background: #fff3b0; padding: 4px 10px; border-radius: 3px; transform: rotate(1deg); box-shadow: 1px 2px 0 rgba(0,0,0,.12); max-width: 300px; line-height: 1.2; }
+  #reqNote span { color: #7a5b00; font-weight: 700; }
+  #stickers { left: 170px; top: 64px; width: 860px; max-height: 630px; overflow: auto; }
+  #stickerGrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px 8px; margin-top: 8px; }
+  .stk { display: grid; justify-items: center; text-align: center; gap: 2px; }
+  .stk canvas { width: 90px; height: 90px; }
+  .stk b { font-family: Caveat, cursive; font-size: 22px; line-height: 1; color: var(--ink); }
+  .stk small { font-size: 13px; color: var(--graphite); line-height: 1.2; }
+  .stk.off b { color: #9a9aa3; letter-spacing: 3px; }
+  #stickerPop { position: absolute; left: 50%; top: 140px; translate: -50% 0; display: flex; align-items: center; gap: 12px; background: var(--card); padding: 10px 22px 10px 12px; box-shadow: 3px 8px 22px var(--shadow); border-radius: 10px; z-index: 30; pointer-events: none; }
+  #stickerPop canvas { width: 100px; height: 100px; }
+  #stickerPop div { display: grid; }
+  #stickerPop small { font-size: 16px; color: var(--graphite); text-transform: uppercase; letter-spacing: 1px; }
+  #stickerPop b { font-family: Caveat, cursive; font-size: 40px; line-height: 1; color: var(--ink); }
+  #stickerPop span { font-size: 18px; color: #7a5b00; }
+  #stickerPop.slap { animation: slap .45s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes slap { 0% { transform: scale(1.8) rotate(-12deg); opacity: 0; } 100% { transform: scale(1) rotate(-2deg); opacity: 1; } }
+  .noteText { font-family: 'Patrick Hand', cursive; font-size: 26px; line-height: 1.3; background: #fffbe0; padding: 10px 14px; transform: rotate(-1deg); box-shadow: 1px 2px 0 rgba(0,0,0,.1); }
   .item.hl { background: rgba(255,216,77,.28); border-radius: 8px; }
   /* lot card, welcome, toast */
   #lotCard { width: 420px; }
@@ -214,9 +232,11 @@
   <div id="parkBar" class="bar">
     <!--ARCADE-->
     <div class="tickets" id="tixBox" title="Tickets"><svg viewBox="0 0 30 22" aria-hidden="true"><path d="M2 3h26v5a3 3 0 0 0 0 6v5H2v-5a3 3 0 0 0 0-6z" fill="#f6c945" stroke="#7a5b00" stroke-width="1.6"/><path d="M11 4v14" stroke="#7a5b00" stroke-dasharray="2 2"/></svg><b id="tix">0</b></div>
+    <div id="reqNote" hidden></div>
     <div id="savedTag" hidden title="Your park saves by itself as you play">&#10003; park saved</div>
     <div class="grow"></div>
     <button id="btnFireworks" hidden>Fireworks!</button>
+    <button id="btnStickers">Stickers</button>
     <button id="btnShop">Park shop</button>
     <button id="btnBuild" class="primary">Ride workshop</button>
   </div>
@@ -285,6 +305,8 @@
     <div class="stats" id="povEndStats"></div>
     <div class="row" style="margin-top:12px"><button id="povAgain" class="primary">Ride again</button><button id="povBackEnd">Back to the park</button></div>
   </div>
+  <div id="stickers" class="card" hidden><div class="row" style="justify-content:space-between;align-items:flex-start"><div><div class="eyebrow">Your park</div><h2>Sticker book</h2></div><button id="stickerClose">Close</button></div><p id="stickerCount"></p><div id="stickerGrid"></div></div>
+  <div id="stickerPop" hidden><canvas width="200" height="200"></canvas><div><small>New sticker!</small><b></b><span></span></div></div>
   <div id="welcome" hidden>
     <label for="parkName" id="nameLabel">First, name your park</label>
     <div class="row nowrap"><input type="text" id="parkName" maxlength="28" autocomplete="off" placeholder="My Water Park"><button id="parkDice" class="icon-btn" title="Random name" aria-label="Random park name">&#127922;</button></div>
@@ -1571,7 +1593,7 @@ function showReport() {
   $('#stats').innerHTML = stat('Top speed', `${s.topMph.toFixed(0)} mph`) + stat('Biggest jump', `${s.longestAir.toFixed(1)} s`) + stat('Max force', `${s.maxG.toFixed(1)} g`) + stat('Ride time', `${s.rideTime.toFixed(1)} s`) + stat('Drop', `${Math.max(0, s.dropFt).toFixed(0)} ft`) + stat(...kitStat(kit, { loops: s.loops, hills: s.hills, turns: s.turns, hops: s.hops, big: Math.round(s.bigHillFt) }));
   const note = WS.crashNote && s.outcome !== 'splash' ? WS.crashNote + ' ' : '';
   $('#tip').innerHTML = (r.approved ? `<div class="stars">${starStr(r.stars)}</div>` : '') + `<b>Lou says:</b> ${esc(tName(note + r.tip))}`;
-  const st = $('#stamp'); st.textContent = r.approved ? 'APPROVED' : WS.sim && WS.sim.stats.outcome === 'stuck' && WS.sim.stats.distFt < 5 ? 'MEH.' : 'TRY AGAIN'; st.className = 'stamp' + (r.approved ? '' : ' blue');
+  const st = $('#stamp'); st.textContent = r.approved ? 'APPROVED' : WS.sim && WS.sim.stats.outcome === 'stuck' && WS.sim.stats.distFt < 5 ? 'MEH.' : 'TRY AGAIN'; if (st.textContent === 'MEH.') setTimeout(() => stickerGet('meh'), 900); st.className = 'stamp' + (r.approved ? '' : ' blue');
   const acts = $('#repActions'); acts.innerHTML = '';
   const btn = (label, fn, primary) => { const b = document.createElement('button'); b.textContent = label; if (primary) b.className = 'primary'; b.onclick = () => { SFX.pop(); fn(); }; acts.appendChild(b); return b; };
   const ride = () => openPOV({ kit: WS.kit, T: WS.track, sim: WS.sim, name: `${WS.kit.name} (test ride)`, stars: 0, from: 'ws', style: WS.style });
@@ -1779,7 +1801,8 @@ function parkUpdate(dt) {
   for (const p of PARK.parts) { p.vy += (p.g ?? 500) * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; if (p.spin) p.rot += p.spin * dt; }
   PARK.parts = PARK.parts.filter(p => p.life > 0);
   PARK.popups = PARK.popups.filter(p => now - p.t0 < 1.4);
-  mascotUpdate(dt); fireworksUpdate(dt);
+  mascotUpdate(dt); fireworksUpdate(dt); lifeUpdate(dt);
+  if (frameN % 60 === 0) stickerCheck();
   const O = PARK.opening;
   SFX.pen(O && !O.done && now - O.t0 < 1.6 ? 0.45 : 0);
   if (O && now - O.t0 > 2 && !O.done) {
@@ -1928,12 +1951,17 @@ function drawRiverBand(c, a, b) {
 }
 function drawPark(c) {
   const cam = PARK.camX;
+  c.save(); c.globalAlpha = 1 - lifeNight();
+  if (lifeNight() < 0.5) {
   const sx = 1010 - cam * 0.06; c.fillStyle = 'rgba(246,213,92,.5)'; c.beginPath(); c.arc(sx, 150, 26, 0, 7); c.fill(); jcircle(c, sx, 150, 27, 40, '#c9a227', 1.6);
   for (let k = 0; k < 10; k++) { const a = k / 10 * 6.28 + now * 0.1; jline(c, sx + Math.cos(a) * 34, 150 + Math.sin(a) * 34, sx + Math.cos(a) * 44, 150 + Math.sin(a) * 44, 50 + k, '#c9a227', 1.4, 1); }
+  }
+  c.restore();
   qkDrawHeat(c, cam);
   drawSkyLife(c, cam, state.owned.banner ? state.name : null); drawFireworks(c);
   for (let i = 0; i < 8; i++) { const span = PW * 0.35 + 1500, wx = i * 520 + now * 5; const x = ((wx - cam * 0.35) % span + span) % span - 200; drawCloud(c, x, 120 + rnd(i) * 150, 0.9 + rnd(i + 4) * 0.5, i); }
   drawParkWorld(c, cam, W);
+  lifeDrawNight(c, cam);
   drawMinimap(c);
 }
 // the park itself (ground, rides, guests), seen from camera x = cam across viewW pixels of park
@@ -1955,9 +1983,10 @@ function drawParkWorld(c, cam, viewW) {
   for (const { g, p } of gs) {
     if (p.pose === 'ride') drawRider(c, g, p.x, p.y, p.r, g.rt.kit.tube);
     else { if (g.state === 'river') { c.fillStyle = '#ff8c42'; c.strokeStyle = INK; c.lineWidth = 1; c.beginPath(); c.ellipse(p.x, p.y, 9, 3.5, 0, 0, 7); c.fill(); c.stroke(); } drawPerson(c, g, p.x, p.y, p.pose, now); }
+    lifeDrawGuest(c, g, p);
     if (g.bubble && now - g.bubble.t0 < 1.6) { c.fillStyle = '#fff'; c.strokeStyle = INK; c.lineWidth = 1.2; c.beginPath(); c.ellipse(p.x + 10, p.y - 34, 11, 9, 0, 0, 7); c.fill(); c.stroke(); htext(c, g.bubble.text, p.x + 10, p.y - 28, 17, g.bubble.text === '?' ? GRAPH : RED); }
   }
-  drawMascot(c);
+  drawMascot(c); lifeDrawWorld(c);
   for (const p of PARK.parts) {
     c.globalAlpha = Math.min(1, p.life * 2); c.fillStyle = p.c;
     if (p.conf) { c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.fillRect(-4, -2, 8, 4); c.restore(); } else { c.beginPath(); c.arc(p.x, p.y, 2, 0, 7); c.fill(); }
@@ -1999,6 +2028,7 @@ function parkUp(p) {
   if (!d || d.moved || !p) return;
   if (p.x >= MM.x && p.x <= MM.x + MM.w && p.y >= MM.y && p.y <= MM.y + MM.h) { PARK.camTarget = clamp((p.x - MM.x) / MM.w * PW - W / 2, 0, PW - W); SFX.pop(); return; }
   if (qkTap(p)) return;
+  if (lifeTap(p)) return;
   const wx = p.x + PARK.camX, y = p.y;
   const s = SLOTS.find(q => wx >= q.x && wx <= q.x + q.w);
   if (y > RIV0 && y < RIV1) { if (state.owned.river) showMiniCard('river'); else openShop('river'); return; }
@@ -2987,6 +3017,8 @@ function miniEnd() {
   if (tix > 0) setTickets(state.tickets + tix); else save();
   const stars = info.stars ? info.stars.filter(s => MINI.score >= s).length : -1, unit = info.unit || '';
   const ex = info.onEnd ? info.onEnd(stars) : null;
+  if (stars === 3) setTimeout(() => stickerGet('superstar'), 1400);
+  if (stars >= 2 || (!info.stars && MINI.score >= 10)) { state.goodGames = (state.goodGames || 0) + 1; save(); }
   $('#miniEndTitle').textContent = ex && ex.title ? ex.title : isBest && MINI.score > 0 ? 'New best score!' : stars === 3 ? 'Superstar shift!' : info.endText || 'Nice try!';
   $('#miniEndScore').innerHTML = (stars >= 0 ? `<span class="stars" style="display:block;font-size:46px;letter-spacing:6px">${[0, 1, 2].map(k => `<span class="${k < stars ? '' : 'off'}">\u2605</span>`).join('')}</span>` : '') + `${unit ? 'Coins' : 'Score'} <b>${MINI.score}</b> &middot; Best <b>${Math.max(best, MINI.score)}</b> &middot; <b>+${tix}</b> tickets` + (stars >= 0 && stars < 3 ? `<br><small style="color:#4a4a4f">Next star at ${info.stars[stars]} ${unit || 'points'}</small>` : '') + (ex && ex.html ? ex.html : '');
   setTimeout(() => { if (scene === 'mini') $('#miniEnd').hidden = false; }, 700);
@@ -3490,7 +3522,7 @@ function vbPoint(d, who) {
   }
   d.total = d.you + d.them; d.spikeLive = false; d.plan = null; d.touches = 0;
   if (d.you >= VB.WIN || d.them >= VB.WIN) {
-    const won = d.you >= VB.WIN; if (won) MINI.score += 10;
+    const won = d.you >= VB.WIN; if (won) { MINI.score += 10; setTimeout(() => stickerGet('pencils'), 1600); }
     MINI_INFO.volley.overText = won ? 'You win!' : 'The pencils win!';
     if (won) for (let i = 0; i < 40; i++) MINI.parts.push({ x: 300 + Math.random() * 600, y: 300, vx: (Math.random() - 0.5) * 500, vy: -300 - Math.random() * 300, life: 1.6, c: pick(['#ef476f', '#ffd166', '#118ab2', '#06d6a0']) });
     setTimeout(() => { if (MINI.type === 'volley' && !MINI.over) miniEnd(); }, 900);
@@ -3709,7 +3741,7 @@ MINI_INFO.float = {
   name: 'Lazy River Float', how: 'Lean back and float a lap around the park. Chat with the people you float up to, and sip your lemonade. Tap the cup (or press S) to sip.',
   time: 110, div: 2, noGo: true, overText: 'Lap done!', endText: 'What a float!',
   stat: d => `lemonade ${Math.round(d.lem * 100)}% · ${d.friends} chat${d.friends === 1 ? '' : 's'}`,
-  onEnd: () => { const d = MINI.d; return { title: 'What a float!', html: `<br><small style="color:#4a4a4f">You chatted with ${d.friends} ${d.friends === 1 ? 'person' : 'people'} and took ${d.sips} sip${d.sips === 1 ? '' : 's'} of lemonade.</small>` }; },
+  onEnd: () => { const d = MINI.d; if (d.friends >= 5) setTimeout(() => stickerGet('float5'), 1200); return { title: 'What a float!', html: `<br><small style="color:#4a4a4f">You chatted with ${d.friends} ${d.friends === 1 ? 'person' : 'people'} and took ${d.sips} sip${d.sips === 1 ? '' : 's'} of lemonade.</small>` }; },
 };
 function flRideName() { const r = state.rides.length ? pick(state.rides) : null; return r ? r.name : null; }
 // Each chat: who they are, what they say, your two answers and what they say back.
@@ -3959,6 +3991,338 @@ MINI_DRAW.float = function (c, d) {
   for (const p of d.drops) { c.globalAlpha = Math.min(1, p.life) * 0.55; c.fillStyle = '#bfe8f5'; c.beginPath(); c.arc(p.x, p.y + (1.6 - p.life) * 40, p.r, 0, 7); c.fill(); c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 2; c.beginPath(); c.arc(p.x - p.r * 0.3, p.y + (1.6 - p.life) * 40 - p.r * 0.3, p.r * 0.4, 3.5, 5); c.stroke(); } c.globalAlpha = 1;
   if (now - d.splashT < 0.4) { c.fillStyle = `rgba(200,236,248,${0.5 - (now - d.splashT)})`; c.fillRect(0, 0, W, H); }
 };
+
+// ---------- park life: guest thoughts, a celebrity in disguise, the suggestion box, day and night ----------
+const LIFE = { clock: 40, nextVip: 35, nextCeleb: 70, raccoons: [], nextRaccoon: 0, lastNight: 0 };
+const DAY_LEN = 300, NIGHT_AT = 215, NIGHT_LEN = 85;   // seconds: day, then dusk into night, then dawn
+const CELEBS = [['DJ Cannonball', 'the famous DJ'], ['Dolly Driftwood', 'the movie star'], ['Skip Splashington', 'the Olympic swimmer'], ['Penny Puddles', 'the pop singer'], ['Captain Kickflip', 'the skateboarder'], ['Barry Buoyant', 'the TV chef']];
+const BOX_X = 392;   // suggestion box by the main gate (park x)
+
+// ----- what guests are thinking -----
+function guestThought(g) {
+  const want = {
+    snack: "I'm starving. Is there a snack shack?", hottub: 'My back hurts. A hot tub would be nice.', fountain: "It's so hot. I want to run through fountains.",
+    volley: 'Anyone want to play volleyball? ...Oh. There is no court.', gift: 'I want a souvenir for my grandma.', river: 'I wish I could just float for a while.',
+    wave: 'Where are the waves? I brought my boogie board.', surf: 'I want to SURF!',
+  };
+  const missing = TIER1.filter(k => !state.owned[k]);
+  if (missing.length && Math.random() < 0.45) return want[pick(missing)];
+  const q = qkData(), L = [];
+  if (state.rides.length) { const r = pick(state.rides); L.push(`I want to ride ${r.name} again!`, `${r.name} made my tummy do a flip.`, `I screamed so loud on ${r.name}.`); }
+  if (!state.rides.length) L.push('When do the water slides open?', 'This water park needs... water slides.');
+  if (state.owned.snack) L.push('That hot dog had 47 pickles.', 'Is it lunch yet? It feels like lunch.');
+  if (state.owned.mascot && q.mood === 'upset') L.push('Why does the duck look so mad?');
+  if (q.quit) L.push('Why is there a goose? Where did the duck go?', 'The goose honked at me. I think we are friends now.');
+  if (state.owned.mascot && q.raises > 0) L.push('That duck has sunglasses now. Iconic.');
+  if (state.owned.volley) L.push('The pencils beat me at volleyball. PENCILS.');
+  if (state.owned.river) L.push('I tried to float all the way around. I fell asleep twice.');
+  if ((state.palms || 0) < 2) L.push('This place needs more palm trees.');
+  if (state.owned.balloon) L.push('I waved at someone in the hot air balloon!');
+  if (TIER2.some(k => !state.owned[k]) && tier2Open()) L.push('What are they building under those tarps?');
+  if (TIER2.some(k => isMystery(k))) L.push('Something is hiding under those tarps...');
+  if (lifeNight() > 0.5) L.push('Is it safe to swim in the dark?', 'I think I saw a raccoon on the slide.');
+  L.push('I lost my flip-flop.', 'My sunscreen is SPF 100. I am basically a ghost.', "I've been here since Tuesday.", 'Ten out of ten. Would splash again.', "My mom says I'm getting pruney.", 'A seagull took my sandwich. Just took it.', 'I can do a cannonball. Want to see? ...Later.', 'I am NOT tired. *yawn*');
+  return pick(L);
+}
+function lifeTap(p) {
+  const wx = p.x + PARK.camX, y = p.y;
+  // suggestion box
+  if (Math.abs(wx - BOX_X) < 26 && y > PG - 56 && y < PG + 10) { openSuggestionBox(); return true; }
+  // raccoons at night
+  for (const r of LIFE.raccoons) if (!r.run && Math.abs(wx - r.x) < 26 && Math.abs(y - (LANE - 8)) < 26) { r.run = true; r.vx = (r.vx > 0 ? 1 : -1) * 320; setTickets(state.tickets + 2); PARK.popups.push({ text: '+2', x: r.x, y: LANE - 30, t0: now }); SFX.voice('squeak'); stickerGet('raccoon'); return true; }
+  // guests
+  let best = null, bd = 30;
+  for (const g of PARK.guests) {
+    if (g.state === 'ride' || g.state === 'climb' || g.state === 'river') continue;
+    const gp = guestPos(g), d = Math.hypot(gp.x - wx, (gp.y - 14) - y);
+    if (d < bd) { bd = d; best = g; }
+  }
+  if (!best) return false;
+  if (best.celeb && !best.celeb.revealed) { revealCeleb(best); return true; }
+  if (best.vip) { openVip(best); return true; }
+  best.thought = { text: best.celeb ? "Shh! Please, no photos." : guestThought(best), t0: now }; SFX.voice('beep');
+  state.thoughtsRead = (state.thoughtsRead || 0) + 1; if (state.thoughtsRead >= 10) stickerGet('mindreader');
+  return true;
+}
+function lifeDrawThought(c, g, x, y) {
+  const t = g.thought; if (!t || now - t.t0 > 4) return;
+  const a = Math.min(1, (4 - (now - t.t0)) * 2);
+  c.save(); c.globalAlpha = a;
+  const lines = flWrap(c, t.text, 190, 16), w = Math.max(...lines.map(l => c.measureText(l).width)) + 26, h = lines.length * 19 + 16, bx = x - w / 2, by = y - 58 - h;
+  c.fillStyle = '#fff'; c.strokeStyle = INK; c.lineWidth = 1.4;
+  // a cloud-shaped thought bubble
+  c.beginPath(); c.roundRect(bx, by, w, h, 14); c.fill();
+  for (let k = 0; k <= Math.floor(w / 22); k++) { c.beginPath(); c.arc(bx + 11 + k * (w - 22) / Math.max(1, Math.floor(w / 22)), by + 2, 9, Math.PI, 0); c.fill(); c.stroke(); c.beginPath(); c.arc(bx + 11 + k * (w - 22) / Math.max(1, Math.floor(w / 22)), by + h - 2, 9, 0, Math.PI); c.fill(); c.stroke(); }
+  c.fillRect(bx + 2, by + 1, w - 4, h - 2); c.beginPath(); c.moveTo(bx, by + 8); c.lineTo(bx, by + h - 8); c.moveTo(bx + w, by + 8); c.lineTo(bx + w, by + h - 8); c.stroke();
+  for (const [dx, dy, r] of [[-4, 12, 5], [-8, 24, 3]]) { c.beginPath(); c.arc(x + dx, by + h + dy, r, 0, 7); c.fill(); c.stroke(); }
+  lines.forEach((l, k) => htext(c, l, x, by + 20 + k * 19, 16, INK, { font: 'hand' }));
+  c.restore();
+}
+
+// ----- the celebrity in disguise -----
+function spawnCeleb() {
+  const g = newGuest(); const [name, what] = pick(CELEBS);
+  g.celeb = { name, what, revealed: false }; g.max = 6; g.hat = null; PARK.guests.push(g);
+  toast('Someone in a trench coat and sunglasses just walked in. On a hot day?', 3600);
+}
+function revealCeleb(g) {
+  g.celeb.revealed = true; g.celeb.at = now; SFX.fanfare();
+  setTickets(state.tickets + 15); save();
+  PARK.popups.push({ text: `It's ${g.celeb.name}!`, x: g.x, y: LANE - 90, t0: now, big: true });
+  g.thought = { text: `Okay, you found me! I'm ${g.celeb.name}, ${g.celeb.what}. Here's a 15 ticket tip. Great park!`, t0: now };
+  for (let i = 0; i < 24; i++) PARK.parts.push({ x: g.x, y: LANE - 30, vx: (Math.random() - 0.5) * 260, vy: -150 - Math.random() * 200, life: 1.2, c: pick(['#ffd166', '#ef476f', '#4fc3e0']), conf: true, rot: 0, spin: 6 });
+  state.celebs = (state.celebs || 0) + 1; stickerGet('celeb');
+}
+function lifeDrawGuest(c, g, p) {
+  if (g.celeb) {
+    c.save(); c.translate(p.x, p.y); c.scale(1.25, 1.25);
+    if (!g.celeb.revealed) {
+      c.fillStyle = '#c8a878'; c.strokeStyle = INK; c.lineWidth = 1; c.beginPath(); c.moveTo(-3.5, -15); c.lineTo(3.5, -15); c.lineTo(5, -3); c.lineTo(-5, -3); c.closePath(); c.fill(); c.stroke();
+      c.beginPath(); c.moveTo(0, -15); c.lineTo(0, -4); c.stroke();
+      c.fillStyle = '#5a4632'; c.fillRect(-5.5, -22.3, 11, 1.8); c.fillRect(-3.2, -26, 6.4, 4); c.strokeRect(-3.2, -26, 6.4, 4);
+      c.fillStyle = '#111'; c.fillRect(-3.4, -19.6, 3, 1.8); c.fillRect(0.4, -19.6, 3, 1.8);
+    } else { starShape(c, 0, -31, 5, '#ffd166'); }
+    c.restore();
+  }
+  if (g.vip) { const bob = Math.sin(now * 4) * 3; c.fillStyle = '#ffd166'; c.strokeStyle = INK; c.lineWidth = 1.6; c.beginPath(); c.arc(p.x, p.y - 44 + bob, 11, 0, 7); c.fill(); c.stroke(); htext(c, '!', p.x, p.y - 37 + bob, 20, RED); }
+  if (g.thought) lifeDrawThought(c, g, p.x, p.y);
+}
+
+// ----- the suggestion box -----
+const NOTES = [
+  'Make the water less wet.', 'More ducks. That is my whole suggestion. More ducks.', 'Please build a slide that goes to the moon.',
+  'Tap Quackers five times, really fast. Trust me. -anonymous', 'Somebody in a trench coat tipped my cousin 15 tickets!',
+  'The waterfall on the lazy river watered down my lemonade. 10/10, would float again.', 'My grandpa is cold. Hot tub please.',
+  'The pencils cheat at volleyball. I have no proof.', 'I got a "MEH." stamp on my slide. RUDE.', 'Build every attraction and something happens under the tarps.',
+  'I left my retainer on the high dive. If you find it, it is mine.', 'Hold the balloon button and yell WEEEE with it. Best day ever.',
+  'Come back after dark. I saw raccoons having a party.', 'Can the snack shack sell pickles on a stick?', 'Your duck mascot should get a raise. Just saying.',
+  'Please put a water slide in the gift shop.', 'The lifeguard said I swim like a fish. A very tired fish.', 'I love this park. Signed, a seagull.',
+];
+function openSuggestionBox() {
+  hidePanels(); SFX.pop();
+  state.notes = state.notes || [];
+  const unread = NOTES.map((_, i) => i).filter(i => !state.notes.includes(i));
+  const i = unread.length ? pick(unread) : Math.floor(Math.random() * NOTES.length), fresh = !state.notes.includes(i);
+  if (fresh) { state.notes.push(i); setTickets(state.tickets + 1); save(); if (state.notes.length >= 8) stickerGet('notes'); }
+  const el = $('#lotCard');
+  el.innerHTML = `<div class="eyebrow">Suggestion box</div><h2>A note from a guest</h2><p class="noteText">"${esc(NOTES[i])}"</p><p style="font-size:16px;color:#4a4a4f">${fresh ? '+1 ticket for reading it. ' : ''}You've read ${state.notes.length} of ${NOTES.length} notes.</p><div class="row"><button class="primary" id="nbNext">Read another</button><button id="nbClose">Close</button></div>`;
+  el.style.left = clamp(BOX_X - PARK.camX - 210, 16, W - 436) + 'px'; el.style.top = '110px'; el.hidden = false;
+  $('#nbNext').onclick = () => openSuggestionBox(); $('#nbClose').onclick = () => { el.hidden = true; };
+}
+function drawSuggestionBox(c) {
+  const x = BOX_X, y = PG;
+  jline(c, x, y, x, y - 30, 3301, '#8a6b4a', 3, 1);
+  c.fillStyle = '#ef476f'; c.strokeStyle = INK; c.lineWidth = 1.6; c.fillRect(x - 17, y - 56, 34, 28); c.strokeRect(x - 17, y - 56, 34, 28);
+  c.fillStyle = '#222'; c.fillRect(x - 9, y - 50, 18, 3);
+  c.fillStyle = '#fff'; c.fillRect(x - 13, y - 44, 26, 12); c.strokeRect(x - 13, y - 44, 26, 12);
+  htext(c, 'IDEAS', x, y - 35, 11, INK, { font: 'Patrick' });
+  const unread = NOTES.length - (state.notes || []).length;
+  if (unread > 0) { const bob = Math.sin(now * 3) * 2; c.fillStyle = '#fffdf5'; c.save(); c.translate(x + 4, y - 60 + bob); c.rotate(0.2); c.fillRect(-6, -8, 12, 10); c.strokeRect(-6, -8, 12, 10); c.restore(); }
+}
+
+// ----- day and night -----
+function lifeNight() {
+  const t = LIFE.clock % DAY_LEN;
+  if (t < NIGHT_AT - 20) return 0;
+  if (t < NIGHT_AT) return (t - (NIGHT_AT - 20)) / 20;
+  if (t < DAY_LEN - 15) return 1;
+  return (DAY_LEN - t) / 15;
+}
+function lifeUpdate(dt) {
+  LIFE.clock += dt;
+  const n = lifeNight();
+  if (n > 0.9 && !LIFE.lastNight) { LIFE.lastNight = 1; toast('Night falls on the park. The lights are on!', 3000); stickerGet('night'); }
+  if (n < 0.1) LIFE.lastNight = 0;
+  // celebrities show up now and then
+  LIFE.nextCeleb -= dt;
+  if (LIFE.nextCeleb <= 0) { LIFE.nextCeleb = 150 + Math.random() * 120; if (state.rides.length && !PARK.guests.some(g => g.celeb && !g.celeb.revealed)) spawnCeleb(); }
+  LIFE.nextVip -= dt;
+  if (LIFE.nextVip <= 0) { LIFE.nextVip = 70 + Math.random() * 60; if (!state.request && !PARK.guests.some(g => g.vip)) spawnVip(); }
+  if (frameN % 45 === 0) { reqCheck(); reqNote(); }
+  // raccoons sneak around at night
+  LIFE.nextRaccoon -= dt;
+  if (n > 0.8 && LIFE.nextRaccoon <= 0 && LIFE.raccoons.length < 3) { LIFE.nextRaccoon = 6 + Math.random() * 8; const fromLeft = Math.random() < 0.5, x = PARK.camX + (fromLeft ? -40 : W + 40); LIFE.raccoons.push({ x, vx: (fromLeft ? 1 : -1) * (70 + Math.random() * 40), ph: Math.random() * 6, loot: pick(['hotdog', 'fries', 'ticket', 'flipflop']) }); }
+  for (const r of LIFE.raccoons) { r.x += r.vx * dt * (n < 0.3 ? 3 : 1); if (r.run) r.vx *= 1 + dt; }
+  LIFE.raccoons = LIFE.raccoons.filter(r => r.x > PARK.camX - 200 && r.x < PARK.camX + W + 200);
+}
+function drawRaccoon(c, r) {
+  const x = r.x, y = LANE - 2, d = r.vx > 0 ? 1 : -1, hop = Math.abs(Math.sin(now * 12 + r.ph)) * 3;
+  c.save(); c.translate(x, y - hop); c.scale(d, 1); c.strokeStyle = INK; c.lineWidth = 1.4;
+  // striped tail
+  c.fillStyle = '#8d8d95'; c.beginPath(); c.ellipse(-20, -10, 10, 5, -0.5, 0, 7); c.fill(); c.stroke();
+  c.strokeStyle = '#444'; c.lineWidth = 2; c.beginPath(); c.moveTo(-24, -15); c.lineTo(-20, -6); c.moveTo(-18, -17); c.lineTo(-14, -9); c.stroke(); c.strokeStyle = INK; c.lineWidth = 1.4;
+  c.fillStyle = '#9a9aa3'; c.beginPath(); c.ellipse(-2, -8, 14, 8, 0, 0, 7); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(-8, -2); c.lineTo(-9, 2); c.moveTo(6, -2); c.lineTo(7, 2); c.stroke();
+  c.beginPath(); c.arc(12, -13, 7, 0, 7); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(8, -19); c.lineTo(9, -24); c.lineTo(12, -19); c.fill(); c.stroke();
+  c.fillStyle = '#333'; c.beginPath(); c.ellipse(14, -14, 5, 2.6, 0, 0, 7); c.fill();
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(15, -14, 1.3, 0, 7); c.fill(); c.fillStyle = INK; c.beginPath(); c.arc(19, -12, 1.4, 0, 7); c.fill();
+  // what it stole
+  if (!r.run) {
+    c.save(); c.translate(20, -8); c.lineWidth = 1;
+    if (r.loot === 'hotdog') { c.fillStyle = '#e8b36b'; c.beginPath(); c.ellipse(0, 0, 7, 3, 0, 0, 7); c.fill(); c.stroke(); c.fillStyle = '#c0504d'; c.fillRect(-6, -2, 12, 2.4); }
+    else if (r.loot === 'fries') { c.fillStyle = '#ef476f'; c.fillRect(-3, -3, 7, 7); c.strokeRect(-3, -3, 7, 7); c.fillStyle = '#ffd166'; c.fillRect(-2, -8, 1.6, 5); c.fillRect(1, -9, 1.6, 6); }
+    else if (r.loot === 'ticket') ticketIcon(c, -6, -5, 0.5);
+    else { c.fillStyle = '#4fc3e0'; c.beginPath(); c.ellipse(0, 0, 7, 3, 0.2, 0, 7); c.fill(); c.stroke(); }
+    c.restore();
+  }
+  c.restore();
+  if (r.run) htext(c, '!', x, y - 34, 22, RED);
+}
+function lifeDrawWorld(c) {
+  drawSuggestionBox(c);
+  for (const r of LIFE.raccoons) drawRaccoon(c, r);
+}
+function lifeDrawNight(c, cam) {
+  const n = lifeNight(); if (n <= 0) return;
+  c.save();
+  c.fillStyle = `rgba(18,28,70,${0.5 * n})`; c.fillRect(0, 0, W, H);
+  c.globalAlpha = n;
+  // moon and stars
+  const mx = 1010 - cam * 0.06, my = 160; c.fillStyle = 'rgba(255,246,208,.25)'; c.beginPath(); c.arc(mx, my, 44, 0, 7); c.fill(); c.fillStyle = '#fff6d0'; c.beginPath(); c.arc(mx, my, 28, 0, 7); c.fill(); c.fillStyle = 'rgba(200,190,150,.45)'; for (const [dx, dy, r] of [[-8, -6, 6], [9, 7, 4], [4, -12, 3]]) { c.beginPath(); c.arc(mx + dx, my + dy, r, 0, 7); c.fill(); }
+  for (let i = 0; i < 40; i++) { const sx = ((rnd(i) * 1800 - cam * 0.05) % W + W) % W, sy = 20 + rnd(i + 99) * 260, tw = 0.5 + 0.5 * Math.sin(now * 3 + i); c.fillStyle = `rgba(255,255,230,${0.4 + tw * 0.6})`; c.beginPath(); c.arc(sx, sy, 1.2 + rnd(i + 7) * 1.4, 0, 7); c.fill(); }
+  // warm light from lamps and buildings
+  c.globalCompositeOperation = 'lighter';
+  const glow = (x, y, r, col) => { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); };
+  for (let i = 0; i < (state.lamps || 0); i++) { const x = lampX(i) - cam; if (x > -100 && x < W + 100) glow(x, PG - 30, 90, 'rgba(255,200,90,.45)'); }
+  for (const s of SLOTS) { const x = s.x + s.w / 2 - cam; if (x < -200 || x > W + 200) continue; if ((s.type === 'lot' && state.rides.some(r => r.lot === s.lot)) || (ATTRACTIONS.includes(s.type) && state.owned[s.type])) glow(x, PG - 60, 120, 'rgba(255,190,110,.22)'); }
+  glow(216 - cam, PG - 170, 140, 'rgba(255,210,120,.3)');
+  c.restore();
+}
+
+// ----- guest requests: a guest with a gold "!" asks for something and tips when it's done -----
+const REQ_WHO = ['Grandma Rose', 'Coach Dave', 'Little Timmy', 'Mrs. Alvarez', 'The Mayor', 'A very tall man', 'Captain Fishsticks', 'Aunt Denise'];
+function reqOptions() {
+  const L = [], names = { snack: 'a Snack Shack', hottub: 'a Hot Tub', fountain: 'a Splash Pad', volley: 'a volleyball court', gift: 'a Gift Shop', river: 'a Lazy River', wave: 'a Wave Pool', surf: 'a Surf Machine', blaster: 'Water Blasters', rescue: 'a Lifeguard Tower', dive: 'a High Dive', bumper: 'Bumper Boats', balloon: 'a Hot Air Balloon' };
+  for (const k of [...TIER1, ...TIER2]) if (!state.owned[k] && !isMystery(k)) L.push({ kind: 'own', target: k, text: `Build ${names[k]}.`, reward: k === 'balloon' ? 40 : 15 });
+  if (firstFreeLot() >= 0 || state.rides.length < 8) L.push({ kind: 'rides', base: state.rides.length, text: 'Open a brand new water slide.', reward: 20 });
+  L.push({ kind: 'palms', base: state.palms || 0, text: 'Plant 2 more palm trees.', reward: 12 });
+  L.push({ kind: 'stars', base: state.goodGames || 0, text: 'Get 2 stars or more in any park game.', reward: 15 });
+  L.push({ kind: 'flowers', base: state.flowers || 0, text: 'Plant a flower bed.', reward: 8 });
+  return L;
+}
+function reqDone(r) {
+  if (r.kind === 'own') return !!state.owned[r.target];
+  if (r.kind === 'rides') return state.rides.length > r.base;
+  if (r.kind === 'palms') return (state.palms || 0) >= r.base + 2;
+  if (r.kind === 'stars') return (state.goodGames || 0) > r.base;
+  if (r.kind === 'flowers') return (state.flowers || 0) > r.base;
+  return false;
+}
+function reqCheck() {
+  const r = state.request; if (!r || !reqDone(r)) return;
+  state.request = null; state.reqsDone = (state.reqsDone || 0) + 1;
+  setTickets(state.tickets + r.reward); SFX.fanfare(); save();
+  toast(`${r.who} is thrilled! +${r.reward} tickets.`, 3600);
+  if (state.reqsDone >= 3) stickerGet('helper');
+  reqNote();
+}
+function reqNote() {
+  const el = $('#reqNote'); if (!el) return; const r = state.request;
+  el.hidden = !r || scene !== 'park'; if (r) el.innerHTML = `<b>${esc(r.who)}:</b> ${esc(r.text)} <span>+${r.reward}</span>`;
+}
+function spawnVip() {
+  const opts = reqOptions(); if (!opts.length) return;
+  const g = newGuest(); g.vip = { who: pick(REQ_WHO), req: pick(opts) }; g.max = 8; PARK.guests.push(g);
+}
+function openVip(g) {
+  hidePanels(); SFX.pop();
+  const v = g.vip, el = $('#lotCard');
+  el.innerHTML = `<div class="eyebrow">Guest request</div><h2>${esc(v.who)}</h2><p class="noteText">"Hi! I love your park. I'll tip you <b>${v.req.reward} tickets</b> if you do one thing for me: ${esc(v.req.text.replace(/\.$/, '').replace(/^./, m => m.toLowerCase()))}."</p><div class="row"><button class="primary" id="vipYes">Deal!</button><button id="vipNo">Not now</button></div>`;
+  el.style.left = clamp(g.x - PARK.camX - 210, 16, W - 436) + 'px'; el.style.top = '110px'; el.hidden = false;
+  $('#vipYes').onclick = () => { state.request = { who: v.who, ...v.req }; g.vip = null; g.thought = { text: 'Yay! Thank you!', t0: now }; el.hidden = true; save(); reqNote(); reqCheck(); };
+  $('#vipNo').onclick = () => { el.hidden = true; g.vip = null; g.thought = { text: 'Okay, maybe next time!', t0: now }; };
+}
+
+// ---------- sticker book: things to do all over the park, +5 tickets each ----------
+const STICKERS = [
+  { id: 'firstride', name: 'Grand Opening', how: 'Open your first water slide.', col: '#4fc3e0' },
+  { id: 'threestar', name: 'Three Stars', how: 'Get 3 stars on a slide.', col: '#ffd166' },
+  { id: 'fiverides', name: 'Slide Tycoon', how: 'Open 5 water slides.', col: '#ef476f' },
+  { id: 'meh', name: 'Meh.', how: 'Build a slide that goes less than 5 feet.', col: '#c9ccd3' },
+  { id: 'everything', name: 'Everything Park', how: 'Build all 8 attractions.', col: '#06d6a0' },
+  { id: 'superstar', name: 'Superstar', how: 'Get 3 stars in any park game.', col: '#ffd166' },
+  { id: 'pencils', name: 'Pencil Pusher', how: 'Beat the pencils at volleyball.', col: '#ffe066' },
+  { id: 'gold', name: 'Gold Medal', how: 'Win gold at the diving meet.', col: '#f6c945' },
+  { id: 'float5', name: 'Chatterbox', how: 'Chat with 5 people in one lazy river lap.', col: '#8fd6ea' },
+  { id: 'balloon', name: 'Up, Up and Away', how: 'Fly the hot air balloon.', col: '#ef476f' },
+  { id: 'celeb', name: 'Star Spotter', how: 'Find the celebrity in disguise.', col: '#9b5de5' },
+  { id: 'mindreader', name: 'Mind Reader', how: 'Tap 10 guests to hear what they are thinking.', col: '#fde2ea' },
+  { id: 'notes', name: 'Mail Carrier', how: 'Read 8 notes from the suggestion box.', col: '#fff3b0' },
+  { id: 'night', name: 'Night Owl', how: 'Stay in the park until night.', col: '#1f3d9e' },
+  { id: 'raccoon', name: 'Night Watch', how: 'Shoo away a sneaky raccoon.', col: '#8d8d95' },
+  { id: 'raise', name: 'Good Boss', how: 'Give Quackers a raise.', col: '#ffd84d' },
+  { id: 'honks', name: 'HONK', how: 'Meet Honks the goose.', col: '#ffffff' },
+  { id: 'helper', name: 'Happy Helper', how: 'Finish 3 guest requests.', col: '#06d6a0' },
+  { id: 'rich', name: 'Ticket Tower', how: 'Save up 200 tickets.', col: '#f6c945' },
+];
+function stickerHas(id) { return !!(state.stickers && state.stickers[id]); }
+function stickerGet(id) {
+  state.stickers = state.stickers || {};
+  if (state.stickers[id]) return;
+  const s = STICKERS.find(x => x.id === id); if (!s) return;
+  state.stickers[id] = Date.now(); setTickets(state.tickets + 5); save();
+  const el = $('#stickerPop'); if (!el) return;
+  const cv2 = el.querySelector('canvas'), c = cv2.getContext('2d'); c.setTransform(2, 0, 0, 2, 0, 0); c.clearRect(0, 0, 100, 100); drawSticker(c, s, true);
+  el.querySelector('b').textContent = s.name; el.querySelector('span').textContent = '+5 tickets';
+  el.hidden = false; el.classList.remove('slap'); void el.offsetWidth; el.classList.add('slap');
+  setTimeout(() => SFX.stamp ? SFX.stamp() : SFX.pop(), 150);
+  clearTimeout(stickerGet.t); stickerGet.t = setTimeout(() => { el.hidden = true; }, 3200);
+  updateStickerBtn();
+}
+function stickerCheck() {
+  const n = state.rides.length;
+  if (n >= 1) stickerGet('firstride');
+  if (n >= 5) stickerGet('fiverides');
+  if (state.rides.some(r => r.stars >= 3)) stickerGet('threestar');
+  if (tier2Open()) stickerGet('everything');
+  if (state.tickets >= 200) stickerGet('rich');
+  const q = qkData(); if (q.raises > 0) stickerGet('raise'); if (q.quit) stickerGet('honks');
+}
+function updateStickerBtn() { const b = $('#btnStickers'); if (b) b.textContent = `Stickers ${Object.keys(state.stickers || {}).length}/${STICKERS.length}`; }
+// sticker art, drawn in a 100 x 100 box
+function drawSticker(c, s, got) {
+  c.save(); c.lineJoin = 'round'; c.lineCap = 'round';
+  c.fillStyle = 'rgba(0,0,0,.12)'; c.beginPath(); c.arc(52, 53, 44, 0, 7); c.fill();
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(50, 50, 44, 0, 7); c.fill(); c.strokeStyle = 'rgba(0,0,0,.15)'; c.lineWidth = 1; c.stroke();
+  c.fillStyle = got ? s.col : '#e9e6dd'; c.beginPath(); c.arc(50, 50, 38, 0, 7); c.fill(); c.strokeStyle = INK; c.lineWidth = 2; c.stroke();
+  if (!got) { htext(c, '?', 50, 66, 46, 'rgba(74,74,79,.5)'); c.restore(); return; }
+  c.save(); c.beginPath(); c.arc(50, 50, 38, 0, 7); c.clip();
+  const I = s.id;
+  if (I === 'firstride') { c.strokeStyle = INK; c.lineWidth = 2; c.strokeRect(24, 30, 12, 46); c.strokeStyle = '#ef476f'; c.lineWidth = 7; c.beginPath(); c.moveTo(36, 32); c.bezierCurveTo(60, 34, 50, 70, 80, 72); c.stroke(); c.fillStyle = '#fff'; c.fillRect(20, 78, 64, 6); }
+  else if (I === 'threestar' || I === 'superstar') { if (I === 'superstar') starShape(c, 50, 52, 26, '#fff3b0'); else { starShape(c, 30, 58, 12, '#fff3b0'); starShape(c, 50, 42, 14, '#fff3b0'); starShape(c, 70, 58, 12, '#fff3b0'); } }
+  else if (I === 'fiverides') { for (let k = 0; k < 5; k++) { c.strokeStyle = '#fff'; c.lineWidth = 4; c.beginPath(); c.moveTo(22 + k * 12, 34); c.quadraticCurveTo(30 + k * 12, 60, 26 + k * 12, 76); c.stroke(); } htext(c, '5', 70, 44, 30, INK); }
+  else if (I === 'meh') { c.save(); c.translate(50, 52); c.rotate(-0.2); c.strokeStyle = '#1f3d9e'; c.lineWidth = 3; c.strokeRect(-30, -16, 60, 32); htext(c, 'MEH.', 0, 10, 28, '#1f3d9e', { font: 'Patrick' }); c.restore(); }
+  else if (I === 'everything') { c.save(); c.translate(50, 86); c.scale(0.17, 0.17); c.translate(-GATE_CX, -TGY); drawGateArch(c, 'My Park'); c.restore(); }
+  else if (I === 'pencils') { c.save(); c.translate(50, 102); c.scale(0.55, 0.55); c.translate(0, -VB.GROUND); vbDrawPencil(c, { x: 0, y: 0, home: 0, hitAt: -9, knock: 0, sharp: 0, broken: true, band: '#ef476f', say: null }, 0, 0); c.restore(); }
+  else if (I === 'gold') { c.fillStyle = '#ef476f'; c.beginPath(); c.moveTo(38, 14); c.lineTo(50, 40); c.lineTo(62, 14); c.lineTo(56, 14); c.lineTo(50, 28); c.lineTo(44, 14); c.closePath(); c.fill(); c.fillStyle = '#ffd166'; c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.arc(50, 56, 20, 0, 7); c.fill(); c.stroke(); htext(c, '1', 50, 66, 26, '#7a5b00'); }
+  else if (I === 'float5') { c.fillStyle = '#ff8c42'; c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.ellipse(50, 68, 28, 10, 0, 0, 7); c.fill(); c.stroke(); c.fillStyle = '#8fd6ea'; c.beginPath(); c.ellipse(50, 68, 14, 4, 0, 0, 7); c.fill(); c.stroke(); c.fillStyle = '#fff'; c.beginPath(); c.roundRect(28, 22, 44, 26, 10); c.fill(); c.stroke(); htext(c, '...', 50, 40, 26, INK); }
+  else if (I === 'balloon') drawHotAirBalloon(c, 50, 70, 0.34, true, true);
+  else if (I === 'celeb') { starShape(c, 50, 42, 20, '#ffd166'); c.fillStyle = '#111'; c.fillRect(28, 60, 18, 10); c.fillRect(54, 60, 18, 10); c.fillRect(44, 62, 12, 3); }
+  else if (I === 'mindreader') { c.fillStyle = '#fff'; c.strokeStyle = INK; c.lineWidth = 2; for (const [x, y, r] of [[40, 42, 16], [58, 38, 18], [66, 52, 12], [46, 54, 14]]) { c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); c.stroke(); } c.fillRect(34, 36, 36, 18); c.beginPath(); c.arc(34, 74, 5, 0, 7); c.fill(); c.stroke(); htext(c, '?!', 52, 54, 22, INK); }
+  else if (I === 'notes') { c.save(); c.translate(50, 50); c.rotate(-0.12); c.fillStyle = '#fffdf5'; c.strokeStyle = INK; c.lineWidth = 2; c.fillRect(-24, -20, 48, 40); c.strokeRect(-24, -20, 48, 40); c.strokeStyle = 'rgba(31,61,158,.6)'; c.lineWidth = 1.4; for (let k = 0; k < 4; k++) { c.beginPath(); c.moveTo(-16, -10 + k * 9); c.lineTo(16 - (k === 3 ? 12 : 0), -10 + k * 9); c.stroke(); } c.restore(); }
+  else if (I === 'night') { c.fillStyle = '#fff6d0'; c.beginPath(); c.arc(46, 48, 20, 0, 7); c.fill(); c.fillStyle = s.col; c.beginPath(); c.arc(56, 42, 18, 0, 7); c.fill(); for (const [x, y] of [[70, 28], [74, 64], [30, 72], [26, 30]]) { c.fillStyle = '#fff'; c.beginPath(); c.arc(x, y, 2, 0, 7); c.fill(); } }
+  else if (I === 'raccoon') { c.save(); c.translate(52, 70 + (LANE - 2) * 0); c.scale(1.6, 1.6); c.translate(-50, -(LANE - 2)); drawRaccoon(c, { x: 50, vx: 1, ph: 0, loot: 'hotdog' }); c.restore(); }
+  else if (I === 'raise') { duckShape(c, 46, 62, 2.4, false); c.fillStyle = '#111'; c.fillRect(56, 30, 16, 5); }
+  else if (I === 'honks') { c.save(); c.translate(46, 84); c.scale(1.1, 1.1); qkDrawHonks(c, 0, 0, 1); c.restore(); }
+  else if (I === 'helper') { c.fillStyle = '#ffd166'; c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.arc(50, 50, 24, 0, 7); c.fill(); c.stroke(); htext(c, '!', 50, 62, 34, RED); }
+  else if (I === 'rich') { for (let k = 0; k < 4; k++) ticketIcon(c, 28 + (k % 2) * 6, 66 - k * 11, 1.4); }
+  c.restore(); c.restore();
+}
+function openStickerBook() {
+  hidePanels(); SFX.pop();
+  const el = $('#stickers'), grid = $('#stickerGrid'); grid.innerHTML = '';
+  const got = Object.keys(state.stickers || {}).length;
+  $('#stickerCount').textContent = `${got} of ${STICKERS.length} stickers. Each new sticker is worth 5 tickets.`;
+  for (const s of STICKERS) {
+    const has = stickerHas(s.id), cell = document.createElement('div'); cell.className = 'stk' + (has ? '' : ' off');
+    const cv2 = document.createElement('canvas'); cv2.width = 180; cv2.height = 180; const c = cv2.getContext('2d'); c.scale(1.8, 1.8); drawSticker(c, s, has);
+    const nm = document.createElement('b'); nm.textContent = has ? s.name : '???';
+    const hw = document.createElement('small'); hw.textContent = s.how;
+    cell.append(cv2, nm, hw); grid.appendChild(cell);
+  }
+  el.hidden = false;
+}
 
 // ---------- High Dive: a whole diving meet ----------
 const DV_EV = [
@@ -4266,6 +4630,7 @@ MINI_DRAW.dive = (c, d) => {
 function diveOnEnd(stars) {
   const ev = DVS.ev, dd = diveData(), before = diveStars(), prev = dd.medals[ev.id] || 0, notes = [];
   if (stars > prev) dd.medals[ev.id] = stars;
+  if (stars === 3) setTimeout(() => stickerGet('gold'), 1200);
   dd.best[ev.id] = Math.max(dd.best[ev.id] || 0, MINI.score);
   const after = diveStars();
   if (stars === 3 && prev < 3) { setTickets(state.tickets + 10); notes.push('First gold in this event: +10 bonus tickets!'); }
@@ -5546,6 +5911,7 @@ function qkEffect(end) {
   else if (end === 'owed') { q.mood = 'ok'; q.owed = true; }
   else if (end === 'quit') { q.quit = true; q.mood = 'ok'; QK.leave = now; SFX.fail(); }
   else if (end === 'back') { setTickets(state.tickets - 15); q.quit = false; q.mood = 'ok'; q.raises = Math.max(1, q.raises); SFX.fanfare(); }
+  if (end === 'raise') stickerGet('raise'); if (end === 'quit') stickerGet('honks');
   save();
 }
 // ----- faces for the dialogue card -----
@@ -5717,6 +6083,7 @@ function balUpdate(dt) {
   if (BAL.done && !BAL.shown && (BAL.land >= 1 || now - BAL.endT > 9)) { BAL.shown = true; balFinish(); }
 }
 function balFinish() {
+  stickerGet('balloon');
   if (BAL.weeOn) { SFX.weee(false); BAL.weeOn = false; }
   state.best = state.best || {}; const best = state.best.balloon || 0; if (BAL.got > best) state.best.balloon = BAL.got;
   if (BAL.got) setTickets(state.tickets + BAL.got); else save();
@@ -5755,8 +6122,8 @@ function balKey(e, down) { if (scene !== 'balloon' || e.key !== ' ') return fals
 
 // ---------- panels ----------
 const PANELS = ['#orders', '#shop', '#lotCard', '#report'];
-function anyPanel() { return ['#orders', '#shop', '#lotCard', '#styleCard', '#prizeCard'].some(s => !$(s).hidden); }
-function hidePanels() { for (const s of ['#orders', '#shop', '#lotCard', '#styleCard', '#prizeCard', '#qkCard']) $(s).hidden = true; }
+function anyPanel() { return ['#stickers', '#orders', '#shop', '#lotCard', '#styleCard', '#prizeCard'].some(s => !$(s).hidden); }
+function hidePanels() { for (const s of ['#stickers', '#orders', '#shop', '#lotCard', '#styleCard', '#prizeCard', '#qkCard']) $(s).hidden = true; }
 function miniScene(canvas, kit) {
   const k = 2, s = 0.26, c = canvas.getContext('2d');
   canvas.width = 300 * k; canvas.height = 150 * k;
@@ -5950,6 +6317,7 @@ function renameCard() {
 // ---------- scenes ----------
 let scene = 'park';
 function showScene(name) {
+  setTimeout(() => reqNote(), 0);
   if (name !== 'balloon' && BAL.weeOn) { SFX.weee(false); BAL.weeOn = false; }
   scene = name; downId = null;
   $('#parkBar').hidden = name !== 'park'; $('#wsBar').hidden = name !== 'ws';
@@ -6017,6 +6385,8 @@ $('#povBackEnd').onclick = () => { SFX.pop(); closePOV(); };
 $('#povAgain').onclick = () => povReplay();
 $('#navL').onclick = () => { PARK.camTarget = clamp(PARK.camTarget - 700, 0, PW - W); };
 $('#navR').onclick = () => { PARK.camTarget = clamp(PARK.camTarget + 700, 0, PW - W); };
+$('#btnStickers').onclick = () => { if (!$('#stickers').hidden) { hidePanels(); return; } openStickerBook(); };
+$('#stickerClose').onclick = () => { $('#stickers').hidden = true; };
 $('#btnShop').onclick = () => { if (!$('#shop').hidden) { hidePanels(); return; } openShop(); };
 $('#btnBuild').onclick = () => {
   SFX.pop(); const l = firstFreeLot();
@@ -6065,7 +6435,7 @@ function start() {
   $('#tix').textContent = state.tickets;
   if (IN_ARCADE) for (const bar of ['#parkBar', '#titleBar']) { const a = document.createElement('a'); a.className = 'back'; a.href = '../../index.html'; a.innerHTML = '&larr; arcade'; $(bar).prepend(a); }
   showScene('title');
-  titleSaveInfo(); spawnStartGuests();
+  titleSaveInfo(); spawnStartGuests(); updateStickerBtn();
   if (window.claude && typeof window.claude.use === 'function') {
     const btn = $('#startBtn'); btn.disabled = true; btn.textContent = 'Loading your park...';
     Promise.race([cloudInit(), new Promise(r => setTimeout(() => r(null), 8000))]).then(cloud => {
@@ -6080,7 +6450,7 @@ function start() {
 addEventListener('pagehide', () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { } });
 function spawnStartGuests() { PARK.guests = []; if (state.rides.length) for (let i = 0; i < Math.min(10, maxGuests()); i++) PARK.guests.push(newGuest(200 + Math.random() * 2400)); }
 function applyLoadedPark(s) {
-  Object.assign(state, s); buildSlots(); updateFireworksBtn();
+  Object.assign(state, s); buildSlots(); updateFireworksBtn(); updateStickerBtn();
   for (const r of state.rides) prepRide(r);
   $('#tix').textContent = state.tickets; spawnStartGuests(); rideCache.clear();
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { }
