@@ -97,7 +97,6 @@ function wordmark(prog) {
   else { ink.setAlpha(Math.max(0, Math.min(1, (prog - 0.2) / 0.5))); ink.text('NOTEBOOK', 0, -8, { size: 72, color: INK }); ink.text('ARCADE', 6, 52, { size: 66, color: RED }); ink.setAlpha(1); }
   if (prog > 0.8) { star(-262, -70, 8, 20); star(272, -60, 7, 24); star(-270, 74, 6, 28); ink.text('vol. 1', 240, -78, { size: 20, color: RED, rot: 0.3 }); }
   ctx.restore();
-  if (prog > 0.9) { ink.text('property of:', 60, 190, { size: 18, color: PEN_MD, font: 'Patrick Hand', weight: 400, align: 'left' }); ink.longLine(150, 194, 330, 191, 30, PEN_LT, 1, 1, 1); ink.text('ME. hands off', 160, 187, { size: 22, color: INK, align: 'left', rot: -0.05 }); ink.text('(this means you, pencils)', 340, 191, { size: 14, color: RED, font: 'Patrick Hand', weight: 400, align: 'left', rot: -0.04 }); }
 }
 
 // ---------- a game, doodled onto the page ----------
