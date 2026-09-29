@@ -139,12 +139,9 @@ function previewPaperFootball(w, h, hov) {
   }
 
   function update(state) {
-    const wanted = (state.hovered || state.pinned) && !state.suppressed;
+    const wanted = state.hovered;
     if (wanted !== state.active) { state.elapsed = 0; state.active = wanted; }
     state.card.classList.toggle('previewing', wanted);
-    state.button.setAttribute('aria-pressed', String(wanted));
-    state.button.setAttribute('aria-label', `${wanted ? 'Stop preview of' : 'Preview'} ${state.title}`);
-    state.button.textContent = wanted ? 'back to sketch ×' : 'watch it play ↻';
     if (wanted) state.draw(motionOff() ? 1300 : state.elapsed);
     wake();
   }
@@ -153,8 +150,7 @@ function previewPaperFootball(w, h, hov) {
     const canvas = document.createElement('canvas');
     canvas.className = 'doodle-preview'; canvas.setAttribute('aria-hidden', 'true');
     card.querySelector('.game-art').append(canvas);
-    const button = card.querySelector('.preview-toggle');
-    const state = {card, button, title:card.querySelector('h3').textContent, draw:createPreview(canvas, card.dataset.preview), hovered:false, pinned:false, suppressed:false, active:false, visible:false, elapsed:0};
+    const state = {card, draw:createPreview(canvas, card.dataset.preview), hovered:false, active:false, visible:false, elapsed:0};
     if (['tennis','bridge'].includes(card.dataset.preview)) {
       const still = document.createElement('canvas'); still.width=1000; still.height=500;
       still.className='tennis-still'; still.setAttribute('aria-hidden','true');
@@ -163,17 +159,9 @@ function previewPaperFootball(w, h, hov) {
     states.push(state);
     card.addEventListener('pointerenter', event => {
       if (event.pointerType !== 'mouse') return;
-      const rect = button.getBoundingClientRect();
-      // A direct click on the preview control must start it, not toggle a just-started hover off.
-      const overButton = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
-      if (!overButton) { state.hovered = true; update(state); }
+      state.hovered = true; update(state);
     });
-    card.addEventListener('pointerleave', () => { state.hovered = false; state.suppressed = false; update(state); });
-    button.addEventListener('click', () => {
-      if (state.active) { state.pinned = false; state.suppressed = true; }
-      else { state.pinned = true; state.suppressed = false; }
-      update(state);
-    });
+    card.addEventListener('pointerleave', () => { state.hovered = false; update(state); });
     update(state);
   });
 

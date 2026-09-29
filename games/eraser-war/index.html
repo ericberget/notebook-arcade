@@ -86,7 +86,7 @@ function newGame() {
   setTimeout(() => { if (state === 'intro') startTurn('you'); }, 3200);
 }
 function groundAt(x) { return ground[Math.max(0, Math.min(W, Math.round(x)))]; }
-function newWind() { wind = Math.round((Math.random() * 2 - 1) * 12) / 10; SFX.wind(wind); }
+function newWind() { wind = Math.round((Math.random() * 2 - 1) * 4) / 10; SFX.wind(wind); }
 
 // the hills: a couple of sines, a big bump (or dip) in the middle, flat pads under each fighter
 function buildGround() {
@@ -336,16 +336,16 @@ function launch(who, ang, pow) {
   state = 'flight'; SFX.throw_();
 }
 function simulate(who, ang, pow, maxT = 500) { // where would it land? used for the preview and the pencil's brain
-  const h = handOf(who); let x = h.x, y = h.y, vx = Math.cos(ang) * pow, vy = Math.sin(ang) * pow; const pts = [];
-  for (let t = 0; t < maxT; t++) { vy += GRAV; vx += wind * WINDK; x += vx; y += vy; pts.push({ x, y }); if (x < -50 || x > W + 50) return { x, y, t, pts, out: true }; if (y >= groundAt(x)) return { x, y, t, pts, out: false }; }
+  const h = handOf(who), other = who === you ? pen : you; let x = h.x, y = h.y, vx = Math.cos(ang) * pow, vy = Math.sin(ang) * pow; const pts = [];
+  for (let t = 0; t < maxT; t++) { vy += GRAV; vx += wind * WINDK; x += vx; y += vy; pts.push({ x, y }); if (Math.hypot(other.x - x, other.y - 24 - y) < 24) return { x, y, t, pts, out: false }; if (x < -60 || x > W + 60) return { x, y, t, pts, out: true }; if (y >= groundAt(x)) return { x, y, t, pts, out: false }; }
   return { x, y, t: maxT, pts, out: true };
 }
 function planAI() {
   let best = null; const target = you.x;
   for (let deg = 25; deg <= 80; deg += 4) for (let pow = 6; pow <= 17; pow += 0.5) { const a2 = -Math.PI + deg * Math.PI / 180; /* up-and-left: canvas y grows downward */ const r = simulate(pen, a2, pow, 600); if (r.out) continue; const err = Math.abs(r.x - target); if (!best || err < best.err) best = { pow, err, ang: a2 }; }
   if (!best) best = { ang: -Math.PI + 0.9, pow: 10, err: 999 };
-  // the pencil isn't perfect: off by a bit, less so as the match goes on
-  const slop = Math.max(0.6, 2.6 - turn * 0.3), adeg = (Math.random() - .5) * Math.max(4, 16 - turn * 1.5) * Math.PI / 180;
+  // Keep the pencil forgiving throughout the match.
+  const slop = 3.2, adeg = (Math.random() - .5) * 18 * Math.PI / 180;
   return { ang: best.ang + adeg, pow: best.pow + (Math.random() - .5) * slop };
 }
 function aimFromMouse() { const h = handOf(you); const dx = mouse.x - h.x, dy = mouse.y - h.y; const d = Math.hypot(dx, dy) || 1; return { ang: Math.atan2(dy, dx), pow: Math.max(4, Math.min(17, d / 15)) }; }
@@ -356,7 +356,9 @@ function impact(x, y, direct) {
   shake = 10; SFX.thud(1); SFX.rub(); carve(x, Math.min(y, groundAt(x)) + 6, r);
   burst(x, y, 34, [PINK, PINK, PINK_DK, PEN_LT], 5); burst(x, y - 6, 10, ['rgba(120,120,130,.5)'], 2);
   const d = Math.hypot(other.x - x, (other.y - 22) - y);
-  let dmg = 0; if (direct) dmg = 34 + Math.round(proj.pow); else if (d < 78) dmg = Math.round(30 * (1 - Math.max(0, d - 20) / 58));
+  const radius = who === you ? 110 : 78;
+  let dmg = 0; if (direct) dmg = 34 + Math.round(proj.pow); else if (d < radius) dmg = Math.round(30 * (1 - Math.max(0, d - 20) / (radius - 20)));
+  if (who === pen) dmg = Math.round(dmg * 0.6);
   const selfD = Math.hypot(who.x - x, (who.y - 22) - y); const selfDmg = selfD < 60 ? Math.round(14 * (1 - selfD / 60)) : 0;
   if (dmg > 0) { other.hp = Math.max(0, other.hp - dmg); other.wob = 30; other.face = 'ow'; popup('-' + dmg, other.x, other.y - 70, RED, 30); popup(direct ? 'DIRECT HIT!' : ['OW!', 'OOF', 'WHAM', 'BONK'][Math.floor(Math.random() * 4)], x, y - 40, direct ? RED : GRAPHITE, direct ? 32 : 24); SFX.ow(other === pen); say(other, other === pen ? ['hey!!', 'my hills!', 'rude.', 'ow ow ow'][Math.floor(Math.random() * 4)] : ['ouch', 'that hurt', 'hey!', 'oof'][Math.floor(Math.random() * 4)], 60); scrawl(direct ? 'BOOM' : 'wham', x + (Math.random() - .5) * 60, Math.min(y, groundAt(x)) - 30 - Math.random() * 30, who === you ? INK : PEN_DK); }
   else { popup(['MISS', 'so close', 'whiff', 'nope'][Math.floor(Math.random() * 4)], x, y - 40, GRAPHITE, 24); scrawl('x', x, Math.min(y, groundAt(x)) - 14, PEN_LT); if (other === pen) say(pen, ['ha! missed', 'nice aim (not)', 'pfft'][Math.floor(Math.random() * 3)], 60); }
@@ -464,7 +466,7 @@ function drawHUD() {
   else ink.text('Eraser War', 600, 62, { size: 44, color: INK, rot: -0.02 });
   ink.text(`turn ${turn} · wind ${Math.abs(wind * 10).toFixed(0)} ${wind === 0 ? '' : wind > 0 ? '→' : '←'} · you ${you.hp} · pencil ${pen.hp}`, 600, 108, { size: 18, color: INK, font: 'Patrick Hand', weight: 400, alpha: 0.85 });
   const msg = state === 'aim' ? 'YOUR TURN · aim with the mouse · click to throw' : state === 'aiturn' ? 'the pencil is thinking...' : state === 'over' ? (winner === 'you' ? 'YOU WIN! new game?' : 'the pencil wins. new game?') : '';
-  if (state === 'aim' && turn === 1) ink.text('the farther the crosshair, the harder the throw', 600, 162, { size: 16, color: PEN_MD, font: 'Patrick Hand', weight: 400 });
+  if (state === 'aim' && turn === 1) ink.text('follow the dotted path · the circle shows where your eraser hits', 600, 162, { size: 16, color: PEN_MD, font: 'Patrick Hand', weight: 400 });
   if (msg) ink.text(msg, 600, 138, { size: 22, color: state === 'aim' ? INK : state === 'over' ? (winner === 'you' ? INK : RED) : PEN_MD, rot: -0.01, alpha: 0.75 + Math.sin(frame * 0.1) * 0.2 });
   // a windsock planted on the middle hill
   const wx = 600, gy = groundAt(600), top = gy - 60; ink.line(wx, gy, wx + 1, top, 5000, PEN_DK, 1.6, 1); const dir = wind >= 0 ? 1 : -1, len = 8 + Math.abs(wind) * 30, sag = 14 - Math.abs(wind) * 10;
@@ -479,8 +481,9 @@ function drawHUD() {
 function tally(x, y, n, color) { for (let i = 0; i < Math.min(n, 40); i++) { const g = Math.floor(i / 5), k = i % 5, bx = x + g * 24 + k * 4; if (k < 4) ink.line(bx, y - 11, bx + 1, y + 1, 6000 + i, color, 1.2, 1); else ink.line(x + g * 24 - 3, y - 2, x + g * 24 + 15, y - 8, 6000 + i, color, 1.2, 1); } if (n > 40) ink.text('+' + (n - 40), x + 8 * 24, y, { size: 13, color, font: 'Patrick Hand', weight: 400, align: 'left' }); }
 function drawAim() {
   if (state !== 'aim') return;
-  const a = aimFromMouse(), r = simulate(you, a.ang, a.pow, 90); const show = Math.min(r.pts.length, Math.round(r.t * 0.45) + 8);
+  const a = aimFromMouse(), r = simulate(you, a.ang, a.pow, 900); const show = r.pts.length;
   ctx.fillStyle = INK; ctx.globalAlpha = 0.45; for (let i = 0; i < show; i += 3) { ctx.beginPath(); ctx.arc(r.pts[i].x, r.pts[i].y, 2, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
+  if (!r.out) { ink.circle(r.x, r.y, 10, 5038, INK, 1.5, 1); ink.line(r.x - 15, r.y, r.x + 15, r.y, 5039, INK, 1, 1); }
   const h = handOf(you); ink.text(`${Math.round(-a.ang * 180 / Math.PI)}°  power ${Math.round(a.pow)}`, h.x + 20, h.y - 50, { size: 15, color: INK, font: 'Patrick Hand', weight: 400, align: 'left', alpha: 0.8 });
   ink.circle(mouse.x, mouse.y, 7, 5040, INK, 1.2, 1); ink.line(mouse.x - 12, mouse.y, mouse.x + 12, mouse.y, 5041, INK, 1, 1); ink.line(mouse.x, mouse.y - 12, mouse.x, mouse.y + 12, 5042, INK, 1, 1);
 }
