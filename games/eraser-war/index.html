@@ -15,6 +15,16 @@
   button, #back { font-family: 'Patrick Hand', cursive; font-size: 18px; background: rgba(251,248,238,.7); border: 2px solid #1f3d9e; color: #1f3d9e; padding: 3px 12px; border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; cursor: pointer; transform: rotate(1deg); }
   button:hover { background: rgba(31,61,158,.1); }
   #back { border: none; border-bottom: 2px solid #1f3d9e; border-radius: 0; text-decoration: none; padding: 6px 10px; transform: rotate(-1.5deg); background: transparent; }
+  #shot-controls { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); width:min(640px,calc(100% - 24px)); box-sizing:border-box; background:#f8f5eb; border:1px solid #213f9470; border-radius:8px 4px 9px 5px; padding:10px 16px; box-shadow:0 3px 12px #0001; }
+  .shot-row { display:flex; gap:18px; align-items:center; }
+  .shot-row label { flex:1; min-width:0; color:#213f94; font-size:17px; }
+  .shot-row output { float:right; font-variant-numeric:tabular-nums; }
+  input[type=range] { display:block; width:100%; height:30px; margin:0; accent-color:#213f94; cursor:pointer; }
+  #fire { min-height:48px; font-size:24px; white-space:nowrap; }
+  button:disabled,input:disabled { opacity:.45; cursor:default; }
+  #shot-status { margin:4px 0 0; color:#55565e; font-size:15px; text-align:center; min-height:20px; }
+  :focus-visible { outline:2px solid #213f94; outline-offset:4px; }
+  @media(max-width:500px) { #shot-controls{padding:8px 10px}.shot-row{gap:10px}.shot-row label{font-size:15px}#fire{font-size:20px;padding:3px 8px}#shot-status{font-size:13px} }
   #mute { padding: 4px 8px 1px; line-height: 0; }
 </style>
 </head>
@@ -23,6 +33,14 @@
   <canvas id="c" width="1200" height="720"></canvas>
   <div id="top"><a href="../../index.html" id="back">← arcade</a><button id="mute" title="sound" aria-label="sound on"></button><button id="newgame">new game</button></div>
 </div></div>
+<section id="shot-controls" aria-label="Aim your eraser">
+  <div class="shot-row">
+    <label for="angle">Angle <output id="angle-value" for="angle">40°</output><input id="angle" type="range" min="10" max="80" step="1" value="40"></label>
+    <label for="power">Power <output id="power-value" for="power">86%</output><input id="power" type="range" min="4" max="17" step="0.1" value="14.6"></label>
+    <button id="fire" type="button" disabled>Throw ↗</button>
+  </div>
+  <p id="shot-status" role="status" aria-live="polite">Getting your notebook ready…</p>
+</section>
 <script src="../../shared/paper.js"></script>
 <script src="../../shared/ink.js"></script>
 <script>
@@ -32,7 +50,7 @@ const ink = NotebookInk(ctx); const { INK, RED, GRAPHITE } = ink;
 const PEN_LT = '#9a9aa0', PEN_MD = '#7a7a82', PEN_DK = '#4a4a50', PINK = '#efb7c3', PINK_DK = '#c97a8e', PAPER = '#f8f5eb';
 const PAPER_STYLE = 'sketchbook';   // this game's sheet: a coffee-stained sketchbook page
 const stage = document.getElementById('stage');
-function fit() { const s = Math.min(window.innerWidth / W, window.innerHeight / H); stage.style.transform = `scale(${s})`; stage.style.marginLeft = ((window.innerWidth - W * s) / 2) + 'px'; stage.style.marginTop = ((window.innerHeight - H * s) / 2) + 'px'; }
+function fit() { const s = Math.min(window.innerWidth / W, Math.max(120, window.innerHeight - 120) / H); stage.style.transform = `scale(${s})`; stage.style.marginLeft = ((window.innerWidth - W * s) / 2) + 'px'; stage.style.marginTop = ((Math.max(120, window.innerHeight - 120) - H * s) / 2) + 'px'; }
 window.addEventListener('resize', fit); fit();
 const paper = document.createElement('canvas'); paper.width = W; paper.height = H;
 NotebookPaper.draw(paper.getContext('2d'), W, H, PAPER_STYLE);
@@ -70,6 +88,7 @@ const SFX = (() => {
 // ---------- world ----------
 const GRAV = 0.26, WINDK = 0.028;
 let ground = new Float32Array(W + 2), tufts = new Uint8Array(W + 2);
+let aimAngle = 40, aimPower = 14.6, lastShot = null, shotNumber = 0, introTimer;
 let you, pen, state = 'intro', turn = 1, wind = 0, frame = 0, introT = 0, proj = null, particles = [], popups = [], scrawls = [], craters = [], shake = 0, mouse = { x: 600, y: 300 }, bubble = null, throwAnim = null, aiPlan = null, waitT = 0, winner = null, theme = 'farm', windmill = null, baseSeed = 1, pageNo = 1;
 const rv = (s, d) => Math.max(0, Math.min(1, (introT - s) / d));
 const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
@@ -77,13 +96,15 @@ const terrainCv = document.createElement('canvas'); terrainCv.width = W; terrain
 let seed = 1; const rnd = () => { const x = Math.sin(seed++ * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); }; const rj = a => (rnd() - 0.5) * a;
 
 function newGame() {
+  clearTimeout(introTimer); lastShot = null; shotNumber = 0; aimAngle = 40; aimPower = 14.6;
   baseSeed = Math.floor(Math.random() * 100000); seed = baseSeed; theme = ['farm', 'town', 'castle'][Math.floor(rnd() * 3)]; pageNo = 1 + Math.floor(rnd() * 40);
-  turn = 1; proj = null; particles = []; popups = []; scrawls = []; craters = []; bubble = null; throwAnim = null; aiPlan = null; winner = null; windmill = null; introT = 0; state = 'intro';
+  turn = 1; proj = null; particles = []; popups = []; scrawls = []; craters = []; bubble = null; throwAnim = null; aiPlan = null; winner = null; windmill = null; introT = 100; state = 'intro';
   buildGround(); buildBackground(); renderTerrain();
   you = { x: 175, hp: 100, dir: 1, y: 0, vy: 0, wob: 0, face: 'grin' }; pen = { x: 1025, hp: 100, dir: -1, y: 0, vy: 0, wob: 0, face: 'smug' };
   you.y = groundAt(you.x); pen.y = groundAt(pen.x);
   wind = 0; newWind(); SFX.scratch();
-  setTimeout(() => { if (state === 'intro') startTurn('you'); }, 3200);
+  syncControls();
+  introTimer = setTimeout(() => { if (state === 'intro') startTurn('you'); }, 1400);
 }
 function groundAt(x) { return ground[Math.max(0, Math.min(W, Math.round(x)))]; }
 function newWind() { wind = Math.round((Math.random() * 2 - 1) * 4) / 10; SFX.wind(wind); }
@@ -322,7 +343,8 @@ function startTurn(who) {
   if (winner) return;
   state = who === 'you' ? 'aim' : 'aiturn'; newWind(); proj = null; throwAnim = null; waitT = 0;
   if (who === 'you') say(you, ['my turn.', 'watch this.', 'hold my juice box', 'aiming...', 'for the notebook!'][Math.floor(Math.random() * 5)], 70);
-  else { aiPlan = planAI(); waitT = 70 + Math.random() * 50; say(pen, ['hmm...', 'let me think', 'calculating', 'too easy', 'ok ok ok'][Math.floor(Math.random() * 5)], 60); }
+  else { aiPlan = planAI(); waitT = 35 + Math.random() * 20; say(pen, ['hmm...', 'let me think', 'calculating', 'too easy', 'ok ok ok'][Math.floor(Math.random() * 5)], 60); }
+  syncControls();
 }
 function say(who, text, life = 90) { bubble = { who, text, life }; }
 function popup(text, x, y, color = GRAPHITE, size = 26) { popups.push({ text, x, y, color, size, life: 60, rot: (Math.random() - .5) * 0.3 }); }
@@ -348,11 +370,18 @@ function planAI() {
   const slop = 3.2, adeg = (Math.random() - .5) * 18 * Math.PI / 180;
   return { ang: best.ang + adeg, pow: best.pow + (Math.random() - .5) * slop };
 }
-function aimFromMouse() { const h = handOf(you); const dx = mouse.x - h.x, dy = mouse.y - h.y; const d = Math.hypot(dx, dy) || 1; return { ang: Math.atan2(dy, dx), pow: Math.max(4, Math.min(17, d / 15)) }; }
-function throwNow(who, ang, pow) { throwAnim = { who, t: 0, ang, pow }; state = 'throwing'; if (who === you) say(you, ['take that!', 'eat eraser!', 'yeet', 'and...'][Math.floor(Math.random() * 4)], 50); else say(pen, ['heads up!', 'catch!', 'special delivery', 'boing'][Math.floor(Math.random() * 4)], 50); }
+function aimFromMouse() { return { ang: -aimAngle * Math.PI / 180, pow: aimPower }; }
+function setAimFromPoint(point) {
+  const h = handOf(you), dx = Math.max(1, point.x - h.x), dy = Math.min(-1, point.y - h.y);
+  aimAngle = Math.max(10, Math.min(80, Math.round(-Math.atan2(dy, dx) * 180 / Math.PI)));
+  aimPower = Math.max(4, Math.min(17, Math.hypot(dx, dy) / 15));
+  syncControls();
+}
+function throwNow(who, ang, pow) { if (who === you) { shotNumber++; const predicted = simulate(you, ang, pow, 900); lastShot = { pts: predicted.pts, x: null, y: null }; } throwAnim = { who, t: 0, ang, pow }; state = 'throwing'; syncControls(); if (who === you) say(you, ['take that!', 'eat eraser!', 'yeet', 'and...'][Math.floor(Math.random() * 4)], 50); else say(pen, ['heads up!', 'catch!', 'special delivery', 'boing'][Math.floor(Math.random() * 4)], 50); }
 
 function impact(x, y, direct) {
   const who = proj.who, other = who === you ? pen : you, r = 30 + proj.pow * 1.4;
+  if (who === you && lastShot) { lastShot.x = x; lastShot.y = y; }
   shake = 10; SFX.thud(1); SFX.rub(); carve(x, Math.min(y, groundAt(x)) + 6, r);
   burst(x, y, 34, [PINK, PINK, PINK_DK, PEN_LT], 5); burst(x, y - 6, 10, ['rgba(120,120,130,.5)'], 2);
   const d = Math.hypot(other.x - x, (other.y - 22) - y);
@@ -366,16 +395,57 @@ function impact(x, y, direct) {
   proj = null; state = 'settle'; waitT = 0;
 }
 function endMatch() {
-  winner = you.hp > 0 ? 'you' : 'pencil'; state = 'over';
+  winner = you.hp > 0 ? 'you' : 'pencil'; state = 'over'; syncControls();
   try { const k = winner === 'you' ? 'ew.wins' : 'ew.losses'; localStorage.setItem(k, (+(localStorage.getItem(k) || 0)) + 1); } catch (e) {}
   if (winner === 'you') { SFX.win(); say(you, 'ERASED!', 400); pen.face = 'dizzy'; you.face = 'grin'; } else { SFX.lose(); say(pen, 'sharpened.', 400); you.face = 'dizzy'; pen.face = 'smug'; }
 }
 
 // ---------- input ----------
 function canvasPos(e) { const r = canvas.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: (t.clientX - r.left) * W / r.width, y: (t.clientY - r.top) * H / r.height }; }
-canvas.addEventListener('mousemove', e => { mouse = canvasPos(e); });
-function onDown(e) { SFX.resume(); mouse = canvasPos(e); if (state === 'aim') { const a = aimFromMouse(); throwNow(you, a.ang, a.pow); e.preventDefault(); } }
-canvas.addEventListener('mousedown', onDown); canvas.addEventListener('touchstart', onDown, { passive: false }); canvas.addEventListener('touchmove', e => { mouse = canvasPos(e); }, { passive: false });
+const angleControl = document.getElementById('angle'), powerControl = document.getElementById('power'), fireButton = document.getElementById('fire'), shotStatus = document.getElementById('shot-status');
+function syncControls() {
+  const ready = state === 'aim', over = state === 'over';
+  angleControl.value = aimAngle; powerControl.value = aimPower;
+  document.getElementById('angle-value').textContent = Math.round(aimAngle) + '°';
+  document.getElementById('power-value').textContent = Math.round(aimPower / 17 * 100) + '%';
+  angleControl.disabled = powerControl.disabled = !ready; fireButton.disabled = !ready && !over;
+  fireButton.textContent = over ? 'Play again ↻' : 'Throw ↗';
+  const text = over ? (winner === 'you' ? `You won in ${shotNumber} throws! Ready for another round?` : 'Try again — adjust your angle and follow the dotted path.') : ready ? 'Drag on the page or use the sliders. Press Throw when ready.' : state === 'intro' ? 'Getting your notebook ready…' : state === 'aiturn' || (throwAnim && throwAnim.who === pen) ? 'The pencil’s turn — your aim is saved.' : 'Eraser away! Watch where it lands.';
+  if (shotStatus.textContent !== text) shotStatus.textContent = text;
+}
+function fireShot() {
+  SFX.resume();
+  if (state === 'over') { newGame(); return; }
+  if (state !== 'aim') return;
+  const a = aimFromMouse(); throwNow(you, a.ang, a.pow);
+}
+fireButton.addEventListener('click', fireShot);
+angleControl.addEventListener('input', () => { aimAngle = Number(angleControl.value); syncControls(); });
+powerControl.addEventListener('input', () => { aimPower = Number(powerControl.value); syncControls(); });
+let aimingPointer = null;
+canvas.addEventListener('pointerdown', e => {
+  if (state !== 'aim' || e.button !== 0 || aimingPointer !== null) return;
+  SFX.resume(); aimingPointer = e.pointerId; canvas.setPointerCapture(e.pointerId);
+  mouse = canvasPos(e); setAimFromPoint(mouse); e.preventDefault();
+});
+canvas.addEventListener('pointermove', e => {
+  if (state !== 'aim' || e.pointerId !== aimingPointer) return;
+  mouse = canvasPos(e); setAimFromPoint(mouse);
+});
+const stopAim = e => { if (aimingPointer === e.pointerId) aimingPointer = null; };
+canvas.addEventListener('pointerup', stopAim); canvas.addEventListener('pointercancel', stopAim); canvas.addEventListener('lostpointercapture', stopAim);
+window.addEventListener('keydown', e => {
+  if (e.target.closest('input,button,a') || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.code === 'Space' && !e.repeat) { e.preventDefault(); fireShot(); return; }
+  if (state !== 'aim') return;
+  if (!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) return;
+  e.preventDefault();
+  if (e.key === 'ArrowUp') aimAngle = Math.min(80, aimAngle + 1);
+  if (e.key === 'ArrowDown') aimAngle = Math.max(10, aimAngle - 1);
+  if (e.key === 'ArrowRight') aimPower = Math.min(17, aimPower + .2);
+  if (e.key === 'ArrowLeft') aimPower = Math.max(4, aimPower - .2);
+  syncControls();
+});
 document.getElementById('newgame').onclick = () => { SFX.resume(); SFX.click(); newGame(); };
 const SPK_ON = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="#1f3d9e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L9 10 L16 4.5 L16.4 21.5 L9 16.5 L3.2 16.2 Z"/><path d="M21 9.5 Q24 13 21 16.8"/><path d="M25 6 Q30 13 25.3 20.2"/></svg>';
 const SPK_OFF = '<svg width="34" height="26" viewBox="0 0 34 26" fill="none" stroke="#1f3d9e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L9 10 L16 4.5 L16.4 21.5 L9 16.5 L3.2 16.2 Z"/><path d="M21 8.5 L30 17.5"/><path d="M30 8.2 L21.2 17.8"/></svg>';
@@ -402,7 +472,7 @@ function step() {
     if (proj.y >= groundAt(proj.x)) { impact(proj.x, proj.y, false); return; }
     if (proj.x < -60 || proj.x > W + 60 || proj.t > 900) { popup('into the margin', proj.x < 0 ? 80 : W - 80, 200, GRAPHITE, 22); scrawl('gone', proj.x < 0 ? 30 : W - 40, 220, PEN_LT); if (proj.who === you) say(pen, 'lol', 60); proj = null; state = 'settle'; waitT = 0; }
   }
-  if (state === 'settle') { if (++waitT > 50 && !you.falling && !pen.falling) { if (you.hp <= 0 || pen.hp <= 0) endMatch(); else { const next = throwAnim && throwAnim.who === you ? 'pencil' : 'you'; if (next === 'you') turn++; startTurn(next); } } }
+  if (state === 'settle') { if (++waitT > 32 && !you.falling && !pen.falling) { if (you.hp <= 0 || pen.hp <= 0) endMatch(); else { const next = throwAnim && throwAnim.who === you ? 'pencil' : 'you'; if (next === 'you') turn++; startTurn(next); } } }
 }
 
 // ---------- drawing ----------
@@ -465,8 +535,8 @@ function drawHUD() {
   if (logoCut) { const lw = 330, lh = lw * logoCut.naturalHeight / logoCut.naturalWidth; ctx.globalAlpha = a; ctx.drawImage(logoCut, 600 - lw / 2, 12, lw, lh); ctx.globalAlpha = 1; }
   else ink.text('Eraser War', 600, 62, { size: 44, color: INK, rot: -0.02 });
   ink.text(`turn ${turn} · wind ${Math.abs(wind * 10).toFixed(0)} ${wind === 0 ? '' : wind > 0 ? '→' : '←'} · you ${you.hp} · pencil ${pen.hp}`, 600, 108, { size: 18, color: INK, font: 'Patrick Hand', weight: 400, alpha: 0.85 });
-  const msg = state === 'aim' ? 'YOUR TURN · aim with the mouse · click to throw' : state === 'aiturn' ? 'the pencil is thinking...' : state === 'over' ? (winner === 'you' ? 'YOU WIN! new game?' : 'the pencil wins. new game?') : '';
-  if (state === 'aim' && turn === 1) ink.text('follow the dotted path · the circle shows where your eraser hits', 600, 162, { size: 16, color: PEN_MD, font: 'Patrick Hand', weight: 400 });
+  const msg = state === 'aim' ? 'YOUR TURN · line it up, then press Throw' : state === 'aiturn' ? 'the pencil is thinking...' : state === 'over' ? (winner === 'you' ? 'YOU WIN! new game?' : 'the pencil wins. new game?') : '';
+  if (state === 'aim' && turn === 1) ink.text('arrow keys adjust your aim · space throws', 600, 162, { size: 16, color: PEN_MD, font: 'Patrick Hand', weight: 400 });
   if (msg) ink.text(msg, 600, 138, { size: 22, color: state === 'aim' ? INK : state === 'over' ? (winner === 'you' ? INK : RED) : PEN_MD, rot: -0.01, alpha: 0.75 + Math.sin(frame * 0.1) * 0.2 });
   // a windsock planted on the middle hill
   const wx = 600, gy = groundAt(600), top = gy - 60; ink.line(wx, gy, wx + 1, top, 5000, PEN_DK, 1.6, 1); const dir = wind >= 0 ? 1 : -1, len = 8 + Math.abs(wind) * 30, sag = 14 - Math.abs(wind) * 10;
@@ -481,11 +551,14 @@ function drawHUD() {
 function tally(x, y, n, color) { for (let i = 0; i < Math.min(n, 40); i++) { const g = Math.floor(i / 5), k = i % 5, bx = x + g * 24 + k * 4; if (k < 4) ink.line(bx, y - 11, bx + 1, y + 1, 6000 + i, color, 1.2, 1); else ink.line(x + g * 24 - 3, y - 2, x + g * 24 + 15, y - 8, 6000 + i, color, 1.2, 1); } if (n > 40) ink.text('+' + (n - 40), x + 8 * 24, y, { size: 13, color, font: 'Patrick Hand', weight: 400, align: 'left' }); }
 function drawAim() {
   if (state !== 'aim') return;
+  if (lastShot) { ctx.save(); ctx.fillStyle = PEN_LT; ctx.globalAlpha = .35; for (let i = 0; i < lastShot.pts.length; i += 5) { const p = lastShot.pts[i]; ctx.fillRect(p.x, p.y, 2, 2); } ctx.restore(); if (lastShot.x !== null) ink.circle(lastShot.x, lastShot.y, 7, 5037, PEN_MD, 1, 1); }
   const a = aimFromMouse(), r = simulate(you, a.ang, a.pow, 900); const show = r.pts.length;
   ctx.fillStyle = INK; ctx.globalAlpha = 0.45; for (let i = 0; i < show; i += 3) { ctx.beginPath(); ctx.arc(r.pts[i].x, r.pts[i].y, 2, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
   if (!r.out) { ink.circle(r.x, r.y, 10, 5038, INK, 1.5, 1); ink.line(r.x - 15, r.y, r.x + 15, r.y, 5039, INK, 1, 1); }
   const h = handOf(you); ink.text(`${Math.round(-a.ang * 180 / Math.PI)}°  power ${Math.round(a.pow)}`, h.x + 20, h.y - 50, { size: 15, color: INK, font: 'Patrick Hand', weight: 400, align: 'left', alpha: 0.8 });
-  ink.circle(mouse.x, mouse.y, 7, 5040, INK, 1.2, 1); ink.line(mouse.x - 12, mouse.y, mouse.x + 12, mouse.y, 5041, INK, 1, 1); ink.line(mouse.x, mouse.y - 12, mouse.x, mouse.y + 12, 5042, INK, 1, 1);
+  const distance = Math.round(Math.abs(r.x - pen.x));
+  const hint = r.out ? 'Off the page — ease up on power' : Math.hypot(r.x - pen.x, r.y - (pen.y - 22)) < 110 ? 'In range!' : r.x < you.x + 200 ? 'Hill in the way — raise your angle' : r.x < pen.x ? `${distance} short — try more power` : `${distance} long — try less power`;
+  ink.text(hint, 600, 194, { size: 18, color: INK, font: 'Patrick Hand', weight: 400 });
 }
 function draw() {
   ctx.save(); if (shake) ctx.translate((Math.random() - .5) * shake * 2, (Math.random() - .5) * shake * 2);
