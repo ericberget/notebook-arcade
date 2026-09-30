@@ -2376,19 +2376,19 @@ function povCollect() {
   for (const x of [x0, x1]) for (const z of zs) seg(V3(x, 0, z), V3(x, top, z), INK, 2.2, 0.9);
   for (let y = 48; y < top; y += 48) { seg(V3(x0, y, -34), V3(x1, y, -34), GRAPH, 1.2, 0.6); seg(V3(x0, y, 34), V3(x1, y, 34), GRAPH, 1.2, 0.6); seg(V3(x0, y, -34), V3(x0, y, 34), GRAPH, 1.2, 0.6); seg(V3(x1, y, -34), V3(x1, y, 34), GRAPH, 1.2, 0.6); }
   // Individual deck boards and side rails make the standing viewpoint feel grounded.
-  const deckStart = list.length;
-  for (let x = x0 - 8, i = 0; x < START_X; x += 12, i++) {
-    const end = Math.min(START_X, x + 12);
-    const D = [V3(x, top, -36), V3(end, top, -36), V3(end, top, 36), V3(x, top, 36)].map(toCam);
+  const deckStart = list.length, deckTop = top - 7, deckEnd = START_X;
+  for (let x = x0 - 8, i = 0; x < deckEnd; x += 12, i++) {
+    const end = Math.min(deckEnd, x + 12);
+    const D = [V3(x, deckTop, -36), V3(end, deckTop, -36), V3(end, deckTop, 36), V3(x, deckTop, 36)].map(toCam);
     const d = D.reduce((n, p) => n + p.z, 0) / D.length;
-    list.push({ d, f: c => { if (polyPath(c, D)) { c.fillStyle = i % 2 ? '#d6b078' : '#e3c18e'; c.fill(); c.strokeStyle = '#806441'; c.lineWidth = 1.5; c.stroke(); } } });
-    seg(V3(x + 4, top + 0.15, -29), V3(x + 4, top + 0.15, 23), '#a08258', 1, 0.45);
-    for (const z of [-31, 31]) seg(V3(x + 7, top + 0.2, z), V3(x + 8, top + 0.2, z), '#66523c', 2, 0.7);
+    list.push({ d, f: c => { if (polyPath(c, D)) { c.fillStyle = i % 2 ? '#67452e' : '#795339'; c.fill(); c.strokeStyle = '#39281d'; c.lineWidth = 2; c.stroke(); } } });
+    seg(V3(x + 4, deckTop + 0.15, -29), V3(x + 4, deckTop + 0.15, 23), '#ac8057', 1.4, 0.65);
+    for (const z of [-31, 31]) seg(V3(x + 7, deckTop + 0.2, z), V3(x + 8, deckTop + 0.2, z), '#2d221a', 2.5, 0.9);
   }
   for (const z of [-36, 36]) {
-    for (const x of [x0, x0 + 32, x1]) seg(V3(x, top, z), V3(x, top + 30, z), '#806441', 5, 1);
-    seg(V3(x0 - 8, top + 30, z), V3(x1 + 4, top + 30, z), '#a07846', 6, 1);
-    seg(V3(x0 - 8, top + 15, z), V3(x1 + 4, top + 15, z), '#a07846', 3, 1);
+    for (const x of [x0, x0 + 32, x1]) seg(V3(x, deckTop, z), V3(x, deckTop + 30, z), '#49301f', 12, 1);
+    seg(V3(x0 - 8, deckTop + 30, z), V3(x1 + 4, deckTop + 30, z), '#543722', 16, 1);
+    seg(V3(x0 - 8, deckTop + 15, z), V3(x1 + 4, deckTop + 15, z), '#543722', 9, 1);
   }
   const deck = POV.t < 0 ? list.splice(deckStart) : null;
   // scenery
@@ -2399,6 +2399,7 @@ function povCollect() {
     else if (it.kind === 'lou') billboard(list, it.x, it.z, c => { c.translate(-it.x, -GY); drawLou(c, it.x, now); });
   }
   // the slide, as rings of quads
+  const slideStart = list.length;
   const sC = POV.cam ? clamp(nearestS(), 0, T.L) : 0, tube = kit.tube, NS = tube ? 12 : 8, r = tube ? 20 : 22, lipH = r * 0.65;
   const secs = [];
   for (let s = Math.max(0, sC - 500); s <= T.L; ) {
@@ -2438,9 +2439,14 @@ function povCollect() {
       } });
     }
   }
-  // While boarding, the deck is in front of the slide mouth. Draw it last so
-  // near-plane board fragments cannot sort behind the long slide polygons.
-  if (deck) list.push({ d: -Infinity, f: c => { deck.sort((a, b) => b.d - a.d); for (const it of deck) it.f(c); } });
+  // Keep the deck together behind the raised slide entrance during boarding.
+  // Individual near-plane boards otherwise cut through the slide mouth.
+  if (deck) {
+    const slide = list.splice(slideStart);
+    list.push({ d: -Infinity, f: c => {
+      for (const layer of [deck, slide]) { layer.sort((a, b) => b.d - a.d); for (const it of layer) it.f(c); }
+    } });
+  }
   return list;
 }
 function nearestS() {
