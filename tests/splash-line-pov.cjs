@@ -15,7 +15,8 @@ vm.runInContext([
   section('const GY =', '// ---------- stage & canvas'),
   section('function crPts(', 'function propsFor('),
   section('const V3 =', 'function clipPoly('),
-  `const SFX = new Proxy({}, { get: () => () => {} });
+  `let povSplashes = 0;
+   const SFX = new Proxy({}, { get: (_, key) => () => { if (key === "povSplash") povSplashes++; } });
    let scene = 'pov', shown = 0;
    function showScene(s) { scene = s; }
    function showPovEnd() { shown++; }
@@ -30,7 +31,7 @@ vm.runInContext([
    let splashes = 0;
    for (const kit of KITS) {
      const T = buildTrack([crPts([[START_X, towerTop(kit)], ...EXAMPLES[kit.id]])], kit);
-     const sim = simulate(T, kit), original = JSON.stringify(sim);
+     const sim = simulate(T, kit), original = JSON.stringify(sim), splashBefore = povSplashes;
      openPOV({ kit, T, sim, name: kit.name, stars: 0, from: 'park' });
      povUpdate(0);
      const start = { ...POV.cam.C };
@@ -70,6 +71,7 @@ vm.runInContext([
      }
      for (let i = 0; i < 300; i++) tick(1 / 60);
      assert.equal(shown, shownBefore + 1, 'results appear exactly once');
+     assert.equal(povSplashes - splashBefore, sim.stats.outcome === 'splash' ? 1 : 0, 'POV splash audio plays exactly once on pool entry');
      assert.equal(JSON.stringify(sim), original, 'playback preserves simulation and score data');
    }
    assert(splashes > 0, 'tested successful splashdowns');
