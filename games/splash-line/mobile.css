@@ -91,3 +91,5 @@ body.phone { background: repeating-linear-gradient(to bottom, #fbf8ee 0 31px, #d
   .phone #welcome { top: 56px; transform: translateX(-50%); max-height: calc(var(--view-height, 100dvh) - 64px); gap: 8px; padding: 14px 20px; }
   .phone #mobileUI > .card { left: max(16px, env(safe-area-inset-left)) !important; right: max(16px, env(safe-area-inset-right)) !important; }
 }
+
+.phone #povSend { right: max(16px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); font-size: 22px; min-width: 100px; min-height: 48px; }
