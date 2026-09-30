@@ -128,7 +128,8 @@
   #lotCard { width: 420px; }
   #welcome { position: absolute; left: 404px; top: 412px; width: 392px; box-sizing: border-box; padding: 14px 20px 16px; background: var(--card); box-shadow: 3px 8px 22px var(--shadow); transform: rotate(-1.2deg); display: grid; gap: 8px; justify-items: start; }
   #welcome::before { content: ''; position: absolute; left: 50%; top: -10px; width: 70px; height: 20px; translate: -50% 0; background: rgba(246,213,92,.55); transform: rotate(2deg); }
-  #nameLabel { font-family: Caveat, cursive; font-size: 32px; color: var(--red); line-height: 1; }
+  #nameLabel, #welcomeBack { font-family: Caveat, cursive; font-size: 32px; color: var(--red); line-height: 1; }
+  #savedParkName { font-family: Caveat, cursive; font-size: 34px; line-height: 1.15; overflow-wrap: anywhere; }
   #welcome .row { width: 100%; flex-wrap: nowrap; }
   #welcome input { font-size: 34px; }
   #saveNote { font-size: 16px; color: var(--graphite); line-height: 1.3; }
@@ -138,7 +139,6 @@
   #savedTag.pulse { animation: savedPulse 1.6s ease; }
   @keyframes savedPulse { 0% { background: rgba(44,138,60,.22); } 100% { background: transparent; } }
   #startBtn:disabled { opacity: .6; }
-  #parkDice { font-size: 22px; padding: 4px 8px; line-height: 1; }
   #startBtn { font-size: 24px; padding: 5px 22px; margin-top: 4px; }
   #povEnd { left: 370px; top: 380px; width: 460px; transform: rotate(-1deg); }
   #styleCard { left: 40px; top: 70px; width: 1120px; max-height: 636px; overflow: auto; }
@@ -308,9 +308,11 @@
   <div id="stickers" class="card" hidden><div class="row" style="justify-content:space-between;align-items:flex-start"><div><div class="eyebrow">Your park</div><h2>Sticker book</h2></div><button id="stickerClose">Close</button></div><p id="stickerCount"></p><div id="stickerGrid"></div></div>
   <div id="stickerPop" hidden><canvas width="200" height="200"></canvas><div><small>New sticker!</small><b></b><span></span></div></div>
   <div id="welcome" hidden>
+    <div id="welcomeBack" hidden>Welcome back to</div>
+    <div id="savedParkName" hidden></div>
     <label for="parkName" id="nameLabel">First, name your park</label>
-    <div class="row nowrap"><input type="text" id="parkName" maxlength="28" autocomplete="off" placeholder="My Water Park"><button id="parkDice" class="icon-btn" title="Random name" aria-label="Random park name">&#127922;</button></div>
-    <button id="startBtn" class="primary">Open the gates!</button>
+    <div class="row nowrap" id="parkNameEntry"><input type="text" id="parkName" maxlength="28" autocomplete="off" placeholder="My Water Park"></div>
+    <button id="startBtn" class="primary">Create my park</button>
     <div id="saveNote"></div>
   </div>
 
@@ -2071,7 +2073,7 @@ function drawFence(c, a, b) {
   jline(c, a - 4, TGY - 30, b + 4, TGY - 30, a + 3, GRAPH, 1.4, 1); jline(c, a - 4, TGY - 12, b + 4, TGY - 12, a + 5, GRAPH, 1.4, 1);
 }
 function drawTitle(c) {
-  const name = ($('#parkName').value.trim() || state.name || 'My Water Park').slice(0, 28);
+  const name = (state.welcomed ? state.name : ($('#parkName').value.trim() || state.name || 'My Water Park')).slice(0, 28);
   // sky
   c.fillStyle = 'rgba(246,213,92,.5)'; c.beginPath(); c.arc(1030, 118, 30, 0, 7); c.fill(); jcircle(c, 1030, 118, 31, 40, '#c9a227', 1.6);
   for (let k = 0; k < 10; k++) { const a = k / 10 * 6.28 + now * 0.1; jline(c, 1030 + Math.cos(a) * 39, 118 + Math.sin(a) * 39, 1030 + Math.cos(a) * 50, 118 + Math.sin(a) * 50, 50 + k, '#c9a227', 1.4, 1); }
@@ -2116,7 +2118,7 @@ function renderTitle(c) {
 function openGates() {
   if (TITLE.zoomAt) return;
   SFX.resume();
-  const v = $('#parkName').value.trim().slice(0, 28);
+  const v = state.welcomed ? state.name : $('#parkName').value.trim().slice(0, 28);
   state.name = v || state.name; TITLE.first = !state.welcomed; state.welcomed = true; save();
   $('#welcome').hidden = true; $('#titleBar').hidden = true;
   TITLE.zoomAt = now || 0.001; SFX.fanfare();
@@ -6447,7 +6449,6 @@ $('#mute').innerHTML = SPK_ON;
 $('#mute').onclick = () => { SFX.resume(); const m = SFX.toggle(); $('#mute').innerHTML = m ? SPK_OFF : SPK_ON; $('#mute').setAttribute('aria-label', m ? 'Sound off' : 'Sound on'); };
 $('#startBtn').onclick = openGates;
 $('#parkName').onkeydown = e => { if (e.key === 'Enter') openGates(); };
-$('#parkDice').onclick = () => { SFX.resume(); SFX.pop(); $('#parkName').value = randomParkName(); };
 
 // ---------- loop ----------
 let lastT = performance.now();
@@ -6479,7 +6480,7 @@ function start() {
     Promise.race([cloudInit(), new Promise(r => setTimeout(() => r(null), 8000))]).then(cloud => {
       if (cloud && (cloud.savedAt || 0) > (state.savedAt || 0) && !TITLE.zoomAt) applyLoadedPark(cloud);
       else if (CLOUD.db && state.welcomed) cloudSave(JSON.stringify(state));
-      btn.disabled = false; btn.textContent = 'Open the gates!'; titleSaveInfo();
+      btn.disabled = false; titleSaveInfo();
     });
   }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => rideCache.clear());
@@ -6495,8 +6496,13 @@ function applyLoadedPark(s) {
 }
 function titleSaveInfo() {
   const note = $('#saveNote');
+  $('#welcomeBack').hidden = !state.welcomed;
+  $('#savedParkName').hidden = !state.welcomed;
+  $('#nameLabel').hidden = !!state.welcomed;
+  $('#parkNameEntry').hidden = !!state.welcomed;
+  $('#startBtn').textContent = state.welcomed ? 'Back to my park' : 'Create my park';
   if (state.welcomed) {
-    $('#parkName').value = state.name; $('#nameLabel').textContent = 'Welcome back to';
+    $('#savedParkName').textContent = state.name;
     const n = state.rides.length;
     note.innerHTML = `<b>&#10003; Your park is saved.</b> ${n ? `${n} ride${n === 1 ? '' : 's'} and ` : ''}${state.tickets} ticket${state.tickets === 1 ? '' : 's'}.`;
   } else { $('#parkName').placeholder = state.name; $('#nameLabel').textContent = 'First, name your park'; note.textContent = 'Your park saves by itself as you play.'; }
