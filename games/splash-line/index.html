@@ -6074,7 +6074,7 @@ function startBalloon() {
   hidePanels();
   const s = slotOf('balloon');
   Object.assign(BAL, { x: 260, alt: 0.05, va: 0, t: 0, got: 0, items: [], birds: [], done: false, endT: 0, wob: 0, land: 0, weeOn: false, weeLast: null, weeN: 0, parts: [], labels: [], nextItem: 500, nextBird: 1400, shown: false, fire: false, hold: false });
-  showScene('balloon'); $('#balEnd').hidden = true; balStat(); SFX.resume(); SFX.whee();
+  showScene('balloon'); $('#balEnd').hidden = true; balStat(); SFX.resume();
 }
 function balStat() { $('#balStat').textContent = `${BAL.got} ticket${BAL.got === 1 ? '' : 's'} · hold to rise, let go to drift down`; }
 function balScreen(wx, alt) { const z = balZoom(), cam = BAL.x - (W * 0.38) / z, oy = H - 720 * z; return { x: (wx - cam) * z, y: balWorldY(alt) * z + oy, z }; }
@@ -6089,8 +6089,8 @@ function balUpdate(dt) {
   if (!BAL.done) BAL.x += balWind() * dt * (1 - BAL.wob * 0.6);
   else { const pad = balPadX(); BAL.x += (pad - BAL.x) * Math.min(1, dt * 1.2); BAL.va = Math.min(BAL.va, -0.25); if (BAL.alt <= 0.001 && Math.abs(pad - BAL.x) < 30) BAL.land = Math.min(1, BAL.land + dt * 0.8); }
   SFX.ride(fire ? 0.55 : 0.08, fire ? 14 : 4);
-  if (fire && !BAL.weeOn && now - (BAL.weeGap || -9) > 0.45) { SFX.weee(true); BAL.weeOn = true; BAL.weeT = now; }
-  if (BAL.weeOn && (!fire || now - BAL.weeT > 3.2)) { SFX.weee(false); BAL.weeOn = false; BAL.weeGap = now; BAL.weeLast = { t: now, n: BAL.weeN || 3 }; }
+  if (fire && !BAL.weeOn && now - (BAL.weeGap || -9) > 0.45) { BAL.weeOn = true; BAL.weeT = now; }
+  if (BAL.weeOn && (!fire || now - BAL.weeT > 3.2)) { BAL.weeOn = false; BAL.weeGap = now; BAL.weeLast = { t: now, n: BAL.weeN || 3 }; }
   if (BAL.weeOn) BAL.weeN = Math.min(11, 2 + Math.floor((now - BAL.weeT) * 4));
   // spawn tickets and seagulls ahead of the balloon
   const ahead = BAL.x + 2600;
@@ -6120,7 +6120,7 @@ function balUpdate(dt) {
 }
 function balFinish() {
   stickerGet('balloon');
-  if (BAL.weeOn) { SFX.weee(false); BAL.weeOn = false; }
+  if (BAL.weeOn) { BAL.weeOn = false; }
   state.best = state.best || {}; const best = state.best.balloon || 0; if (BAL.got > best) state.best.balloon = BAL.got;
   if (BAL.got) setTickets(state.tickets + BAL.got); else save();
   const rides = state.rides.length;
@@ -6354,7 +6354,7 @@ function renameCard() {
 let scene = 'park';
 function showScene(name) {
   setTimeout(() => reqNote(), 0);
-  if (name !== 'balloon' && BAL.weeOn) { SFX.weee(false); BAL.weeOn = false; }
+  if (name !== 'balloon' && BAL.weeOn) { BAL.weeOn = false; }
   scene = name; downId = null;
   fit();
   $('#parkBar').hidden = name !== 'park'; $('#wsBar').hidden = name !== 'ws';
