@@ -2187,7 +2187,7 @@ const vlerp = (a, b, t) => V3(lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.
 const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const FOCAL = 540, NEAR = 3;
 // Playback comfort affects the view only; simulation and inspection keep real ride timing.
-const POV_COMFORT = { rate: 0.6, readySeconds: 2, turnResponse: 8, airResponse: 5, shakeScale: 0.12 };
+const POV_COMFORT = { rate: 0.6, readySeconds: 3.6, turnResponse: 8, airResponse: 5, shakeScale: 0.12 };
 const LIGHT = vnorm(V3(0.35, 0.9, 0.3));
 const SWAY = { kiddie: [10, 380], body: [22, 460], tube: [70, 420], loop: [30, 520], launch: [0, 1], drop: [0, 1], bunny: [14, 400], lazy: [40, 700], camel: [0, 1], switch: [30, 420], dloop: [30, 520], cliff: [0, 1], tour: [50, 460] };
 const POV = { on: false, from: 'park', kit: null, T: null, sim: null, name: '', stars: 0, t: 0, phase: 'ride', endT: 0, cam: null, look: { yaw: 0, pitch: 0, ty: 0, tp: 0 }, drag: null, labels: [], drops: [], fired: 0, lastZ: 0, shake: 0, scenery: null, rgb: [0, 0, 0] };
@@ -2227,6 +2227,18 @@ function povScenery(kit) {
 }
 
 // ----- camera -----
+function povBoardingProgress() {
+  const elapsed = POV_COMFORT.readySeconds + POV.t / POV_COMFORT.rate;
+  return smoothstep(1.5, 3.1, elapsed);
+}
+function povBoardingCam(seat) {
+  const u = povBoardingProgress();
+  const standing = V3(START_X - 60, POV.kit.towerH + 44, 0);
+  const F = vnorm(vlerp(vnorm(V3(1, -0.6, 0)), seat.F, u));
+  const up = vnorm(vlerp(V3(0, 1, 0), seat.U, u));
+  return { C: vlerp(standing, seat.C, u), F,
+    U: vnorm(vsub(up, vmul(F, vdot(up, F)))), mph: 0, g: 1, air: false };
+}
 function povTargetCam(t) {
   const fr = POV.sim.frames, fi = clamp(t * 60, 0, fr.length - 1), i = Math.min(fr.length - 2, Math.floor(fi)), u = fi - i, a = fr[i], b = fr[i + 1] || a;
   if (a.a && b.a && a.s >= 0) {
@@ -2244,7 +2256,7 @@ function povUpdate(dt) {
   if (POV.phase === 'ride') {
     POV.t += dt * POV_COMFORT.rate;
     const tc = POV.t < 0 ? 0 : Math.min(POV.t, POV.endT);
-    const tgt = povTargetCam(tc);
+    const seat = povTargetCam(tc), tgt = POV.t < 0 ? povBoardingCam(seat) : seat;
     if (!POV.cam) POV.cam = { C: tgt.C, F: tgt.F, U: tgt.U };
     const k = 1 - Math.exp(-dt * (tgt.air ? POV_COMFORT.airResponse : POV_COMFORT.turnResponse));
     POV.cam.C = tgt.C; POV.cam.F = vnorm(vlerp(POV.cam.F, tgt.F, k)); POV.cam.U = vnorm(vlerp(POV.cam.U, tgt.U, k));
@@ -2363,7 +2375,22 @@ function povCollect() {
   const seg = (a, b, col, w, al) => { const A = toCam(a), B = toCam(b); list.push({ d: (A.z + B.z) / 2, f: c => segDraw(c, A, B, col, w, al) }); };
   for (const x of [x0, x1]) for (const z of zs) seg(V3(x, 0, z), V3(x, top, z), INK, 2.2, 0.9);
   for (let y = 48; y < top; y += 48) { seg(V3(x0, y, -34), V3(x1, y, -34), GRAPH, 1.2, 0.6); seg(V3(x0, y, 34), V3(x1, y, 34), GRAPH, 1.2, 0.6); seg(V3(x0, y, -34), V3(x0, y, 34), GRAPH, 1.2, 0.6); seg(V3(x1, y, -34), V3(x1, y, 34), GRAPH, 1.2, 0.6); }
-  { const D = [V3(x0 - 8, top, -36), V3(START_X, top, -36), V3(START_X, top, 36), V3(x0 - 8, top, 36)].map(toCam); const d = Math.max(...D.map(q => q.z)); list.push({ d, f: c => { if (polyPath(c, D)) { c.fillStyle = 'rgba(214,176,120,.8)'; c.fill(); c.strokeStyle = INK; c.lineWidth = 2; c.stroke(); } } }); }
+  // Individual deck boards and side rails make the standing viewpoint feel grounded.
+  const deckStart = list.length;
+  for (let x = x0 - 8, i = 0; x < START_X; x += 12, i++) {
+    const end = Math.min(START_X, x + 12);
+    const D = [V3(x, top, -36), V3(end, top, -36), V3(end, top, 36), V3(x, top, 36)].map(toCam);
+    const d = D.reduce((n, p) => n + p.z, 0) / D.length;
+    list.push({ d, f: c => { if (polyPath(c, D)) { c.fillStyle = i % 2 ? '#d6b078' : '#e3c18e'; c.fill(); c.strokeStyle = '#806441'; c.lineWidth = 1.5; c.stroke(); } } });
+    seg(V3(x + 4, top + 0.15, -29), V3(x + 4, top + 0.15, 23), '#a08258', 1, 0.45);
+    for (const z of [-31, 31]) seg(V3(x + 7, top + 0.2, z), V3(x + 8, top + 0.2, z), '#66523c', 2, 0.7);
+  }
+  for (const z of [-36, 36]) {
+    for (const x of [x0, x0 + 32, x1]) seg(V3(x, top, z), V3(x, top + 30, z), '#806441', 5, 1);
+    seg(V3(x0 - 8, top + 30, z), V3(x1 + 4, top + 30, z), '#a07846', 6, 1);
+    seg(V3(x0 - 8, top + 15, z), V3(x1 + 4, top + 15, z), '#a07846', 3, 1);
+  }
+  const deck = POV.t < 0 ? list.splice(deckStart) : null;
   // scenery
   for (const it of POV.scenery) {
     if (it.kind === 'prop') billboard(list, it.x, it.z, c => { c.translate(-it.p.x, -GY); drawProp(c, it.p, it.id); });
@@ -2411,6 +2438,9 @@ function povCollect() {
       } });
     }
   }
+  // While boarding, the deck is in front of the slide mouth. Draw it last so
+  // near-plane board fragments cannot sort behind the long slide polygons.
+  if (deck) list.push({ d: -Infinity, f: c => { deck.sort((a, b) => b.d - a.d); for (const it of deck) it.f(c); } });
   return list;
 }
 function nearestS() {
@@ -2431,12 +2461,17 @@ function povRender(c) {
     const n = Math.min(34, (POV.mph - 16) * 1.1); c.strokeStyle = INK; c.lineWidth = 1.5; c.globalAlpha = 0.28;
     c.beginPath(); for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, r0 = 330 + Math.random() * 260, l = POV.mph * 2.2; c.moveTo(W / 2 + Math.cos(a) * r0, H / 2 + Math.sin(a) * r0); c.lineTo(W / 2 + Math.cos(a) * (r0 + l), H / 2 + Math.sin(a) * (r0 + l)); } c.stroke(); c.globalAlpha = 1;
   }
-  povRider(c);
+  // Legs rise into view as the camera lowers; nothing is seated during the standing beat.
+  const seated = POV.t < 0 ? povBoardingProgress() : 1;
+  if (seated > 0) { c.save(); c.translate(0, (1 - seated) * 280); povRider(c); c.restore(); }
   for (const d of POV.drops) { c.globalAlpha = Math.min(1, d.life) * 0.55; c.fillStyle = 'rgba(160,225,245,.6)'; c.beginPath(); c.ellipse(d.x, d.y, d.r * 0.8, d.r, 0, 0, 7); c.fill(); c.strokeStyle = AQUA_DK; c.lineWidth = 1; c.stroke(); c.fillStyle = '#fff'; c.beginPath(); c.arc(d.x - d.r * 0.3, d.y - d.r * 0.3, d.r * 0.2, 0, 7); c.fill(); }
   c.globalAlpha = 1;
   POV.labels = POV.labels.filter(l => now - l.t0 < 1.4);
   for (const l of POV.labels) { const a = now - l.t0; htext(c, l.text, l.x, l.y - a * 40, 62, l.color, { alpha: Math.min(1, (1.4 - a) * 2), rot: -0.08 }); }
-  if (POV.t < 0 && POV.phase === 'ride') htext(c, POV.t < -0.45 * POV_COMFORT.rate ? 'ready...' : 'GO!', W / 2, 250, 80, RED, { rot: -0.05 });
+  if (POV.t < 0 && POV.phase === 'ride') {
+    const boarding = povBoardingProgress();
+    htext(c, boarding === 0 ? 'take in the view...' : boarding < 1 ? 'settle in...' : 'ready...', W / 2, 150, 38, INK, { rot: -0.025 });
+  }
   if (POV.phase === 'end') povEndFx(c);
   povHud(c);
 }
