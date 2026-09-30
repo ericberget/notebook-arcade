@@ -140,6 +140,8 @@
   @keyframes savedPulse { 0% { background: rgba(44,138,60,.22); } 100% { background: transparent; } }
   #startBtn:disabled { opacity: .6; }
   #startBtn { font-size: 24px; padding: 5px 22px; margin-top: 4px; }
+  #povSend { position: absolute; right: 40px; bottom: 26px; min-height: 48px; padding: 8px 20px; font-size: 27px; color: #fff4d7; background: #49301fcc; border: 0; border-radius: 5px; box-shadow: none; text-decoration: underline; text-underline-offset: 5px; z-index: 5; cursor: pointer; }
+  #povSend:hover, #povSend:focus-visible { background: #342216; outline: 2px solid #f6d55c; outline-offset: 3px; }
   #povEnd { left: 370px; top: 380px; width: 460px; transform: rotate(-1deg); }
   #styleCard { left: 40px; top: 70px; width: 1120px; max-height: 636px; overflow: auto; }
   .stwrap { display: grid; grid-template-columns: 560px 1fr; gap: 22px; margin-top: 10px; align-items: start; }
@@ -301,6 +303,7 @@
     <div class="row" style="margin-top:10px"><button id="miniAgain" class="primary">Play again</button><button id="miniBackEnd">Back to the park</button></div>
   </div>
   <div id="povBar" class="bar" hidden><button id="povBack">&larr; Back</button><div class="order"><b id="povTitle">Ride</b><br>Drag to look around</div></div>
+  <button id="povSend" hidden>Send it</button>
   <div id="povEnd" class="card" hidden>
     <div class="eyebrow" id="povEndEyebrow">You rode</div><h2 id="povEndName"></h2><div class="stars" id="povEndStars"></div>
     <div class="stats" id="povEndStats"></div>
@@ -2205,6 +2208,7 @@ function openPOV({ kit, T, sim, name, stars, from, style = null }) {
   POV.style = style;
   POV.on = true; POV.from = from; POV.kit = kit; POV.T = T; POV.sim = sim; POV.name = name; POV.stars = stars;
   POV.t = -POV_COMFORT.readySeconds * POV_COMFORT.rate; POV.phase = 'ride'; POV.endT = sim.frames[sim.frames.length - 1].t; POV.cam = null; POV.fired = 0; POV.labels = []; POV.drops = []; POV.lastZ = 0; POV.shake = 0;
+  POV.waiting = true; $('#povSend').hidden = false;
   POV.float = null; POV.endShown = false;
   POV.look = { yaw: 0, pitch: 0, ty: 0, tp: 0 }; POV.rgb = hexRgb(rideColor(kit, style));
   POV.reportWasOpen = !$('#report').hidden; $('#report').hidden = true; $('#toast').classList.remove('on');
@@ -2213,6 +2217,7 @@ function openPOV({ kit, T, sim, name, stars, from, style = null }) {
   showScene('pov'); SFX.pop();
 }
 function closePOV() {
+  POV.waiting = false; $('#povSend').hidden = true;
   POV.on = false; SFX.ride(0, 0); $('#povEnd').hidden = true;
   showScene(POV.from);
   if (POV.from === 'ws' && POV.reportWasOpen) $('#report').hidden = false;
@@ -2227,6 +2232,11 @@ function povScenery(kit) {
 }
 
 // ----- camera -----
+function povSend() {
+  if (!POV.on || !POV.waiting) return;
+  POV.waiting = false; $('#povSend').hidden = true;
+  POV.t = -(POV_COMFORT.readySeconds - 1.5) * POV_COMFORT.rate;
+}
 function povBoardingProgress() {
   const elapsed = POV_COMFORT.readySeconds + POV.t / POV_COMFORT.rate;
   return smoothstep(1.5, 3.1, elapsed);
@@ -2254,7 +2264,7 @@ function povTargetCam(t) {
 }
 function povUpdate(dt) {
   if (POV.phase === 'ride') {
-    POV.t += dt * POV_COMFORT.rate;
+    if (!POV.waiting) POV.t += dt * POV_COMFORT.rate;
     const tc = POV.t < 0 ? 0 : Math.min(POV.t, POV.endT);
     const seat = povTargetCam(tc), tgt = POV.t < 0 ? povBoardingCam(seat) : seat;
     if (!POV.cam) POV.cam = { C: tgt.C, F: tgt.F, U: tgt.U };
@@ -2373,6 +2383,17 @@ function povCollect() {
   // tower
   const top = kit.towerH, x0 = TOWER_X0, x1 = TOWER_X1, zs = [-34, 34];
   const seg = (a, b, col, w, al) => { const A = toCam(a), B = toCam(b); list.push({ d: (A.z + B.z) / 2, f: c => segDraw(c, A, B, col, w, al) }); };
+  const face = (pts, color, outline = null) => {
+    const q = pts.map(toCam), d = q.reduce((sum, p) => sum + p.z, 0) / q.length;
+    list.push({ d, f: c => { if (polyPath(c, q)) { c.fillStyle = color; c.fill(); if (outline) { c.strokeStyle = outline; c.lineWidth = 1; c.stroke(); } } } });
+  };
+  const block = (x, y, z, w, h, depth, colors) => {
+    const a = V3(x-w/2,y,z-depth/2), b = V3(x+w/2,y,z-depth/2), c = V3(x+w/2,y,z+depth/2), d = V3(x-w/2,y,z+depth/2);
+    const up = p => vadd(p,V3(0,h,0));
+    face([a,b,up(b),up(a)],colors[0]); face([b,c,up(c),up(b)],colors[1]);
+    face([c,d,up(d),up(c)],colors[1]); face([d,a,up(a),up(d)],colors[0]);
+    face([up(a),up(b),up(c),up(d)],colors[2]);
+  };
   for (const x of [x0, x1]) for (const z of zs) seg(V3(x, 0, z), V3(x, top, z), INK, 2.2, 0.9);
   for (let y = 48; y < top; y += 48) { seg(V3(x0, y, -34), V3(x1, y, -34), GRAPH, 1.2, 0.6); seg(V3(x0, y, 34), V3(x1, y, 34), GRAPH, 1.2, 0.6); seg(V3(x0, y, -34), V3(x0, y, 34), GRAPH, 1.2, 0.6); seg(V3(x1, y, -34), V3(x1, y, 34), GRAPH, 1.2, 0.6); }
   // Individual deck boards and side rails make the standing viewpoint feel grounded.
@@ -2386,10 +2407,22 @@ function povCollect() {
     for (const z of [-31, 31]) seg(V3(x + 7, deckTop + 0.2, z), V3(x + 8, deckTop + 0.2, z), '#2d221a', 2.5, 0.9);
   }
   for (const z of [-36, 36]) {
-    for (const x of [x0, x0 + 32, x1]) seg(V3(x, deckTop, z), V3(x, deckTop + 30, z), '#49301f', 12, 1);
+    for (const x of [x0, x0 + 32, x1]) {
+      block(x, deckTop + 0.3, z, 7, 1, 7, ['#55545a','#3e4048','#8b8990']);
+      block(x, deckTop + 1, z, 3.3, 29, 3.3, ['#67452e','#39281d','#98714c']);
+      for (const offset of [-2.5, 2.5]) seg(V3(x-2.5,deckTop+1.4,z+offset),V3(x-1.7,deckTop+1.4,z+offset),'#d1c8af',2,1);
+    }
     seg(V3(x0 - 8, deckTop + 30, z), V3(x1 + 4, deckTop + 30, z), '#543722', 16, 1);
     seg(V3(x0 - 8, deckTop + 15, z), V3(x1 + 4, deckTop + 15, z), '#543722', 9, 1);
   }
+  const shadowStart = list.length;
+  const mouth = povFrame(0);
+  for (let layer = 0; layer < 4; layer++) {
+    const pts = [];
+    for (let i = 0; i < 32; i++) { const a = i / 32 * Math.PI * 2; pts.push(V3(mouth.P.x + 5 + Math.cos(a) * (9-layer), deckTop + 0.4 + layer*0.02, Math.sin(a) * (25-layer))); }
+    face(pts, 'rgba(25,18,13,0.08)');
+  }
+  const shadow = list.splice(shadowStart);
   const deck = POV.t < 0 ? list.splice(deckStart) : null;
   // scenery
   for (const it of POV.scenery) {
@@ -2439,14 +2472,30 @@ function povCollect() {
       } });
     }
   }
+  const rimStart = list.length;
+  if (POV.t < 0 && secs.length && secs[0].s === 0) {
+    const fr = povFrame(0);
+    // Molded front edge: a short return below and behind the open mouth.
+    for (let j = 0; j < NS; j++) {
+      const a = j / NS * Math.PI * (tube ? 2 : 1), b = (j+1) / NS * Math.PI * (tube ? 2 : 1);
+      const point = angle => tube
+        ? vadd(vadd(fr.P,vmul(fr.U,r+Math.sin(angle-Math.PI/2)*r)),vmul(fr.L,Math.cos(angle-Math.PI/2)*r))
+        : vadd(vadd(fr.P,vmul(fr.L,Math.cos(angle)*r)),vmul(fr.U,lipH-Math.sin(angle)*lipH));
+      const A=point(a), B=point(b), offset=vadd(vmul(fr.F,-1.5),vmul(fr.U,-2));
+      face([A,B,vadd(B,offset),vadd(A,offset)], `rgb(${rgb.map(v=>Math.round(v*0.58)).join(',')})`, INK);
+      seg(A,B,'rgba(255,255,235,.65)',2,1);
+    }
+  }
+  const rim = list.splice(rimStart);
   // Keep the deck together behind the raised slide entrance during boarding.
   // Individual near-plane boards otherwise cut through the slide mouth.
   if (deck) {
     const slide = list.splice(slideStart);
     list.push({ d: -Infinity, f: c => {
-      for (const layer of [deck, slide]) { layer.sort((a, b) => b.d - a.d); for (const it of layer) it.f(c); }
+      for (const layer of [deck, shadow, slide, rim]) { layer.sort((a, b) => b.d - a.d); for (const it of layer) it.f(c); }
     } });
   }
+  if (!deck) list.push(...shadow, ...rim);
   return list;
 }
 function nearestS() {
@@ -2474,10 +2523,6 @@ function povRender(c) {
   c.globalAlpha = 1;
   POV.labels = POV.labels.filter(l => now - l.t0 < 1.4);
   for (const l of POV.labels) { const a = now - l.t0; htext(c, l.text, l.x, l.y - a * 40, 62, l.color, { alpha: Math.min(1, (1.4 - a) * 2), rot: -0.08 }); }
-  if (POV.t < 0 && POV.phase === 'ride') {
-    const boarding = povBoardingProgress();
-    htext(c, boarding === 0 ? 'take in the view...' : boarding < 1 ? 'settle in...' : 'ready...', W / 2, 150, 38, INK, { rot: -0.025 });
-  }
   if (POV.phase === 'end') povEndFx(c);
   povHud(c);
 }
@@ -6345,6 +6390,7 @@ $('#seNext').onclick = () => surfStart(SURF.wi + 1);
 $('#seShack').onclick = () => openSurfShack();
 $('#sePark').onclick = () => { SFX.pop(); showScene('park'); };
 $('#smRiderBtn').onclick = () => openTesters();
+$('#povSend').onclick = povSend;
 $('#povBack').onclick = () => { SFX.pop(); closePOV(); };
 $('#povBackEnd').onclick = () => { SFX.pop(); closePOV(); };
 $('#povAgain').onclick = () => povReplay();

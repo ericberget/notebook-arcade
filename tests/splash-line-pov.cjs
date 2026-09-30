@@ -40,6 +40,13 @@ vm.runInContext([
      for (let i = 0; i < 89; i++) tick(1 / 60);
      assert(POV.t < 0, 'holds at the top before sitting');
      assert.deepEqual(POV.cam.C, start, 'standing viewpoint stays steady');
+     tick(10);
+     assert.deepEqual(POV.cam.C, start, 'waits indefinitely for Send it');
+     assert.equal(POV.waiting, true);
+     povSend();
+     const launchTime = POV.t; povSend();
+     assert.equal(POV.t, launchTime, 'double activation does not restart boarding');
+     assert.equal(POV.waiting, false);
      const before = POV.t;
      for (let i = 0; i < 60; i++) tick(1 / 60);
      assert(Math.abs(POV.t - before - 0.6) < 1e-8, 'one second advances 0.6 seconds of ride');
@@ -69,7 +76,7 @@ vm.runInContext([
    for (const outcome of ['stuck', 'crash', 'gone']) {
      const sim = { ...POV.sim, stats: { ...POV.sim.stats, outcome } };
      openPOV({ kit: POV.kit, T: POV.T, sim, name: outcome, stars: 0, from: 'park' });
-     POV.t = POV.endT; tick(0.1);
+     povSend(); POV.t = POV.endT; tick(0.1);
      assert.equal(POV.phase, 'end'); assert.equal(POV.float, null);
      const before = shown;
      for (let i = 0; i < 28; i++) tick(0.05);
@@ -80,6 +87,7 @@ vm.runInContext([
    // Re-entering a ride clears its ending and countdown; leaving cannot show stale results.
    openPOV({ kit: POV.kit, T: POV.T, sim: POV.sim, name: 'Replay', stars: 0, from: 'park' });
    assert.equal(POV.float, null); assert.equal(POV.endShown, false);
+   assert.equal(POV.waiting, true, 'replay waits for Send it again');
    assert(POV.t < 0); assert.equal(POV.phase, 'ride');
    console.log('PASS: all ' + KITS.length + ' slide kits; slower playback, launch pause, finite cameras, ' + splashes + ' floating splashdowns, result timing, replay reset, unchanged simulation.');`
 ].join('\n'), context);
