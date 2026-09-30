@@ -2650,9 +2650,9 @@ function povEndFx(c) {
   }
 }
 function povHud(c) {
-  c.fillStyle = 'rgba(255,243,176,.92)'; c.save(); c.translate(128, 598); c.rotate(-0.02); c.fillRect(0, 0, 230, 98); c.restore();
-  htext(c, `${Math.round(POV.mph || 0)} mph`, 142, 652, 56, INK, { align: 'left' });
-  htext(c, `${Math.max(0, POV.g || 0).toFixed(1)} g${POV.air ? '  ·  in the air!' : ''}`, 146, 684, 20, GRAPH, { font: 'Patrick', align: 'left' });
+  c.fillStyle = 'rgba(255,243,176,.92)'; c.save(); c.translate(128, 636); c.rotate(-0.02); c.fillRect(0, 0, 138, 60); c.restore();
+  htext(c, `${Math.round(POV.mph || 0)} mph`, 138, 669, 34, INK, { align: 'left' });
+  htext(c, `${Math.max(0, POV.g || 0).toFixed(1)} g${POV.air ? ' · air' : ''}`, 140, 689, 15, GRAPH, { font: 'Patrick', align: 'left' });
   // mini side view
   const mx = W - 262, my = 70, mw = 240, mh = 132, s = Math.min(mw / 1090, mh / 620);
   c.fillStyle = 'rgba(255,253,245,.92)'; c.fillRect(mx, my, mw, mh); c.strokeStyle = INK; c.lineWidth = 1.2; c.strokeRect(mx, my, mw, mh);
