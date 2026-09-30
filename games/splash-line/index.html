@@ -2381,6 +2381,17 @@ function billboard(list, x, z, draw) {
   if (a.x < -400 || a.x > W + 400 || a.y < -400 || a.y > H + 500) return;
   list.push({ d: q.z, f: c => { c.save(); c.translate(a.x, a.y); c.rotate(rot); c.scale(k, k); draw(c); c.restore(); } });
 }
+// Clip a world-space surface at the platform height before drawing it over wood.
+function povAboveDeck(points, height) {
+  const out = [];
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i], b = points[(i + 1) % points.length];
+    const insideA = a.y >= height, insideB = b.y >= height;
+    if (insideA) out.push(a);
+    if (insideA !== insideB) out.push(vlerp(a, b, (height - a.y) / (b.y - a.y)));
+  }
+  return out;
+}
 function povCollect() {
   const list = [], kit = POV.kit, T = POV.T, rgb = POV.rgb;
   // tower
@@ -2400,12 +2411,13 @@ function povCollect() {
   for (const x of [x0, x1]) for (const z of zs) seg(V3(x, 0, z), V3(x, top, z), INK, 2.2, 0.9);
   for (let y = 48; y < top; y += 48) { seg(V3(x0, y, -34), V3(x1, y, -34), GRAPH, 1.2, 0.6); seg(V3(x0, y, 34), V3(x1, y, 34), GRAPH, 1.2, 0.6); seg(V3(x0, y, -34), V3(x0, y, 34), GRAPH, 1.2, 0.6); seg(V3(x1, y, -34), V3(x1, y, 34), GRAPH, 1.2, 0.6); }
   // Individual deck boards and side rails make the standing viewpoint feel grounded.
-  const deckStart = list.length, deckTop = top - 7, deckEnd = START_X;
+  const deckStart = list.length, deckTop = top - 7, deckEnd = START_X - 12;
   for (let x = x0 - 8, i = 0; x < deckEnd; x += 12, i++) {
     const end = Math.min(deckEnd, x + 12);
     const D = [V3(x, deckTop, -36), V3(end, deckTop, -36), V3(end, deckTop, 36), V3(x, deckTop, 36)].map(toCam);
     const d = D.reduce((n, p) => n + p.z, 0) / D.length;
-    list.push({ d, f: c => { if (polyPath(c, D)) { c.fillStyle = i % 2 ? '#67452e' : '#795339'; c.fill(); c.strokeStyle = '#39281d'; c.lineWidth = 2; c.stroke(); } } });
+    list.push({ d, f: c => { if (polyPath(c, D)) { c.fillStyle = i % 2 ? '#67452e' : '#795339'; c.fill(); } } });
+    seg(V3(x, deckTop + 0.05, -36), V3(x, deckTop + 0.05, 36), '#39281d', 1.5, 1);
     seg(V3(x + 4, deckTop + 0.15, -29), V3(x + 4, deckTop + 0.15, 23), '#ac8057', 1.4, 0.65);
     for (const z of [-31, 31]) seg(V3(x + 7, deckTop + 0.2, z), V3(x + 8, deckTop + 0.2, z), '#2d221a', 2.5, 0.9);
   }
@@ -2435,18 +2447,18 @@ function povCollect() {
     else if (it.kind === 'lou') billboard(list, it.x, it.z, c => { c.translate(-it.x, -GY); drawLou(c, it.x, now); });
   }
   // the slide, as rings of quads
-  const slideStart = list.length;
+  const raisedSlide = [];
   const sC = POV.cam ? clamp(nearestS(), 0, T.L) : 0, tube = kit.tube, NS = tube ? 12 : 8, r = tube ? 20 : 22, lipH = r * 0.65;
   const secs = [];
   for (let s = Math.max(0, sC - 500); s <= T.L; ) {
-    const fr = povFrame(s), ring = [];
+    const fr = povFrame(s), ring = [], world = [];
     for (let j = 0; j <= NS; j++) {
       const a = tube ? j / NS * Math.PI * 2 : j / NS * Math.PI;
       const w = tube ? vadd(vadd(fr.P, vmul(fr.U, r + Math.sin(a - Math.PI / 2) * r)), vmul(fr.L, Math.cos(a - Math.PI / 2) * r))
         : vadd(vadd(fr.P, vmul(fr.L, Math.cos(a) * r)), vmul(fr.U, lipH - Math.sin(a) * lipH));
-      ring.push(toCam(w));
+      ring.push(toCam(w)); world.push(w);
     }
-    secs.push({ s, ring, U: fr.U, L: fr.L });
+    secs.push({ s, ring, world, U: fr.U, L: fr.L });
     if (s >= T.L) break;
     s = Math.min(T.L, s + 5 + Math.abs(s - sC) * 0.018);
     if (s - sC > 2400) break;
@@ -2464,15 +2476,22 @@ function povCollect() {
       const floor = tube ? (j === 0 || j === NS - 1) : (j === 3 || j === 4);
       const band = floor && ((Math.floor(A.s / 18 - now * 5) & 1) === 0);
       const rb = POV.style && POV.style.paint === 'rainbow';
-      const col = floor ? (band ? 'rgba(210,244,252,.95)' : 'rgba(120,212,236,.95)') : rb ? `hsla(${(A.s * 0.35) % 360},80%,${Math.round(48 + lit * 14)}%,${tube ? 0.16 : 0.95})` : `rgba(${Math.min(255, rgb[0] * lit + 40) | 0},${Math.min(255, rgb[1] * lit + 40) | 0},${Math.min(255, rgb[2] * lit + 40) | 0},${tube ? 0.13 : 0.95})`;
+      const col = floor ? (band ? 'rgba(210,244,252,1)' : 'rgba(120,212,236,1)') : rb ? `hsla(${(A.s * 0.35) % 360},80%,${Math.round(48 + lit * 14)}%,${tube ? 0.16 : 1})` : `rgba(${Math.min(255, rgb[0] * lit + 40) | 0},${Math.min(255, rgb[1] * lit + 40) | 0},${Math.min(255, rgb[2] * lit + 40) | 0},${tube ? 0.13 : 1})`;
       const lip = !tube && (j === 0 || j === NS - 1);
-      list.push({ d, f: c => {
+      const surface = { d, f: c => {
         if (!polyPath(c, q)) return;
         if (!tube || floor || d > 45) { c.fillStyle = col; c.fill(); }
         if (lip) { const e = j === 0 ? [q[0], q[3]] : [q[1], q[2]]; segDraw(c, e[0], e[1], INK, clamp(900 / d, 1, 4), 0.95); }
         if (rib) segDraw(c, q[0], q[1], INK, clamp(500 / d, 0.6, tube ? 3 : 2.4), tube ? 0.75 : 0.35);
         if (tube && (j === 0 || j === 6)) segDraw(c, q[0], q[3], INK, clamp(500 / d, 0.6, 2.2), 0.5);
-      } });
+      } };
+      list.push(surface);
+      if (deck) {
+        const above = povAboveDeck([A.world[j], A.world[j + 1], B.world[j + 1], B.world[j]], deckTop).map(toCam);
+        if (above.length >= 3) raisedSlide.push({ d, f: c => {
+          c.save(); if (polyPath(c, above)) { c.clip(); surface.f(c); } c.restore();
+        } });
+      }
     }
   }
   const rimStart = list.length;
@@ -2493,9 +2512,14 @@ function povCollect() {
   // Keep the deck together behind the raised slide entrance during boarding.
   // Individual near-plane boards otherwise cut through the slide mouth.
   if (deck) {
-    const slide = list.splice(slideStart);
+    const footprint = [V3(x0-8,deckTop,-36),V3(deckEnd,deckTop,-36),V3(deckEnd,deckTop,36),V3(x0-8,deckTop,36)].map(toCam);
     list.push({ d: -Infinity, f: c => {
-      for (const layer of [deck, shadow, slide, rim]) { layer.sort((a, b) => b.d - a.d); for (const it of layer) it.f(c); }
+      for (const layer of [deck, shadow]) { layer.sort((a, b) => b.d - a.d); for (const it of layer) it.f(c); }
+      // Restore only surfaces physically above the boards, within their footprint.
+      c.save();
+      if (polyPath(c, footprint)) { c.clip(); raisedSlide.sort((a,b) => b.d-a.d); for (const it of raisedSlide) it.f(c); }
+      c.restore();
+      rim.sort((a,b) => b.d-a.d); for (const it of rim) it.f(c);
     } });
   }
   if (!deck) list.push(...shadow, ...rim);

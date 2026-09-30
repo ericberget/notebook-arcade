@@ -15,6 +15,7 @@ vm.runInContext([
   section('const GY =', '// ---------- stage & canvas'),
   section('function crPts(', 'function propsFor('),
   section('const V3 =', 'function clipPoly('),
+  section('// Clip a world-space surface', 'function povCollect()'),
   `let povSplashes = 0;
    const SFX = new Proxy({}, { get: (_, key) => () => { if (key === "povSplash") povSplashes++; } });
    let scene = 'pov', shown = 0;
@@ -28,6 +29,13 @@ vm.runInContext([
        assert(Object.values(v).every(Number.isFinite), 'camera remains finite');
      assert(Math.abs(vdot(POV.cam.F, POV.cam.U)) < 1e-8, 'camera stays orthogonal');
    }
+   const crossing = [V3(0,2,0),V3(1,2,0),V3(1,-2,0),V3(0,-2,0)];
+   const clipped = povAboveDeck(crossing, 0);
+   assert.equal(clipped.length, 4);
+   assert(clipped.every(p => p.y >= 0), 'foreground slide never includes geometry below the deck');
+   assert.equal(clipped.filter(p => p.y === 0).length, 2, 'crossing faces meet the deck exactly');
+   assert.equal(povAboveDeck(crossing, 3).length, 0, 'entirely hidden faces stay behind wood');
+   assert.deepEqual(povAboveDeck(crossing, -3), crossing, 'raised entrance is preserved');
    let splashes = 0;
    for (const kit of KITS) {
      const T = buildTrack([crPts([[START_X, towerTop(kit)], ...EXAMPLES[kit.id]])], kit);
