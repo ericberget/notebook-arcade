@@ -128,7 +128,8 @@
   #lotCard { width: 420px; }
   #welcome { position: absolute; left: 404px; top: 412px; width: 392px; box-sizing: border-box; padding: 14px 20px 16px; background: var(--card); box-shadow: 3px 8px 22px var(--shadow); transform: rotate(-1.2deg); display: grid; gap: 8px; justify-items: start; }
   #welcome::before { content: ''; position: absolute; left: 50%; top: -10px; width: 70px; height: 20px; translate: -50% 0; background: rgba(246,213,92,.55); transform: rotate(2deg); }
-  #nameLabel { font-family: Caveat, cursive; font-size: 32px; color: var(--red); line-height: 1; }
+  #nameLabel, #welcomeBack { font-family: Caveat, cursive; font-size: 32px; color: var(--red); line-height: 1; }
+  #savedParkName { font-family: Caveat, cursive; font-size: 34px; line-height: 1.15; overflow-wrap: anywhere; }
   #welcome .row { width: 100%; flex-wrap: nowrap; }
   #welcome input { font-size: 34px; }
   #saveNote { font-size: 16px; color: var(--graphite); line-height: 1.3; }
@@ -138,7 +139,6 @@
   #savedTag.pulse { animation: savedPulse 1.6s ease; }
   @keyframes savedPulse { 0% { background: rgba(44,138,60,.22); } 100% { background: transparent; } }
   #startBtn:disabled { opacity: .6; }
-  #parkDice { font-size: 22px; padding: 4px 8px; line-height: 1; }
   #startBtn { font-size: 24px; padding: 5px 22px; margin-top: 4px; }
   #povEnd { left: 370px; top: 380px; width: 460px; transform: rotate(-1deg); }
   #styleCard { left: 40px; top: 70px; width: 1120px; max-height: 636px; overflow: auto; }
@@ -223,6 +223,7 @@
   #rotate { position: fixed; left: 16px; right: 16px; bottom: 16px; text-align: center; color: #5a5040; font-size: 18px; }
   @media (prefers-reduced-motion: reduce) { .stamp.go, .shake, .tickets.bump { animation: none; } }
 </style>
+<link rel="stylesheet" href="mobile.css">
 </head>
 <body>
 <div id="wrap"><div id="stage">
@@ -308,9 +309,11 @@
   <div id="stickers" class="card" hidden><div class="row" style="justify-content:space-between;align-items:flex-start"><div><div class="eyebrow">Your park</div><h2>Sticker book</h2></div><button id="stickerClose">Close</button></div><p id="stickerCount"></p><div id="stickerGrid"></div></div>
   <div id="stickerPop" hidden><canvas width="200" height="200"></canvas><div><small>New sticker!</small><b></b><span></span></div></div>
   <div id="welcome" hidden>
+    <div id="welcomeBack" hidden>Welcome back to</div>
+    <div id="savedParkName" hidden></div>
     <label for="parkName" id="nameLabel">First, name your park</label>
-    <div class="row nowrap"><input type="text" id="parkName" maxlength="28" autocomplete="off" placeholder="My Water Park"><button id="parkDice" class="icon-btn" title="Random name" aria-label="Random park name">&#127922;</button></div>
-    <button id="startBtn" class="primary">Open the gates!</button>
+    <div class="row nowrap" id="parkNameEntry"><input type="text" id="parkName" maxlength="28" autocomplete="off" placeholder="My Water Park"></div>
+    <button id="startBtn" class="primary">Create my park</button>
     <div id="saveNote"></div>
   </div>
 
@@ -694,6 +697,15 @@ let now = 0, frameN = 0;
 
 // ---------- stage & canvas ----------
 const stage = $('#stage'), cv = $('#c'), ctx = cv.getContext('2d');
+// Keep game coordinates stable while phone controls live outside the scaled paper.
+const mobileUI = document.createElement('div'); mobileUI.id = 'mobileUI'; $('#wrap').append(mobileUI);
+const stageControls = [...stage.children].filter(el => el.id !== 'c' && el.id !== 'binding');
+let phoneLayout = false;
+function layoutControls(phone) {
+  if (phone === phoneLayout) return;
+  phoneLayout = phone; document.body.classList.toggle('phone', phone);
+  for (const el of stageControls) (phone ? mobileUI : stage).append(el);
+}
 let SC = 1, K = 0;
 const paper = document.createElement('canvas');
 const rideCache = new Map();
@@ -707,15 +719,24 @@ function drawPaper() {
   p.strokeStyle = 'rgba(220,90,90,.55)'; p.lineWidth = 1.5; p.beginPath(); p.moveTo(110.5, 0); p.lineTo(110.5, H); p.stroke();
 }
 function fit() {
-  const vw = innerWidth, vh = innerHeight;
-  const rim = vw < 820 || vh < 520 ? 6 : 34, bind = 46;
-  SC = Math.min((vw - rim * 2) / (W + bind), (vh - rim * 2) / H);
+  const vw = document.documentElement.clientWidth, vh = window.visualViewport ? window.visualViewport.height : innerHeight;
+  layoutControls(vw <= 1000 && (vw < 760 || vh < 600 || matchMedia('(pointer: coarse)').matches));
+  document.body.dataset.scene = scene;
+  document.documentElement.style.setProperty('--view-height', `${vh}px`);
+  const rim = phoneLayout ? 6 : 34, bind = phoneLayout ? 0 : 46;
+  const sideTools = phoneLayout && scene === 'ws' && vw > vh;
+  const left = sideTools ? 116 : 0;
+  const top = phoneLayout ? (scene === 'ws' && !sideTools ? 110 : 62) : 0;
+  const bottom = phoneLayout ? (scene === 'park' || (scene === 'ws' && !sideTools) ? 72 : 12) : 0;
+  const room = Math.max(80, vh - top - bottom);
+  SC = Math.min((vw - left - rim * 2) / (W + bind), (room - rim * 2) / H);
   stage.style.transform = `scale(${SC})`;
-  stage.style.left = ((vw - (W + bind) * SC) / 2 + bind * SC) + 'px';
-  stage.style.top = Math.max(0, (vh - H * SC) / 2) + 'px';
+  stage.style.left = (left + (vw - left - (W + bind) * SC) / 2 + bind * SC) + 'px';
+  stage.style.top = Math.max(0, phoneLayout && scene === 'title' && vh > vw ? 80 : top + (room - H * SC) / 2) + 'px';
   const nk = clamp((devicePixelRatio || 1) * SC, 1, 2.5);
   if (Math.abs(nk - K) > 0.05) { K = nk; cv.width = Math.round(W * K); cv.height = Math.round(H * K); drawPaper(); rideCache.clear(); }
-  $('#rotate').hidden = !(vh > vw * 1.15 && vw < 760);
+  $('#rotate').hidden = !(phoneLayout && vh > vw * 1.15 && scene === 'ws');
+  $('#rotate').textContent = 'Turn sideways for more drawing room. You can keep drawing here, too.';
 }
 function toStage(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; }
 
@@ -1433,8 +1454,9 @@ function wsDown(p) {
   if (!$('#report').hidden) return;
   const end = wsEndPt(), st = wsStartPt();
   let from = null;
-  if (!end) { if (Math.hypot(p.x - st.x, p.y - st.y) < 60 || (p.x > TOWER_X0 - 20 && p.x < START_X + 30 && Math.abs(p.y - st.y) < 40)) from = st; }
-  else if (Math.hypot(p.x - end.x, p.y - end.y) < 60) from = end;
+  const grabRadius = phoneLayout ? Math.max(60, 24 / SC) : 60;
+  if (!end) { if (Math.hypot(p.x - st.x, p.y - st.y) < grabRadius || (p.x > TOWER_X0 - 20 && p.x < START_X + 30 && Math.abs(p.y - st.y) < 40)) from = st; }
+  else if (Math.hypot(p.x - end.x, p.y - end.y) < grabRadius) from = end;
   if (!from) { toast(end ? 'Keep drawing from the end of your slide (the blue dot).' : 'Start at the yellow circle on top of the tower.'); WS.hintPulse = now; return; }
   WS.marks = []; WS.play = null; SFX.ride(0, 0);
   WS.cur = [{ x: from.x, y: from.y }];
@@ -1951,8 +1973,8 @@ function drawRiverBand(c, a, b) {
 }
 function drawPark(c) {
   const cam = PARK.camX;
-  c.save(); c.globalAlpha = 1 - lifeNight();
-  if (lifeNight() < 0.5) {
+  c.save();
+  {
   const sx = 1010 - cam * 0.06; c.fillStyle = 'rgba(246,213,92,.5)'; c.beginPath(); c.arc(sx, 150, 26, 0, 7); c.fill(); jcircle(c, sx, 150, 27, 40, '#c9a227', 1.6);
   for (let k = 0; k < 10; k++) { const a = k / 10 * 6.28 + now * 0.1; jline(c, sx + Math.cos(a) * 34, 150 + Math.sin(a) * 34, sx + Math.cos(a) * 44, 150 + Math.sin(a) * 44, 50 + k, '#c9a227', 1.4, 1); }
   }
@@ -1961,7 +1983,6 @@ function drawPark(c) {
   drawSkyLife(c, cam, state.owned.banner ? state.name : null); drawFireworks(c);
   for (let i = 0; i < 8; i++) { const span = PW * 0.35 + 1500, wx = i * 520 + now * 5; const x = ((wx - cam * 0.35) % span + span) % span - 200; drawCloud(c, x, 120 + rnd(i) * 150, 0.9 + rnd(i + 4) * 0.5, i); }
   drawParkWorld(c, cam, W);
-  lifeDrawNight(c, cam);
   drawMinimap(c);
 }
 // the park itself (ground, rides, guests), seen from camera x = cam across viewW pixels of park
@@ -1986,7 +2007,7 @@ function drawParkWorld(c, cam, viewW) {
     lifeDrawGuest(c, g, p);
     if (g.bubble && now - g.bubble.t0 < 1.6) { c.fillStyle = '#fff'; c.strokeStyle = INK; c.lineWidth = 1.2; c.beginPath(); c.ellipse(p.x + 10, p.y - 34, 11, 9, 0, 0, 7); c.fill(); c.stroke(); htext(c, g.bubble.text, p.x + 10, p.y - 28, 17, g.bubble.text === '?' ? GRAPH : RED); }
   }
-  drawMascot(c); lifeDrawWorld(c);
+  drawMascot(c);
   for (const p of PARK.parts) {
     c.globalAlpha = Math.min(1, p.life * 2); c.fillStyle = p.c;
     if (p.conf) { c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.fillRect(-4, -2, 8, 4); c.restore(); } else { c.beginPath(); c.arc(p.x, p.y, 2, 0, 7); c.fill(); }
@@ -2071,7 +2092,7 @@ function drawFence(c, a, b) {
   jline(c, a - 4, TGY - 30, b + 4, TGY - 30, a + 3, GRAPH, 1.4, 1); jline(c, a - 4, TGY - 12, b + 4, TGY - 12, a + 5, GRAPH, 1.4, 1);
 }
 function drawTitle(c) {
-  const name = ($('#parkName').value.trim() || state.name || 'My Water Park').slice(0, 28);
+  const name = (state.welcomed ? state.name : ($('#parkName').value.trim() || state.name || 'My Water Park')).slice(0, 28);
   // sky
   c.fillStyle = 'rgba(246,213,92,.5)'; c.beginPath(); c.arc(1030, 118, 30, 0, 7); c.fill(); jcircle(c, 1030, 118, 31, 40, '#c9a227', 1.6);
   for (let k = 0; k < 10; k++) { const a = k / 10 * 6.28 + now * 0.1; jline(c, 1030 + Math.cos(a) * 39, 118 + Math.sin(a) * 39, 1030 + Math.cos(a) * 50, 118 + Math.sin(a) * 50, 50 + k, '#c9a227', 1.4, 1); }
@@ -2116,7 +2137,7 @@ function renderTitle(c) {
 function openGates() {
   if (TITLE.zoomAt) return;
   SFX.resume();
-  const v = $('#parkName').value.trim().slice(0, 28);
+  const v = state.welcomed ? state.name : $('#parkName').value.trim().slice(0, 28);
   state.name = v || state.name; TITLE.first = !state.welcomed; state.welcomed = true; save();
   $('#welcome').hidden = true; $('#titleBar').hidden = true;
   TITLE.zoomAt = now || 0.001; SFX.fanfare();
@@ -4030,44 +4051,11 @@ MINI_DRAW.float = function (c, d) {
   if (now - d.splashT < 0.4) { c.fillStyle = `rgba(200,236,248,${0.5 - (now - d.splashT)})`; c.fillRect(0, 0, W, H); }
 };
 
-// ---------- park life: guest thoughts, a celebrity in disguise, the suggestion box, day and night ----------
-const LIFE = { clock: 40, nextVip: 35, nextCeleb: 70, raccoons: [], nextRaccoon: 0, lastNight: 0 };
-const DAY_LEN = 300, NIGHT_AT = 215, NIGHT_LEN = 85;   // seconds: day, then dusk into night, then dawn
+// ---------- park life: celebrities and guest requests ----------
+const LIFE = { nextVip: 35, nextCeleb: 70 };
 const CELEBS = [['DJ Cannonball', 'the famous DJ'], ['Dolly Driftwood', 'the movie star'], ['Skip Splashington', 'the Olympic swimmer'], ['Penny Puddles', 'the pop singer'], ['Captain Kickflip', 'the skateboarder'], ['Barry Buoyant', 'the TV chef']];
-const BOX_X = 392;   // suggestion box by the main gate (park x)
-
-// ----- what guests are thinking -----
-function guestThought(g) {
-  const want = {
-    snack: "I'm starving. Is there a snack shack?", hottub: 'My back hurts. A hot tub would be nice.', fountain: "It's so hot. I want to run through fountains.",
-    volley: 'Anyone want to play volleyball? ...Oh. There is no court.', gift: 'I want a souvenir for my grandma.', river: 'I wish I could just float for a while.',
-    wave: 'Where are the waves? I brought my boogie board.', surf: 'I want to SURF!',
-  };
-  const missing = TIER1.filter(k => !state.owned[k]);
-  if (missing.length && Math.random() < 0.45) return want[pick(missing)];
-  const q = qkData(), L = [];
-  if (state.rides.length) { const r = pick(state.rides); L.push(`I want to ride ${r.name} again!`, `${r.name} made my tummy do a flip.`, `I screamed so loud on ${r.name}.`); }
-  if (!state.rides.length) L.push('When do the water slides open?', 'This water park needs... water slides.');
-  if (state.owned.snack) L.push('That hot dog had 47 pickles.', 'Is it lunch yet? It feels like lunch.');
-  if (state.owned.mascot && q.mood === 'upset') L.push('Why does the duck look so mad?');
-  if (q.quit) L.push('Why is there a goose? Where did the duck go?', 'The goose honked at me. I think we are friends now.');
-  if (state.owned.mascot && q.raises > 0) L.push('That duck has sunglasses now. Iconic.');
-  if (state.owned.volley) L.push('The pencils beat me at volleyball. PENCILS.');
-  if (state.owned.river) L.push('I tried to float all the way around. I fell asleep twice.');
-  if ((state.palms || 0) < 2) L.push('This place needs more palm trees.');
-  if (state.owned.balloon) L.push('I waved at someone in the hot air balloon!');
-  if (TIER2.some(k => !state.owned[k]) && tier2Open()) L.push('What are they building under those tarps?');
-  if (TIER2.some(k => isMystery(k))) L.push('Something is hiding under those tarps...');
-  if (lifeNight() > 0.5) L.push('Is it safe to swim in the dark?', 'I think I saw a raccoon on the slide.');
-  L.push('I lost my flip-flop.', 'My sunscreen is SPF 100. I am basically a ghost.', "I've been here since Tuesday.", 'Ten out of ten. Would splash again.', "My mom says I'm getting pruney.", 'A seagull took my sandwich. Just took it.', 'I can do a cannonball. Want to see? ...Later.', 'I am NOT tired. *yawn*');
-  return pick(L);
-}
 function lifeTap(p) {
   const wx = p.x + PARK.camX, y = p.y;
-  // suggestion box
-  if (Math.abs(wx - BOX_X) < 26 && y > PG - 56 && y < PG + 10) { openSuggestionBox(); return true; }
-  // raccoons at night
-  for (const r of LIFE.raccoons) if (!r.run && Math.abs(wx - r.x) < 26 && Math.abs(y - (LANE - 8)) < 26) { r.run = true; r.vx = (r.vx > 0 ? 1 : -1) * 320; setTickets(state.tickets + 2); PARK.popups.push({ text: '+2', x: r.x, y: LANE - 30, t0: now }); SFX.voice('squeak'); stickerGet('raccoon'); return true; }
   // guests
   let best = null, bd = 30;
   for (const g of PARK.guests) {
@@ -4078,9 +4066,7 @@ function lifeTap(p) {
   if (!best) return false;
   if (best.celeb && !best.celeb.revealed) { revealCeleb(best); return true; }
   if (best.vip) { openVip(best); return true; }
-  best.thought = { text: best.celeb ? "Shh! Please, no photos." : guestThought(best), t0: now }; SFX.voice('beep');
-  state.thoughtsRead = (state.thoughtsRead || 0) + 1; if (state.thoughtsRead >= 10) stickerGet('mindreader');
-  return true;
+  return false;
 }
 function lifeDrawThought(c, g, x, y) {
   const t = g.thought; if (!t || now - t.t0 > 4) return;
@@ -4126,106 +4112,13 @@ function lifeDrawGuest(c, g, p) {
   if (g.thought) lifeDrawThought(c, g, p.x, p.y);
 }
 
-// ----- the suggestion box -----
-const NOTES = [
-  'Make the water less wet.', 'More ducks. That is my whole suggestion. More ducks.', 'Please build a slide that goes to the moon.',
-  'Tap Quackers five times, really fast. Trust me. -anonymous', 'Somebody in a trench coat tipped my cousin 15 tickets!',
-  'The waterfall on the lazy river watered down my lemonade. 10/10, would float again.', 'My grandpa is cold. Hot tub please.',
-  'The pencils cheat at volleyball. I have no proof.', 'I got a "MEH." stamp on my slide. RUDE.', 'Build every attraction and something happens under the tarps.',
-  'I left my retainer on the high dive. If you find it, it is mine.', 'Hold the balloon button and yell WEEEE with it. Best day ever.',
-  'Come back after dark. I saw raccoons having a party.', 'Can the snack shack sell pickles on a stick?', 'Your duck mascot should get a raise. Just saying.',
-  'Please put a water slide in the gift shop.', 'The lifeguard said I swim like a fish. A very tired fish.', 'I love this park. Signed, a seagull.',
-];
-function openSuggestionBox() {
-  hidePanels(); SFX.pop();
-  state.notes = state.notes || [];
-  const unread = NOTES.map((_, i) => i).filter(i => !state.notes.includes(i));
-  const i = unread.length ? pick(unread) : Math.floor(Math.random() * NOTES.length), fresh = !state.notes.includes(i);
-  if (fresh) { state.notes.push(i); setTickets(state.tickets + 1); save(); if (state.notes.length >= 8) stickerGet('notes'); }
-  const el = $('#lotCard');
-  el.innerHTML = `<div class="eyebrow">Suggestion box</div><h2>A note from a guest</h2><p class="noteText">"${esc(NOTES[i])}"</p><p style="font-size:16px;color:#4a4a4f">${fresh ? '+1 ticket for reading it. ' : ''}You've read ${state.notes.length} of ${NOTES.length} notes.</p><div class="row"><button class="primary" id="nbNext">Read another</button><button id="nbClose">Close</button></div>`;
-  el.style.left = clamp(BOX_X - PARK.camX - 210, 16, W - 436) + 'px'; el.style.top = '110px'; el.hidden = false;
-  $('#nbNext').onclick = () => openSuggestionBox(); $('#nbClose').onclick = () => { el.hidden = true; };
-}
-function drawSuggestionBox(c) {
-  const x = BOX_X, y = PG;
-  jline(c, x, y, x, y - 30, 3301, '#8a6b4a', 3, 1);
-  c.fillStyle = '#ef476f'; c.strokeStyle = INK; c.lineWidth = 1.6; c.fillRect(x - 17, y - 56, 34, 28); c.strokeRect(x - 17, y - 56, 34, 28);
-  c.fillStyle = '#222'; c.fillRect(x - 9, y - 50, 18, 3);
-  c.fillStyle = '#fff'; c.fillRect(x - 13, y - 44, 26, 12); c.strokeRect(x - 13, y - 44, 26, 12);
-  htext(c, 'IDEAS', x, y - 35, 11, INK, { font: 'Patrick' });
-  const unread = NOTES.length - (state.notes || []).length;
-  if (unread > 0) { const bob = Math.sin(now * 3) * 2; c.fillStyle = '#fffdf5'; c.save(); c.translate(x + 4, y - 60 + bob); c.rotate(0.2); c.fillRect(-6, -8, 12, 10); c.strokeRect(-6, -8, 12, 10); c.restore(); }
-}
-
-// ----- day and night -----
-function lifeNight() {
-  const t = LIFE.clock % DAY_LEN;
-  if (t < NIGHT_AT - 20) return 0;
-  if (t < NIGHT_AT) return (t - (NIGHT_AT - 20)) / 20;
-  if (t < DAY_LEN - 15) return 1;
-  return (DAY_LEN - t) / 15;
-}
 function lifeUpdate(dt) {
-  LIFE.clock += dt;
-  const n = lifeNight();
-  if (n > 0.9 && !LIFE.lastNight) { LIFE.lastNight = 1; toast('Night falls on the park. The lights are on!', 3000); stickerGet('night'); }
-  if (n < 0.1) LIFE.lastNight = 0;
   // celebrities show up now and then
   LIFE.nextCeleb -= dt;
   if (LIFE.nextCeleb <= 0) { LIFE.nextCeleb = 150 + Math.random() * 120; if (state.rides.length && !PARK.guests.some(g => g.celeb && !g.celeb.revealed)) spawnCeleb(); }
   LIFE.nextVip -= dt;
   if (LIFE.nextVip <= 0) { LIFE.nextVip = 70 + Math.random() * 60; if (!state.request && !PARK.guests.some(g => g.vip)) spawnVip(); }
   if (frameN % 45 === 0) { reqCheck(); reqNote(); }
-  // raccoons sneak around at night
-  LIFE.nextRaccoon -= dt;
-  if (n > 0.8 && LIFE.nextRaccoon <= 0 && LIFE.raccoons.length < 3) { LIFE.nextRaccoon = 6 + Math.random() * 8; const fromLeft = Math.random() < 0.5, x = PARK.camX + (fromLeft ? -40 : W + 40); LIFE.raccoons.push({ x, vx: (fromLeft ? 1 : -1) * (70 + Math.random() * 40), ph: Math.random() * 6, loot: pick(['hotdog', 'fries', 'ticket', 'flipflop']) }); }
-  for (const r of LIFE.raccoons) { r.x += r.vx * dt * (n < 0.3 ? 3 : 1); if (r.run) r.vx *= 1 + dt; }
-  LIFE.raccoons = LIFE.raccoons.filter(r => r.x > PARK.camX - 200 && r.x < PARK.camX + W + 200);
-}
-function drawRaccoon(c, r) {
-  const x = r.x, y = LANE - 2, d = r.vx > 0 ? 1 : -1, hop = Math.abs(Math.sin(now * 12 + r.ph)) * 3;
-  c.save(); c.translate(x, y - hop); c.scale(d, 1); c.strokeStyle = INK; c.lineWidth = 1.4;
-  // striped tail
-  c.fillStyle = '#8d8d95'; c.beginPath(); c.ellipse(-20, -10, 10, 5, -0.5, 0, 7); c.fill(); c.stroke();
-  c.strokeStyle = '#444'; c.lineWidth = 2; c.beginPath(); c.moveTo(-24, -15); c.lineTo(-20, -6); c.moveTo(-18, -17); c.lineTo(-14, -9); c.stroke(); c.strokeStyle = INK; c.lineWidth = 1.4;
-  c.fillStyle = '#9a9aa3'; c.beginPath(); c.ellipse(-2, -8, 14, 8, 0, 0, 7); c.fill(); c.stroke();
-  c.beginPath(); c.moveTo(-8, -2); c.lineTo(-9, 2); c.moveTo(6, -2); c.lineTo(7, 2); c.stroke();
-  c.beginPath(); c.arc(12, -13, 7, 0, 7); c.fill(); c.stroke();
-  c.beginPath(); c.moveTo(8, -19); c.lineTo(9, -24); c.lineTo(12, -19); c.fill(); c.stroke();
-  c.fillStyle = '#333'; c.beginPath(); c.ellipse(14, -14, 5, 2.6, 0, 0, 7); c.fill();
-  c.fillStyle = '#fff'; c.beginPath(); c.arc(15, -14, 1.3, 0, 7); c.fill(); c.fillStyle = INK; c.beginPath(); c.arc(19, -12, 1.4, 0, 7); c.fill();
-  // what it stole
-  if (!r.run) {
-    c.save(); c.translate(20, -8); c.lineWidth = 1;
-    if (r.loot === 'hotdog') { c.fillStyle = '#e8b36b'; c.beginPath(); c.ellipse(0, 0, 7, 3, 0, 0, 7); c.fill(); c.stroke(); c.fillStyle = '#c0504d'; c.fillRect(-6, -2, 12, 2.4); }
-    else if (r.loot === 'fries') { c.fillStyle = '#ef476f'; c.fillRect(-3, -3, 7, 7); c.strokeRect(-3, -3, 7, 7); c.fillStyle = '#ffd166'; c.fillRect(-2, -8, 1.6, 5); c.fillRect(1, -9, 1.6, 6); }
-    else if (r.loot === 'ticket') ticketIcon(c, -6, -5, 0.5);
-    else { c.fillStyle = '#4fc3e0'; c.beginPath(); c.ellipse(0, 0, 7, 3, 0.2, 0, 7); c.fill(); c.stroke(); }
-    c.restore();
-  }
-  c.restore();
-  if (r.run) htext(c, '!', x, y - 34, 22, RED);
-}
-function lifeDrawWorld(c) {
-  drawSuggestionBox(c);
-  for (const r of LIFE.raccoons) drawRaccoon(c, r);
-}
-function lifeDrawNight(c, cam) {
-  const n = lifeNight(); if (n <= 0) return;
-  c.save();
-  c.fillStyle = `rgba(18,28,70,${0.5 * n})`; c.fillRect(0, 0, W, H);
-  c.globalAlpha = n;
-  // moon and stars
-  const mx = 1010 - cam * 0.06, my = 160; c.fillStyle = 'rgba(255,246,208,.25)'; c.beginPath(); c.arc(mx, my, 44, 0, 7); c.fill(); c.fillStyle = '#fff6d0'; c.beginPath(); c.arc(mx, my, 28, 0, 7); c.fill(); c.fillStyle = 'rgba(200,190,150,.45)'; for (const [dx, dy, r] of [[-8, -6, 6], [9, 7, 4], [4, -12, 3]]) { c.beginPath(); c.arc(mx + dx, my + dy, r, 0, 7); c.fill(); }
-  for (let i = 0; i < 40; i++) { const sx = ((rnd(i) * 1800 - cam * 0.05) % W + W) % W, sy = 20 + rnd(i + 99) * 260, tw = 0.5 + 0.5 * Math.sin(now * 3 + i); c.fillStyle = `rgba(255,255,230,${0.4 + tw * 0.6})`; c.beginPath(); c.arc(sx, sy, 1.2 + rnd(i + 7) * 1.4, 0, 7); c.fill(); }
-  // warm light from lamps and buildings
-  c.globalCompositeOperation = 'lighter';
-  const glow = (x, y, r, col) => { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); };
-  for (let i = 0; i < (state.lamps || 0); i++) { const x = lampX(i) - cam; if (x > -100 && x < W + 100) glow(x, PG - 30, 90, 'rgba(255,200,90,.45)'); }
-  for (const s of SLOTS) { const x = s.x + s.w / 2 - cam; if (x < -200 || x > W + 200) continue; if ((s.type === 'lot' && state.rides.some(r => r.lot === s.lot)) || (ATTRACTIONS.includes(s.type) && state.owned[s.type])) glow(x, PG - 60, 120, 'rgba(255,190,110,.22)'); }
-  glow(216 - cam, PG - 170, 140, 'rgba(255,210,120,.3)');
-  c.restore();
 }
 
 // ----- guest requests: a guest with a gold "!" asks for something and tips when it's done -----
@@ -4285,10 +4178,6 @@ const STICKERS = [
   { id: 'float5', name: 'Chatterbox', how: 'Chat with 5 people in one lazy river lap.', col: '#8fd6ea' },
   { id: 'balloon', name: 'Up, Up and Away', how: 'Fly the hot air balloon.', col: '#ef476f' },
   { id: 'celeb', name: 'Star Spotter', how: 'Find the celebrity in disguise.', col: '#9b5de5' },
-  { id: 'mindreader', name: 'Mind Reader', how: 'Tap 10 guests to hear what they are thinking.', col: '#fde2ea' },
-  { id: 'notes', name: 'Mail Carrier', how: 'Read 8 notes from the suggestion box.', col: '#fff3b0' },
-  { id: 'night', name: 'Night Owl', how: 'Stay in the park until night.', col: '#1f3d9e' },
-  { id: 'raccoon', name: 'Night Watch', how: 'Shoo away a sneaky raccoon.', col: '#8d8d95' },
   { id: 'raise', name: 'Good Boss', how: 'Give Quackers a raise.', col: '#ffd84d' },
   { id: 'honks', name: 'HONK', how: 'Meet Honks the goose.', col: '#ffffff' },
   { id: 'helper', name: 'Happy Helper', how: 'Finish 3 guest requests.', col: '#06d6a0' },
@@ -4317,7 +4206,7 @@ function stickerCheck() {
   if (state.tickets >= 200) stickerGet('rich');
   const q = qkData(); if (q.raises > 0) stickerGet('raise'); if (q.quit) stickerGet('honks');
 }
-function updateStickerBtn() { const b = $('#btnStickers'); if (b) b.textContent = `Stickers ${Object.keys(state.stickers || {}).length}/${STICKERS.length}`; }
+function updateStickerBtn() { const b = $('#btnStickers'); if (b) b.textContent = `Stickers ${STICKERS.filter(s => stickerHas(s.id)).length}/${STICKERS.length}`; }
 // sticker art, drawn in a 100 x 100 box
 function drawSticker(c, s, got) {
   c.save(); c.lineJoin = 'round'; c.lineCap = 'round';
@@ -4337,10 +4226,6 @@ function drawSticker(c, s, got) {
   else if (I === 'float5') { c.fillStyle = '#ff8c42'; c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.ellipse(50, 68, 28, 10, 0, 0, 7); c.fill(); c.stroke(); c.fillStyle = '#8fd6ea'; c.beginPath(); c.ellipse(50, 68, 14, 4, 0, 0, 7); c.fill(); c.stroke(); c.fillStyle = '#fff'; c.beginPath(); c.roundRect(28, 22, 44, 26, 10); c.fill(); c.stroke(); htext(c, '...', 50, 40, 26, INK); }
   else if (I === 'balloon') drawHotAirBalloon(c, 50, 70, 0.34, true, true);
   else if (I === 'celeb') { starShape(c, 50, 42, 20, '#ffd166'); c.fillStyle = '#111'; c.fillRect(28, 60, 18, 10); c.fillRect(54, 60, 18, 10); c.fillRect(44, 62, 12, 3); }
-  else if (I === 'mindreader') { c.fillStyle = '#fff'; c.strokeStyle = INK; c.lineWidth = 2; for (const [x, y, r] of [[40, 42, 16], [58, 38, 18], [66, 52, 12], [46, 54, 14]]) { c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); c.stroke(); } c.fillRect(34, 36, 36, 18); c.beginPath(); c.arc(34, 74, 5, 0, 7); c.fill(); c.stroke(); htext(c, '?!', 52, 54, 22, INK); }
-  else if (I === 'notes') { c.save(); c.translate(50, 50); c.rotate(-0.12); c.fillStyle = '#fffdf5'; c.strokeStyle = INK; c.lineWidth = 2; c.fillRect(-24, -20, 48, 40); c.strokeRect(-24, -20, 48, 40); c.strokeStyle = 'rgba(31,61,158,.6)'; c.lineWidth = 1.4; for (let k = 0; k < 4; k++) { c.beginPath(); c.moveTo(-16, -10 + k * 9); c.lineTo(16 - (k === 3 ? 12 : 0), -10 + k * 9); c.stroke(); } c.restore(); }
-  else if (I === 'night') { c.fillStyle = '#fff6d0'; c.beginPath(); c.arc(46, 48, 20, 0, 7); c.fill(); c.fillStyle = s.col; c.beginPath(); c.arc(56, 42, 18, 0, 7); c.fill(); for (const [x, y] of [[70, 28], [74, 64], [30, 72], [26, 30]]) { c.fillStyle = '#fff'; c.beginPath(); c.arc(x, y, 2, 0, 7); c.fill(); } }
-  else if (I === 'raccoon') { c.save(); c.translate(52, 70 + (LANE - 2) * 0); c.scale(1.6, 1.6); c.translate(-50, -(LANE - 2)); drawRaccoon(c, { x: 50, vx: 1, ph: 0, loot: 'hotdog' }); c.restore(); }
   else if (I === 'raise') { duckShape(c, 46, 62, 2.4, false); c.fillStyle = '#111'; c.fillRect(56, 30, 16, 5); }
   else if (I === 'honks') { c.save(); c.translate(46, 84); c.scale(1.1, 1.1); qkDrawHonks(c, 0, 0, 1); c.restore(); }
   else if (I === 'helper') { c.fillStyle = '#ffd166'; c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.arc(50, 50, 24, 0, 7); c.fill(); c.stroke(); htext(c, '!', 50, 62, 34, RED); }
@@ -4350,7 +4235,7 @@ function drawSticker(c, s, got) {
 function openStickerBook() {
   hidePanels(); SFX.pop();
   const el = $('#stickers'), grid = $('#stickerGrid'); grid.innerHTML = '';
-  const got = Object.keys(state.stickers || {}).length;
+  const got = STICKERS.filter(s => stickerHas(s.id)).length;
   $('#stickerCount').textContent = `${got} of ${STICKERS.length} stickers. Each new sticker is worth 5 tickets.`;
   for (const s of STICKERS) {
     const has = stickerHas(s.id), cell = document.createElement('div'); cell.className = 'stk' + (has ? '' : ' off');
@@ -6358,6 +6243,7 @@ function showScene(name) {
   setTimeout(() => reqNote(), 0);
   if (name !== 'balloon' && BAL.weeOn) { SFX.weee(false); BAL.weeOn = false; }
   scene = name; downId = null;
+  fit();
   $('#parkBar').hidden = name !== 'park'; $('#wsBar').hidden = name !== 'ws';
   $('#welcome').hidden = $('#titleBar').hidden = name !== 'title';
   $('#povBar').hidden = name !== 'pov'; if (name !== 'pov') $('#povEnd').hidden = true;
@@ -6385,7 +6271,7 @@ cv.addEventListener('pointerdown', e => {
   const p = toStage(e); if (scene === 'ws') wsDown(p); else if (scene === 'pov') povDown(p); else if (scene === 'mini') miniDown(p); else if (scene === 'surf') surfDown(p); else if (scene === 'balloon') balDown(p); else parkDown(p);
 });
 cv.addEventListener('pointermove', e => { if (alive() && scene === 'surf') { surfMove(toStage(e)); return; } if (alive() && scene === 'mini' && downId === null) { miniMove(toStage(e)); return; } if (!alive() || e.pointerId !== downId || scene === 'title') return; const p = toStage(e); if (scene === 'ws') wsMove(p); else if (scene === 'pov') povMove(p); else if (scene === 'mini') miniMove(p); else parkMove(p); });
-const endPtr = e => { if (!alive() || e.pointerId !== downId) return; endStroke(e.type === 'pointerup' ? toStage(e) : null); };
+const endPtr = e => { if (!alive() || e.pointerId !== downId) return; const p = e.type === 'pointerup' ? toStage(e) : null; if (p && scene === 'ws') wsMove(p); endStroke(p); };
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr); cv.addEventListener('lostpointercapture', endPtr);
 cv.addEventListener('wheel', e => { if (scene !== 'park') return; e.preventDefault(); PARK.camTarget = clamp(PARK.camTarget + (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY), 0, PW - W); }, { passive: false });
 addEventListener('keyup', e => { if (alive()) { miniKey(e, false); surfKey(e, false); balKey(e, false); } });
@@ -6447,7 +6333,6 @@ $('#mute').innerHTML = SPK_ON;
 $('#mute').onclick = () => { SFX.resume(); const m = SFX.toggle(); $('#mute').innerHTML = m ? SPK_OFF : SPK_ON; $('#mute').setAttribute('aria-label', m ? 'Sound off' : 'Sound on'); };
 $('#startBtn').onclick = openGates;
 $('#parkName').onkeydown = e => { if (e.key === 'Enter') openGates(); };
-$('#parkDice').onclick = () => { SFX.resume(); SFX.pop(); $('#parkName').value = randomParkName(); };
 
 // ---------- loop ----------
 let lastT = performance.now();
@@ -6468,6 +6353,7 @@ function start() {
   if (started || !alive()) return; started = true;
   load();
   fit(); addEventListener('resize', () => { if (alive()) fit(); });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (alive()) fit(); });
   buildSlots(); updateFireworksBtn();
   for (const r of state.rides) prepRide(r);
   $('#tix').textContent = state.tickets;
@@ -6479,7 +6365,7 @@ function start() {
     Promise.race([cloudInit(), new Promise(r => setTimeout(() => r(null), 8000))]).then(cloud => {
       if (cloud && (cloud.savedAt || 0) > (state.savedAt || 0) && !TITLE.zoomAt) applyLoadedPark(cloud);
       else if (CLOUD.db && state.welcomed) cloudSave(JSON.stringify(state));
-      btn.disabled = false; btn.textContent = 'Open the gates!'; titleSaveInfo();
+      btn.disabled = false; titleSaveInfo();
     });
   }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => rideCache.clear());
@@ -6495,8 +6381,13 @@ function applyLoadedPark(s) {
 }
 function titleSaveInfo() {
   const note = $('#saveNote');
+  $('#welcomeBack').hidden = !state.welcomed;
+  $('#savedParkName').hidden = !state.welcomed;
+  $('#nameLabel').hidden = !!state.welcomed;
+  $('#parkNameEntry').hidden = !!state.welcomed;
+  $('#startBtn').textContent = state.welcomed ? 'Back to my park' : 'Create my park';
   if (state.welcomed) {
-    $('#parkName').value = state.name; $('#nameLabel').textContent = 'Welcome back to';
+    $('#savedParkName').textContent = state.name;
     const n = state.rides.length;
     note.innerHTML = `<b>&#10003; Your park is saved.</b> ${n ? `${n} ride${n === 1 ? '' : 's'} and ` : ''}${state.tickets} ticket${state.tickets === 1 ? '' : 's'}.`;
   } else { $('#parkName').placeholder = state.name; $('#nameLabel').textContent = 'First, name your park'; note.textContent = 'Your park saves by itself as you play.'; }

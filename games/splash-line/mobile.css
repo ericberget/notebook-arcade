@@ -1,0 +1,93 @@
+/* Phone UI stays at CSS-pixel size; only the illustrated game world scales. */
+#mobileUI { display: none; }
+body.phone { background: repeating-linear-gradient(to bottom, #fbf8ee 0 31px, #dbe1df 31px 32px); }
+.phone #binding, .phone #stage::before { display: none; }
+.phone #stage { box-shadow: none; }
+.phone #mobileUI { display: block; position: fixed; inset: 0; height: var(--view-height, 100dvh); z-index: 10; pointer-events: none; }
+.phone #mobileUI > * { pointer-events: auto; }
+.phone button, .phone .back { min-height: 44px; min-width: 44px; box-sizing: border-box; font-size: 17px; padding: 8px 10px; touch-action: manipulation; }
+.phone input[type=text] { font-size: 24px; min-height: 44px; }
+.phone .bar { position: absolute; top: 0; left: 0; right: 0; height: auto; min-height: 56px; padding: max(6px, env(safe-area-inset-top)) calc(58px + env(safe-area-inset-right)) 6px max(8px, env(safe-area-inset-left)); gap: 6px; background: #fbf8eef2; pointer-events: none; }
+.phone .bar > * { pointer-events: auto; flex-shrink: 0; }
+.phone .bar .back { display: flex; align-items: center; font-size: 16px; }
+.phone .bar .grow { flex: 1; min-width: 0; }
+.phone #mute { top: max(6px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); width: 44px; height: 44px; padding: 8px; z-index: 12; background: #fffdf5; }
+.phone #parkBar { flex-wrap: wrap; padding-right: 60px; }
+.phone #parkBar .tickets { font-size: 25px; padding: 0 8px; height: 44px; }
+.phone #parkBar .grow, .phone #savedTag { display: none; }
+.phone #parkBar #btnBuild, .phone #parkBar #btnShop, .phone #parkBar #btnStickers { position: fixed; bottom: max(8px, env(safe-area-inset-bottom)); height: 48px; background: #fffdf5; }
+.phone #parkBar #btnStickers { left: max(8px, env(safe-area-inset-left)); width: calc(30% - 12px); font-size: 15px; }
+.phone #parkBar #btnShop { left: 30%; width: calc(28% - 4px); }
+.phone #parkBar #btnBuild { left: 58%; width: calc(42% - 8px - env(safe-area-inset-right)); background: #f6d55c; }
+.phone #reqNote { font-size: 14px; max-width: 180px; }
+.phone #wsBar { padding-right: 8px; padding-top: calc(54px + env(safe-area-inset-top)); padding-bottom: 6px; justify-content: center; }
+.phone #wsBar .grow { display: none; }
+.phone #wsBar button { flex: 1; padding: 8px 5px; font-size: 16px; white-space: nowrap; }
+.phone #wsBar #btnBack { min-width: 60px; }
+.phone #wsBar #btnTest { min-width: 78px; }
+.phone #wsBar #order { position: absolute; top: max(6px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: calc(60px + env(safe-area-inset-right)); max-width: none; padding: 3px 5px; font-size: 14px; line-height: 1.15; }
+.phone .order { min-width: 0; flex: 1; font-size: 14px; padding: 4px 8px; transform: none; overflow-wrap: anywhere; }
+.phone .order b { font-size: 20px; }
+.phone .order .live { font-size: 18px; gap: 10px; }
+.phone .order .live span { min-width: 0; }
+.phone #btnTester { left: max(8px, env(safe-area-inset-left)); bottom: max(8px, env(safe-area-inset-bottom)); min-height: 48px; font-size: 14px; }
+.phone #btnTester canvas { width: 44px; height: 28px; }
+.phone .nav { top: auto; bottom: calc(68px + env(safe-area-inset-bottom)); width: 48px; height: 48px; font-size: 34px; }
+.phone #navL { left: max(8px, env(safe-area-inset-left)); }
+.phone #navR { right: max(8px, env(safe-area-inset-right)); }
+.phone #mobileUI > .card { position: absolute; z-index: 20; left: max(8px, env(safe-area-inset-left)) !important; right: max(8px, env(safe-area-inset-right)) !important; top: max(8px, env(safe-area-inset-top)) !important; bottom: auto; width: auto !important; height: auto !important; max-height: calc(var(--view-height, 100dvh) - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); padding: 18px; overflow: auto; overscroll-behavior: contain; transform: none; box-shadow: 0 0 0 100vmax #30291c88; border: 1px solid #c9c1a6; border-radius: 10px; }
+.phone .card h2 { font-size: 30px; }
+.phone .card p { font-size: 17px; line-height: 1.35; }
+.phone .card .row { gap: 8px; }
+.phone .card .row > .grow { flex: 1; }
+.phone #orders > .row:first-child, .phone #shop > .row:first-child, .phone #styleCard > .row:first-child { position: sticky; top: -18px; margin: -18px -18px 0; padding: 14px 18px; z-index: 2; background: #fffdf5; border-bottom: 1px solid #d8d0b6; }
+.phone .card .row button { flex-shrink: 0; }
+.phone #orders .grid, .phone #testerCard .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.phone .wo { padding: 12px; transform: none; }
+.phone .wo .gl, .phone .wo .bn { font-size: 16px; }
+.phone .wo .tag { position: static; justify-self: start; font-size: 14px; }
+.phone .wo .nm { font-size: 26px; }
+.phone .wo canvas { height: 110px; }
+.phone .item { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 8px; }
+.phone .item svg { width: 40px; }
+.phone .item .ds { font-size: 16px; }
+.phone .item button { min-width: 68px; }
+.phone .stwrap { grid-template-columns: 1fr; }
+.phone #stPrev { width: 100%; height: auto; }
+.phone .tester canvas { width: 100%; height: auto; max-width: 180px; }
+.phone #stickerGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.phone .stk canvas { max-width: 100%; height: auto; }
+.phone #qkCard { grid-template-columns: 1fr; gap: 10px; }
+.phone #qkFace { width: 90px; height: 90px; justify-self: center; }
+.phone .stamp { position: static; display: inline-block; font-size: 26px; margin: 10px 0; transform: rotate(-4deg); }
+.phone .checks li { grid-template-columns: 24px minmax(0, 1fr); font-size: 17px; }
+.phone .checks .got { grid-column: 2; }
+.phone #report { display: flex; flex-direction: column; }
+.phone #report .head { order: -2; }
+.phone #repActions { order: -1; position: sticky; top: -18px; z-index: 3; background: #fffdf5; margin: 0 -18px; padding: 10px 18px; border-bottom: 1px solid #d8d0b6; }
+.phone .steps { grid-template-columns: 1fr; }
+.phone #welcome { left: 50%; top: 50%; width: min(420px, calc(100% - 32px)); max-height: calc(var(--view-height, 100dvh) - 100px); overflow: auto; transform: translate(-50%, -35%); padding: 20px; gap: 12px; border-radius: 6px; }
+.phone #welcome #startBtn { width: 100%; font-size: 23px; }
+.phone #nameLabel, .phone #welcomeBack { font-size: 28px; }
+.phone #savedParkName { font-size: 32px; }
+.phone #toast { z-index: 30; bottom: calc(70px + env(safe-area-inset-bottom)); width: calc(100% - 40px); max-width: 480px; box-sizing: border-box; font-size: 17px; transform: none; }
+.phone #stickerPop { z-index: 25; top: 110px; max-width: calc(100% - 32px); box-sizing: border-box; padding: 10px; }
+.phone #stickerPop canvas { width: 60px; height: 60px; }
+.phone #stickerPop b { font-size: 26px; }
+.phone #diveTwist { width: 72px; height: 72px; right: max(8px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); font-size: 22px; }
+.phone #rotate { z-index: 9; color: #1f3d9e; background: #fff3b0; border-radius: 6px; padding: 8px; left: 150px; right: 8px; bottom: max(8px, env(safe-area-inset-bottom)); font-size: 14px; }
+@media (max-width: 540px) {
+  .phone #orders .grid { grid-template-columns: 1fr; }
+  .phone #stickerGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .phone .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .phone .snup, .phone .swave { flex-wrap: wrap; }
+}
+@media (orientation: landscape) {
+  .phone #wsBar { top: 56px; left: env(safe-area-inset-left); right: auto; width: 110px; max-height: calc(var(--view-height, 100dvh) - 62px); overflow-y: auto; padding: 4px 8px; flex-direction: column; align-items: stretch; gap: 5px; background: transparent; }
+  .phone #wsBar #order { position: fixed; right: calc(172px + env(safe-area-inset-right)); }
+  .phone #wsBar button { flex: none; }
+  .phone #btnTester { top: max(6px, env(safe-area-inset-top)); bottom: auto; left: auto; right: calc(60px + env(safe-area-inset-right)); max-width: 100px; min-height: 44px; padding: 2px 4px; }
+  .phone #btnTester canvas { width: 30px; }
+  .phone #welcome { top: 56px; transform: translateX(-50%); max-height: calc(var(--view-height, 100dvh) - 64px); gap: 8px; padding: 14px 20px; }
+  .phone #mobileUI > .card { left: max(16px, env(safe-area-inset-left)) !important; right: max(16px, env(safe-area-inset-right)) !important; }
+}
