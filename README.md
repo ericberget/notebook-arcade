@@ -2,7 +2,7 @@
 
 Small browser games drawn in ballpoint pen and pencil on notebook paper.
 
-- **Splash Line** — draw water slides from the tower to the pool, pass Lifeguard Lou's inspection, then open them in your own water park and ride them in first person. Three-star rides win trophies that unlock prize slides, and park attractions like the surf wave are playable mini-games.
+- **Splash Line** — draw water slides from the tower to the pool, pass Lifeguard Lou's inspection, then open them in your own water park and ride them in first person. Master different slide designs to unlock prize rides. A park journal guides four milestones toward Lou’s final inspection, with guest requests, amenities, ride upgrades, and a completion celebration. Drawings and parks save locally with a backup and export/import controls.
 - **X’s & O’s Football** — draw receiver routes, hike, and steer your runner.
 - **Doodle Slingshot** — fling doodles at scribbled towers.
 - **Scribble Tennis** — play full-court rallies with lobs and hard shots.
@@ -39,3 +39,7 @@ Football now opens to Quick Play and Season Mode, with eight clubs, a five-round
 Phones get a larger field, a compact scoreboard, Run/Pass tabs, thumb steering, and independent pass aiming. Desktop keeps the notebook-on-desk layout. Player cards use unlined textured paper with torn edges, and primary buttons use yellow pencil shading.
 
 Football source is in `games/xo-football/`. Run `node tests/football-phone.cjs`, `node tests/football-coach.cjs`, `node tests/football-season-game.cjs`, and `node tests/football-replay.cjs` from the repository root. This GitHub edition retains the root layout used by GitHub Pages and the existing games.
+
+Splash Line has expressive notebook guests and customizable entrance signs. Seaside Blue, Warm Boardwalk, and Summer Festival become available after opening 3, 5, and 7 different slide designs. Styles cost game tickets once, remain owned, and can be switched freely from the park entrance or journal.
+
+Splash Line checks: `node tests/splash-line-pov.cjs` and `node tests/splash-line-care.cjs`. The latter covers forgiving slide starts, save recovery, progression, attainable requests, and entrance purchases. Native iPad packaging and physical-device testing remain separate release work.

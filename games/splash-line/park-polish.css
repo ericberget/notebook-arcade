@@ -1,0 +1,80 @@
+/* The journal is a quiet layer over the illustrated park. */
+#parkBook { left: 190px; top: 70px; width: 820px; max-height: 612px; overflow: auto; padding: 28px 32px; transform: none; z-index: 24; box-sizing: border-box; }
+.bookTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.bookTop h2 { font-size: 34px; line-height: 1.1; margin: 4px 0 14px; }
+.bookTabs { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid #c9c7b9; margin-bottom: 20px; }
+.bookTabs button { border: 0; background: transparent; border-radius: 0; box-shadow: none; padding: 8px 12px; }
+.bookTabs button[aria-current=page] { background: #fff0ae; text-decoration: underline; text-underline-offset: 5px; }
+#parkBook p { font-size: 20px; line-height: 1.4; margin: 8px 0 14px; }
+#parkBook h3 { font-size: 26px; margin: 0 0 4px; }
+#parkBook button { min-height: 48px; padding: 8px 14px; font-size: 20px; margin: 3px; }
+.bookLead { padding: 18px 22px; background: #f5f1de; margin-bottom: 18px; }
+.bookMeters { display: flex; flex-wrap: wrap; gap: 24px; font-size: 17px; }
+.bookMeters b { font-size: 28px; display: block; }
+.milestone { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 12px; padding: 18px 0; border-bottom: 1px solid #dedacb; }
+.milestone p { margin: 0 !important; }
+.milestone small { color: #716444; font-size: 16px; }
+.stepNumber { width: 32px; height: 32px; border: 1px solid #b4ab93; border-radius: 50%; display: grid; place-items: center; font-size: 22px; }
+.achieved .stepNumber { background: #e6f0d9; color: #356331; border-color: #88a675; }
+.bookActions { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0; }
+.commission { margin-top: 20px; }
+.rideBookRow { border-bottom: 1px solid #dedacb; padding: 16px 0; }
+.bookSmall, #parkBook .bookSmall { font-size: 17px; color: #625d50; line-height: 1.45; }
+.bookHelp { padding-left: 24px; font-size: 21px; line-height: 1.45; }
+.bookHelp li { margin-bottom: 18px; padding-left: 8px; }
+.parkCertificate { text-align: center; padding: 28px 30px; border: 3px double #b09239; background: #fff9de; margin-bottom: 22px; }
+.parkCertificate h2 { font-size: 42px; }
+.signature { font: 700 36px Caveat, cursive; margin: 20px 0; color: #b74638; }
+#firstGuide { position: absolute; top: 82px; left: 340px; width: 570px; padding: 10px 16px; background: #fff6ce; color: #484330; font-size: 20px; line-height: 1.3; pointer-events: none; }
+#titleOptions.quiet { font-size: 17px; border: 0; background: transparent; box-shadow: none; text-decoration: underline; text-underline-offset: 4px; }
+#report { max-height: 600px; overflow: auto; }
+#report .stamp { position: static; display: inline-block; font-size: 26px; margin: 10px 0; transform: rotate(-3deg); }
+#report.firstReport:not(.showDetails) #stats, #report.firstReport:not(.showDetails) .checks .star { display: none; }
+#report:not([hidden]) ~ #firstGuide { display: none; }
+#parkBar { gap: 7px; }
+#parkBar button { font-size: 18px; min-height: 46px; padding: 6px 12px; }
+#savedTag { max-width: 105px; font-size: 14px; }
+button:focus-visible, a:focus-visible { outline: 3px solid #186e9d; outline-offset: 4px; }
+@media (pointer: coarse) {
+  #stage button { min-height: 52px; min-width: 52px; }
+  #stage .swatch { width: 54px; height: 54px; }
+  #stage .icon-btn { width: 54px; height: 54px; }
+}
+.phone #firstGuide { position: fixed; left: 124px; top: 76px; width: calc(100% - 155px); box-sizing: border-box; font-size: 15px; }
+.phone .bookTop h2 { font-size: 28px; }
+.phone .milestone { grid-template-columns: 32px 1fr; }
+.phone .milestone > button { grid-column: 2; justify-self: start; }
+.phone #parkBook p { font-size: 18px; }
+.phone #parkBook .bookTabs { gap: 0; }
+.phone #parkBook .bookTabs button { font-size: 16px; padding: 6px; }
+.phone #btnBook { position: static; font-size: 15px; }
+.phone #titleOptions { font-size: 15px; }
+@media (max-width: 760px) and (orientation: portrait) {
+  .phone #firstGuide { top: 126px; left: 12px; width: calc(100% - 24px); }
+}
+
+.bookIcon { width: 28px; height: 28px; flex: 0 0 28px; }
+.settingsGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+#parkBook .settingTile { display: flex; align-items: center; gap: 16px; text-align: left; padding: 18px; margin: 0; }
+.settingTile strong, .settingTile small { display: block; }
+.settingTile strong { font-size: 23px; font-weight: 400; }
+.settingTile small { font-size: 17px; opacity: .8; }
+#parkBook .settingsNote { margin: 10px 0 24px; }
+#parkBook .saveHeading { margin-top: 20px; }
+.bookCredit { border-top: 1px solid #c9c7b9; margin-top: 22px; padding-top: 18px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: 18px; color: #625d50; }
+.bookCredit a { display: inline-flex; align-items: center; gap: 8px; color: #2547a3; text-underline-offset: 4px; min-height: 44px; }
+.bookCredit .bookIcon { width: 20px; height: 20px; flex-basis: 20px; }
+.helpCards section { display: flex; gap: 18px; padding: 18px 0; border-bottom: 1px solid #dedacb; }
+.helpCards .bookIcon { margin-top: 3px; color: #2547a3; }
+#parkBook .helpCards p { margin-bottom: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+.phone #parkBook .settingTile { padding: 12px; gap: 10px; }
+.phone .settingTile strong { font-size: 20px; }
+
+.entranceGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+.entranceChoice { border: 1px solid #cfc7b3; padding: 14px; background: #fffdf4; }
+.entranceChoice.selected { border: 2px solid #598272; background: #f4f5e6; }
+.entranceChoice canvas { display: block; width: 100%; height: auto; }
+#parkBook .entranceChoice h3 { font-size: 25px; }
+#parkBook .entranceChoice p { margin: 8px 0; }
+@media (max-width: 540px) { .entranceGrid { grid-template-columns: 1fr; } }

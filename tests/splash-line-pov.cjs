@@ -74,6 +74,10 @@ vm.runInContext([
        assert.equal(shown, shownBefore, 'four seconds on the water before results');
        assert(Math.hypot(POV.cam.C.x - entry.x, POV.cam.C.z - entry.z) > 1, 'continues drifting after splash');
        assert(POV.cam.C.x > kit.pool[0] && POV.cam.C.x < kit.pool[1], 'drift stays inside pool');
+       const basin=povPoolBounds(kit);
+       const ahead=POV.float.forward.x>0?basin.right-POV.cam.C.x:POV.cam.C.x-basin.left;
+       assert(ahead>180,'ample water ahead of floating feet');
+       assert(basin.halfWidth-Math.abs(POV.cam.C.z)>200,'room on both sides of rider');
        assert(POV.cam.C.y > 10 && POV.cam.C.y < 14, 'floats above water');
        assert(!POV.air && POV.mph < 1, 'air and speed settle after splash');
      }
