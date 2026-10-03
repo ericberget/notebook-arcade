@@ -14,14 +14,19 @@ const context = vm.createContext({ assert, console, matchMedia: () => ({ matches
 vm.runInContext([
   section('const GY =', '// ---------- stage & canvas'),
   section('function crPts(', 'function propsFor('),
-  section('const V3 =', 'function clipPoly('),
+  section('const V3 =', '// ----- world drawing -----'),
   section('// Clip a world-space surface', 'function povCollect()'),
   `let povSplashes = 0;
    const SFX = new Proxy({}, { get: (_, key) => () => { if (key === "povSplash") povSplashes++; } });
-   let scene = 'pov', shown = 0;
+   let scene = 'pov', shown = 0, bookOpens = 0;
+   const state = { firstRide: true, milestones: {} }, returnNotices = [];
+   function save() {}
+   function openBook() { bookOpens++; }
+   function toast(text) { returnNotices.push(text); }
    function showScene(s) { scene = s; }
    function showPovEnd() { shown++; }
    function rideColor(kit) { return kit.color; }
+   function povTubeArt() {}
    povScenery = () => [];
    function tick(dt) { now += dt; povUpdate(dt); }
    function checkCamera() {
@@ -36,8 +41,28 @@ vm.runInContext([
    assert.equal(clipped.filter(p => p.y === 0).length, 2, 'crossing faces meet the deck exactly');
    assert.equal(povAboveDeck(crossing, 3).length, 0, 'entirely hidden faces stay behind wood');
    assert.deepEqual(povAboveDeck(crossing, -3), crossing, 'raised entrance is preserved');
+   const visibleFace=[V3(-5,-5,20),V3(5,-5,20),V3(5,5,40),V3(-5,5,40)];
+   assert(povPolyVisible(visibleFace));
+   assert(!povPolyVisible(visibleFace.map(p=>V3(p.x+1000,p.y,p.z))),'offscreen faces skip drawing');
+   assert(!povPolyVisible(visibleFace.map(p=>V3(p.x,p.y,-20))),'faces behind the camera skip drawing');
+   assert(povPolyVisible([V3(-20,-5,-5),V3(20,-5,-5),V3(20,5,40),V3(-20,5,40)]),'faces crossing the near plane remain eligible');
+   let strokes=0, vertices=0;
+   const pen={save(){},restore(){},clip(){},beginPath(){},closePath(){},stroke(){strokes++;},moveTo(x,y){assert(Number.isFinite(x)&&Number.isFinite(y));vertices++;},lineTo(x,y){assert(Number.isFinite(x)&&Number.isFinite(y));vertices++;}};
+   povWoodTexture(pen,visibleFace,100);
+   assert(strokes>0&&strokes<25,'detailed wood uses a bounded number of batched strokes');
+   assert(vertices>100,'grain and hatch detail remains present');
+   assert.strictEqual(povWoodBatches(100),povWoodBatches(100),'pen batches are reused');
+   strokes=0;povWoodTexture(pen,visibleFace.map(p=>V3(p.x+1000,p.y,p.z)),100);
+   assert.equal(strokes,0,'hidden wood does no pen work');
+   povWoodTexture(pen,[V3(-5,-5,-2),V3(5,-5,-2),V3(5,5,40),V3(-5,5,40)],100);
    let splashes = 0;
    for (const kit of KITS) {
+     const style={x:Object.fromEntries(['flowers','umbrellas','lifering','loungers','lanterns','pinwheels','towels','bubbles','mistarch','beachballs','noodles','sailboats','duckies'].map(id=>[id,true]))};
+     const extras=povExtraScenery(kit,style),bounds=povPoolBounds(kit);
+     assert.equal(povExtraScenery(kit,null).length,0,'undecorated rides add no extra rendering work');
+     assert(extras.some(item=>item.id==='sailboats'),'purchased sailboat is visible in POV');
+     for(const item of extras){assert(Number.isFinite(item.x)&&Number.isFinite(item.z));if(item.floating){assert(item.x>bounds.left&&item.x<bounds.right&&Math.abs(item.z)<bounds.halfWidth,'floating extras stay in the basin');}else assert(Math.abs(item.z)>bounds.halfWidth,'shore decorations stay out of the water');}
+     style.x.sailboats=false;assert(!povExtraScenery(kit,style).some(item=>item.id==='sailboats'),'turning off an extra removes it from POV');
      const T = buildTrack([crPts([[START_X, towerTop(kit)], ...EXAMPLES[kit.id]])], kit);
      const sim = simulate(T, kit), original = JSON.stringify(sim), splashBefore = povSplashes;
      openPOV({ kit, T, sim, name: kit.name, stars: 0, from: 'park' });
@@ -103,5 +128,16 @@ vm.runInContext([
    assert.equal(POV.float, null); assert.equal(POV.endShown, false);
    assert.equal(POV.waiting, true, 'replay waits for Send it again');
    assert(POV.t < 0); assert.equal(POV.phase, 'ride');
-   console.log('PASS: all ' + KITS.length + ' slide kits; slower playback, launch pause, finite cameras, ' + splashes + ' floating splashdowns, result timing, replay reset, unchanged simulation.');`
+   closePOV();
+   assert.equal(scene, 'park', 'leaving POV returns straight to the park');
+   assert.equal(bookOpens, 0, 'first POV ride never opens the journal automatically');
+   assert.equal(returnNotices.length, 1, 'first reward gets one quiet notice');
+   closePOV();
+   assert.equal(returnNotices.length, 1, 'reward notice does not repeat');
+   openPOV({ kit: POV.kit, T: POV.T, sim: POV.sim, name: 'Workshop', stars: 0, from: 'ws' });
+   POV.reportWasOpen = true; closePOV();
+   assert.equal(scene, 'ws', 'workshop test returns to the workshop');
+   assert.equal(document.querySelector('#report').hidden, false, 'workshop inspection stays available');
+   assert.equal(bookOpens, 0);
+   console.log('PASS: all ' + KITS.length + ' slide kits; POV decoration placement, batched wood, offscreen culling, slower playback, launch pause, finite cameras, ' + splashes + ' floating splashdowns, result timing, replay reset, uninterrupted park return, unchanged simulation.');`
 ].join('\n'), context);

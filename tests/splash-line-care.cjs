@@ -77,7 +77,57 @@ for(const item of P.entrances.filter(e=>e.price)){
  const ready={...park,tickets:item.price,rides:P.families.slice(0,item.need).map((kit,i)=>({...fixture,id:i+1,lot:i,kit}))};
  assert.equal(P.selectEntrance(ready,item.id),true);assert.equal(ready.tickets,0);assert.equal(P.normalize(ready).entranceStyle,item.id);
 }
+// New ride decorations use the same unlock, purchase, toggle, and save path as existing extras.
+const extras=vm.createContext({console,assert,P,fixture});
+vm.runInContext(`
+ const state={tickets:100},SFX={cash(){},pop(){}},rideCache=new Map();
+ function setTickets(n){state.tickets=n;}function save(){}function toast(){}
+`+section('const PAINTS =','// ---------- the test rider crew')+`
+ renderStyleOpts=()=>{};
+ for(const id of ['beachballs','flowers','umbrellas','lifering','loungers','lanterns','pinwheels','noodles','towels','sailboats','bubbles','mistarch']){
+   const item=STYLE_OPTS.x.items.find(x=>x.id===id);
+   assert(item,'extra is offered in the style picker');
+   ST.ride=JSON.parse(JSON.stringify(fixture));ST.ride.riders=item.need-1;state.tickets=100;
+   styleChoose('x',id);assert.equal(state.tickets,100);assert(!ST.ride.style.x[id],'rider unlock is respected');
+   ST.ride.riders=item.need;state.tickets=item.cost-1;
+   styleChoose('x',id);assert.equal(state.tickets,item.cost-1);assert(!ST.ride.style.x[id],'cannot overspend');
+   state.tickets=100;styleChoose('x',id);assert.equal(state.tickets,100-item.cost);assert.equal(ST.ride.style.x[id],true);
+   styleChoose('x',id);assert.equal(ST.ride.style.x[id],false,'owned extras can be removed');
+   ST.ride.riders=0;styleChoose('x',id);assert.equal(ST.ride.style.x[id],true);assert.equal(state.tickets,100-item.cost,'owned extras are free to reapply');
+   const restored=P.normalize(JSON.parse(JSON.stringify({rides:[ST.ride],tickets:state.tickets})));
+   assert.equal(restored.rides[0].style.x[id],true,'decoration survives saving and loading');
+   assert.equal(restored.rides[0].bought['x:'+id],true,'purchase survives saving and loading');
+ }
+`,extras);
+// Park packages enforce design and amenity requirements in the purchase handler,
+// then persist ownership without charging twice or inflating amenity milestones.
+const parkExtras=vm.createContext({console,assert,P,fixture});
+vm.runInContext(`
+ const Progress=P,state={tickets:100,owned:{},rides:[]},UMB_X=Array(11),now=0,W=1200,PW=10000,PG=540;
+ const SLOTS=['gate','snack','gift','hottub','wave','surf'].map((type,i)=>({type,x:10+i*500,w:300}));
+ const slotOf=type=>SLOTS.find(s=>s.type===type),slotOfLot=lot=>({x:3300+lot*632,w:612});
+ const PARK={camX:0,camTarget:0,popups:[]},MASCOT={},SFX={cash(){}};
+ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+ function setTickets(n){state.tickets=n;}function save(){}function hidePanels(){}function updateFireworksBtn(){}function toast(){}
+`+section('const TIER1 =','function openShop(focus)')+section('function parkExtraSpots(', 'function drawParkExtras(')+section('function buy(it)', 'function showPrize(')+`
+ for(const id of ['wayfinding','pinwheelgarden','picnic','cabanas','duckparade','parkbunting']){
+   const it=SHOP.find(i=>i.id===id);assert(it&&it.art,'package has shop artwork');
+   state.tickets=100;state.owned={};state.rides=[];
+   const setDesigns=n=>{state.rides=P.families.slice(0,n).map((kit,i)=>({...fixture,id:i+1,lot:i,kit}));};
+   if(it.needs)state.owned[it.needs[0]]=true;
+   if(it.needDesigns){setDesigns(it.needDesigns-1);buy(it);assert.equal(state.tickets,100);assert(!state.owned[id],'locked package cannot be bought');}
+   setDesigns(it.needDesigns||0);
+   if(it.needs){state.owned={};buy(it);assert.equal(state.tickets,100);assert(!state.owned[id],'required amenity is checked on purchase');state.owned[it.needs[0]]=true;}
+   state.tickets=it.price-1;buy(it);assert.equal(state.tickets,it.price-1);assert(!state.owned[id],'cannot overspend');
+   const amenities=P.facts(state).amenities;state.tickets=100;buy(it);
+   assert.equal(state.owned[id],true);assert.equal(state.tickets,100-it.price);assert(Number.isFinite(PARK.camTarget),'camera goes to the new decoration');
+   buy(it);assert.equal(state.tickets,100-it.price,'packages are purchased once');
+   assert.equal(P.facts(state).amenities,amenities,'cosmetic packages do not count as amenities');
+   assert.equal(P.normalize(JSON.parse(JSON.stringify(state))).owned[id],true,'package survives a save round trip');
+   for(const spot of parkExtraSpots(id)){assert(spot.x>=0&&spot.x<PW);assert(spot.y<570,'decorations leave the guest path clear');}
+ }
+`,parkExtras);
 // Exercise actual request generation at maximum decoration counts.
 const requests=vm.createContext({console,assert});
 vm.runInContext(`const state={owned:{},rides:[],palms:10,flowers:12,goodGames:0};const TIER1=[],TIER2=[],KITS=[];const firstFreeLot=()=>0;const isMystery=()=>false;const unlockedCount=()=>0;`+section('function reqOptions()', 'function reqCheck()')+`assert(!reqOptions().some(r=>['palms','flowers'].includes(r.kind)));assert(reqOptions().some(r=>r.kind==='rides'));`,requests);
-console.log('PASS: forgiving launch physics, freehand hills, draft/settings migration, unique mastery, campaign completion, backup recovery, failed saves, attainable requests, entrance unlocks and purchases.');
+console.log('PASS: forgiving launch physics, freehand hills, draft/settings migration, unique mastery, campaign completion, backup recovery, failed saves, attainable requests, entrance unlocks and purchases, all twelve ride extras, six park packages, purchase requirements and saved ownership.');

@@ -49,7 +49,7 @@ body.phone { background: repeating-linear-gradient(to bottom, #fbf8ee 0 31px, #d
 .phone .wo .nm { font-size: 26px; }
 .phone .wo canvas { height: 110px; }
 .phone .item { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 8px; }
-.phone .item svg { width: 40px; }
+.phone .item svg, .phone .item canvas { width: 40px; }
 .phone .item .ds { font-size: 16px; }
 .phone .item button { min-width: 68px; }
 .phone .stwrap { grid-template-columns: 1fr; }
