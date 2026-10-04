@@ -3711,12 +3711,36 @@ function faceAt(c, x, y, s, mood, eyeGap = 2.8) {
   else { c.moveTo(x - 3.5 * s, my); c.quadraticCurveTo(x, my + 3.5 * s, x + 3.5 * s, my); c.stroke(); }
 }
 function armsUp(c, x, y, mood) { if (mood === 'whee' || mood === 'air') { jline(c, x - 2, y, x - 8, y - 12, 3, INK, 1.8, 1); jline(c, x + 4, y, x + 7, y - 12, 4, INK, 1.8, 1); } }
+let louRiderImage = null, louRiderFrames = null;
+function getLouRiderFrames() {
+  if (!louRiderImage) {
+    louRiderImage = document.createElement('img');
+    louRiderImage.onload = () => {
+      // Decode and shrink once; rides only paint a small cached sprite each frame.
+      const cell = louRiderImage.naturalWidth / 3;
+      louRiderFrames = [0,1,2].map(i => {
+        const cv = document.createElement('canvas'); cv.width = cv.height = 160;
+        cv.getContext('2d').drawImage(louRiderImage,i*cell,0,cell,louRiderImage.naturalHeight,0,0,160,160);
+        return cv;
+      });
+      updateTesterBtn();
+      document.querySelectorAll('#testerGrid canvas[data-tester="lou"]').forEach(cv => drawTesterCard(cv,'lou'));
+    };
+    louRiderImage.src = 'images/lou-rider-poses.png';
+  }
+  return louRiderFrames;
+}
 function drawTester(c, x, y, r, mood = 'happy', sc = 1, g = 1, id = null) {
   const who = id || tester().id;
   if (who === 'sandy') return drawSandy(c, x, y, r, mood, sc);
   c.save(); c.translate(x, y); c.rotate(r); c.scale(sc, sc); c.lineJoin = 'round'; c.lineCap = 'round';
   const O = (fill, w = 1.8) => { c.fillStyle = fill; c.fill(); c.strokeStyle = INK; c.lineWidth = w; c.stroke(); };
   if (who === 'lou') {
+    const frames = getLouRiderFrames();
+    if (frames) {
+      const pose = mood === 'air' || mood === 'whee' ? 1 : mood === 'worried' || mood === 'dizzy' || mood === 'fast' ? 2 : 0;
+      c.drawImage(frames[pose], -17, -31, 40, 40); c.restore(); return;
+    }
     // Tiny seated rider: folded arms, silver moustache, shades that never come off.
     const airborne = mood === 'air' || mood === 'whee', kick = airborne ? -4 : 0;
     c.beginPath();c.moveTo(-7,-1);c.lineTo(3,0);c.lineTo(12,2+kick);c.lineTo(19,1+kick);c.lineTo(20,5+kick);c.lineTo(8,7);c.lineTo(-8,5);c.closePath();O('#586a82',1.2);
@@ -3806,6 +3830,7 @@ function openTesters() {
     b.disabled = locked;
     b.innerHTML = `<canvas></canvas><span class="nm">${esc(t.name)}${locked ? ' · Locked' : ''}</span><span class="bl">${esc(locked ? 'Final unlock: pass the final park inspection.' : t.blurb)}</span>`;
     b.onclick = () => { if (!testerAvailable(t)) return; state.tester = t.id; save(); $('#testerCard').hidden = true; updateTesterBtn(); SFX.voice(t.voice); if (scene === 'surf') { surfMenuRender(); toast(`${t.name} is surfing now.`); } else if (!$('#lotCard').hidden && $('#dvRider')) { showDiveCard(); toast(`${t.name} is diving now.`); } else toast(`${t.name} is your test rider now.`); };
+    b.querySelector('canvas').dataset.tester = t.id;
     grid.appendChild(b);
     requestAnimationFrame(() => drawTesterCard(b.querySelector('canvas'), t.id));
   }
