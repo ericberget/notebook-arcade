@@ -1697,7 +1697,7 @@ function drawRider(c, g, x, y, r, tube) {
 
 // ---------- saved game ----------
 const SAVE_KEY = 'splash-line-park-v1';
-const state = { version: 2, name: 'Sketchwater Park', tickets: 5, rides: [], owned: {}, palms: 0, umbrellas: 0, unlocked: 0, riders: 0, welcomed: false, tester: 'sandy', mastered: {}, drafts: {}, settings: { muted: false, comfort: true } };
+const state = { version: 2, name: 'Sketchwater Park', tickets: 5, lifetimeTickets: 5, rides: [], owned: {}, palms: 0, umbrellas: 0, unlocked: 0, riders: 0, welcomed: false, tester: 'sandy', mastered: {}, drafts: {}, settings: { muted: false, comfort: true } };
 let saveIssue = '', saveBlocked = false;
 const SAVED = { local: false, cloud: false, at: 0, shownAt: 0 };
 function load() {
@@ -1756,8 +1756,14 @@ function unlockedCount() { return Math.max(state.unlocked, state.rides.length); 
 // ---------- UI helpers ----------
 let toastTimer = 0;
 function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), ms); }
+function recordTicketBalance(v) {
+  const before = Math.max(state.lifetimeTickets || 0, state.tickets || 0);
+  state.lifetimeTickets = before + Math.max(0, v - state.tickets);
+  state.tickets = v;
+  if (before < 10000 && state.lifetimeTickets >= 10000) toast('Lou unlocked! Choose him in the test-rider menu.', 5000);
+}
 function setTickets(v, bump = true) {
-  state.tickets = v; $('#tix').textContent = v;
+  recordTicketBalance(v); $('#tix').textContent = v;
   if (bump) { const b = $('#tixBox'); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
   save();
 }
@@ -2023,8 +2029,8 @@ function openRide() {
   PARK.camTarget = clamp(slotOfLot(WS.lot).x + 306 - W / 2, 0, PW - W);
   prepRide(ride); delete state.drafts[draftKey(WS.lot, kit.id)];
   state.firstOpenPending = state.rides.length === 1 && !state.firstRide;
-  if (prize) { state.tickets += prize.tickets; prize.paid = true; }
-  if (bonus) { state.tickets += bonus; PARK.opening.paid = true; }
+  if (prize) { recordTicketBalance(state.tickets + prize.tickets); prize.paid = true; }
+  if (bonus) { recordTicketBalance(state.tickets + bonus); PARK.opening.paid = true; }
   $('#tix').textContent = state.tickets;
   save();
 }
@@ -3695,9 +3701,10 @@ const TESTERS = [
   { id: 'pickle', name: 'Mr. Pickle', blurb: 'Briny, green and brave.', voice: 'whee' },
   { id: 'penguin', name: 'Pengo', blurb: 'Born to slide. Belly first.', voice: 'honk' },
   { id: 'tri', name: 'Tri-Tim', blurb: 'Three pointy sides of courage.', voice: 'whee' },
-  { id: 'lou', name: 'Lou', blurb: 'Fine. I’ll test it myself.', voice: 'whee', finalUnlock: true },
+  { id: 'lou', name: 'Lou', blurb: 'Fine. I’ll test it myself.', voice: 'whee', ticketUnlock: 10000 },
 ];
-const testerAvailable = t => !t.finalUnlock || !!state.completedAt;
+const louTicketTotal = () => Math.max(state.lifetimeTickets || 0, state.tickets || 0);
+const testerAvailable = t => !t.ticketUnlock || louTicketTotal() >= t.ticketUnlock;
 const tester = () => TESTERS.find(t => t.id === state.tester && testerAvailable(t)) || TESTERS[0];
 const tName = s => String(s).replace(/Sandy/g, tester().name);
 function faceAt(c, x, y, s, mood, eyeGap = 2.8) {
@@ -3828,7 +3835,7 @@ function openTesters() {
     const b = document.createElement('button'); b.className = 'tester' + (tester().id === t.id ? ' on' : '');
     const locked = !testerAvailable(t);
     b.disabled = locked;
-    b.innerHTML = `<canvas></canvas><span class="nm">${esc(t.name)}${locked ? ' · Locked' : ''}</span><span class="bl">${esc(locked ? 'Final unlock: pass the final park inspection.' : t.blurb)}</span>`;
+    b.innerHTML = `<canvas></canvas><span class="nm">${esc(t.name)}${locked ? ' · Locked' : ''}</span><span class="bl">${esc(locked ? `${Math.min(louTicketTotal(),10000).toLocaleString()} / 10,000 tickets earned` : t.blurb)}</span>`;
     b.onclick = () => { if (!testerAvailable(t)) return; state.tester = t.id; save(); $('#testerCard').hidden = true; updateTesterBtn(); SFX.voice(t.voice); if (scene === 'surf') { surfMenuRender(); toast(`${t.name} is surfing now.`); } else if (!$('#lotCard').hidden && $('#dvRider')) { showDiveCard(); toast(`${t.name} is diving now.`); } else toast(`${t.name} is your test rider now.`); };
     b.querySelector('canvas').dataset.tester = t.id;
     grid.appendChild(b);
@@ -7597,13 +7604,13 @@ function bookButton(parent, text, action, primary = false) {
 }
 function renderPlan(box) {
   const f = Progress.facts(state), completed = !!state.completedAt;
-  if (completed) box.innerHTML = `<div class="parkCertificate"><div class="eyebrow">Park inspection passed</div><h2>${esc(state.name)}</h2><p>Final inspection passed.</p><p>${f.distinct} slide designs · ${f.mastered} mastered designs · ${state.reqsDone || 0} guest requests completed</p><div class="signature">Lou · Safety &amp; Fun Inspector</div><p class="bookSmall">Lou is now available as a test rider. “Fine. I’ll test it myself.” Your gold gate is yours to keep.</p></div>`;
-  else box.innerHTML = `<div class="bookLead"><p>Complete four goals to earn the gold gate and unlock Lou as a test rider. Build different slides, fulfill guest requests, and pass the Grand Tour inspection.</p><div class="bookMeters"><span><b>${f.distinct}</b> different designs</span><span><b>${f.mastered}/13</b> mastery stamps</span><span><b>${f.amenities}</b> amenities</span></div></div>`;
+  if (completed) box.innerHTML = `<div class="parkCertificate"><div class="eyebrow">Park inspection passed</div><h2>${esc(state.name)}</h2><p>Final inspection passed.</p><p>${f.distinct} slide designs · ${f.mastered} mastered designs · ${state.reqsDone || 0} guest requests completed</p><div class="signature">Lou · Safety &amp; Fun Inspector</div><p class="bookSmall">Your gold gate is yours to keep. Keep building, or go for a ride.</p></div>`;
+  else box.innerHTML = `<div class="bookLead"><p>Complete four goals to earn the gold gate. Build different slides, fulfill guest requests, and pass the Grand Tour inspection.</p><div class="bookMeters"><span><b>${f.distinct}</b> different designs</span><span><b>${f.mastered}/13</b> mastery stamps</span><span><b>${f.amenities}</b> amenities</span></div></div>`;
   state.milestones = state.milestones || {};
   f.tasks.forEach((task, i) => {
     const previousDone = f.tasks.slice(0,i).every(t => t.done), ready = task.done && previousDone;
     const row = document.createElement('div'); row.className = 'milestone' + (ready ? ' achieved' : '');
-    row.innerHTML = `<span class="stepNumber">${ready ? '✓' : i + 1}</span><div><h3>${task.name}</h3><p>${task.detail}</p>${i < 3 ? `<small>${state.milestones[i] ? 'Reward collected' : i === 0 ? 'Reward: a free color for your first slide' : 'Reward: 20 tickets'}</small>` : '<small>Final reward: Lou joins the test crew.</small>'}</div>`;
+    row.innerHTML = `<span class="stepNumber">${ready ? '✓' : i + 1}</span><div><h3>${task.name}</h3><p>${task.detail}</p>${i < 3 ? `<small>${state.milestones[i] ? 'Reward collected' : i === 0 ? 'Reward: a free color for your first slide' : 'Reward: 20 tickets'}</small>` : '<small>Reward: gold gate and fireworks.</small>'}</div>`;
     if (i < 3 && ready && !state.milestones[i]) bookButton(row, i === 0 ? 'Choose a color' : 'Collect reward', () => {
       if (i === 0) { chooseWelcomeColor(); return; }
       state.milestones[i] = true; setTickets(state.tickets + 20); openBook('plan');
@@ -7623,7 +7630,8 @@ function renderPlan(box) {
     bookButton(actions, 'Entrance styles', openEntranceStyles);
     renderCommission(box);
   }
-  if (completed) bookButton(box, state.tester === 'lou' ? 'Lou is your test rider' : 'Choose Lou as test rider', () => { state.tester = 'lou'; saveNow(); updateTesterBtn(); toast('Lou: Fine. I’ll test it myself.'); openBook('plan'); }, true);
+  const louGoal = document.createElement('p'); louGoal.className = 'bookSmall'; louGoal.textContent = `Lou joins the test crew at 10,000 tickets earned. ${Math.min(louTicketTotal(),10000).toLocaleString()} / 10,000 — spending tickets keeps your progress.`; box.appendChild(louGoal);
+  if (testerAvailable(TESTERS.find(t => t.id === 'lou'))) bookButton(box, state.tester === 'lou' ? 'Lou is your test rider' : 'Choose Lou as test rider', () => { state.tester = 'lou'; saveNow(); updateTesterBtn(); toast('Lou: Fine. I’ll test it myself.'); openBook('plan'); }, true);
   if (completed) bookButton(box, 'Celebrate in the park', () => { hidePanels(); showScene('park'); PARK.camTarget = 0; launchFireworks(); });
 }
 function chooseWelcomeColor() {

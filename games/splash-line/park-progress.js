@@ -63,6 +63,7 @@
     }
     s.version = 2; s.name = String(s.name || 'My Water Park').slice(0, 28);
     s.tickets = finite(s.tickets) ? Math.max(0, Math.floor(s.tickets)) : 5;
+    s.lifetimeTickets = Math.max(s.tickets, finite(s.lifetimeTickets) ? Math.floor(s.lifetimeTickets) : s.rides.reduce((sum, r) => sum + r.earned, 0));
     s.owned = s.owned && typeof s.owned === 'object' && !Array.isArray(s.owned) ? s.owned : {};
     s.mastered = Object.fromEntries(Object.entries(s.mastered || {}).filter(([k,v]) => families.includes(k) && v));
     s.rides.filter(r => r.stars === 3 || r.trophy).forEach(r => { s.mastered[r.kit] = true; });

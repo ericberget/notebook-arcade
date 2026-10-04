@@ -1,18 +1,16 @@
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const vm = require('node:vm');
-const html = fs.readFileSync(require('node:path').join(__dirname, '../games/splash-line/index.html'), 'utf8');
-const start = html.indexOf('const TESTERS =');
-const end = html.indexOf('const tName =', start);
-const ctx = vm.createContext({assert});
-vm.runInContext(`const state = {tester:'lou'}; ${html.slice(start,end)}
-assert.equal(tester().id, 'sandy', 'locked Lou falls back to an available rider');
-assert(!TESTERS.filter(testerAvailable).some(t=>t.id==='lou'), 'Lou cannot appear as a random guest before unlock');
-state.completedAt = 123;
-assert.equal(tester().id, 'lou', 'existing completed parks unlock Lou');
-assert(TESTERS.filter(testerAvailable).some(t=>t.id==='lou'));
-const saved = JSON.stringify(state); delete state.completedAt; state.tester='ducky';
-assert.equal(tester().id,'ducky', 'ordinary riders remain available');
-Object.assign(state,JSON.parse(saved)); assert.equal(tester().id,'lou','selection survives save roundtrip');
-`, ctx);
-console.log('PASS: Lou locked before completion, unlocked for completed parks, random guest gating, existing riders and saved selection.');
+const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
+const P=require('../games/splash-line/park-progress.js');
+const html=fs.readFileSync(require('node:path').join(__dirname,'../games/splash-line/index.html'),'utf8');
+const section=(a,b)=>html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));
+vm.runInNewContext(`const state={tester:'lou',tickets:9999,lifetimeTickets:9999,completedAt:123};let notices=0;function toast(){notices++;}
+${section('const TESTERS =','const tName =')}
+${section('function recordTicketBalance(', 'function setTickets(')}
+assert.equal(tester().id,'sandy','inspection alone does not unlock Lou');
+recordTicketBalance(10000);assert.equal(tester().id,'lou');assert.equal(notices,1);
+recordTicketBalance(20);assert.equal(tester().id,'lou','spending preserves unlock');assert.equal(state.lifetimeTickets,10000);
+recordTicketBalance(25);assert.equal(state.lifetimeTickets,10005);assert.equal(notices,1);
+state.tester='ducky';assert.equal(tester().id,'ducky');
+`,{assert});
+assert.equal(P.normalize({rides:[],tickets:10000}).lifetimeTickets,10000,'legacy balance gets credit');
+assert.equal(P.normalize({rides:[],tickets:20,lifetimeTickets:10000}).lifetimeTickets,10000,'earned progress survives loading');
+console.log('PASS: Lou unlocks at 10,000 total tickets, retains unlock after spending, announces once, and preserves saved progress.');
