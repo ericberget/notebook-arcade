@@ -61,6 +61,8 @@
       lots.add(r.lot); ids.add(r.id); r.name = String(r.name || 'My slide').slice(0, 26);
       r.stars = Math.max(1, Math.min(3, Math.floor(r.stars || 1))); r.riders = Math.max(0, Math.floor(r.riders || 0)); r.earned = Math.max(0, Math.floor(r.earned || 0));
     }
+    if (s.tester === 'blob') s.tester = 'crab';
+    if (s.tester === 'tri') s.tester = 'toast';
     s.version = 2; s.name = String(s.name || 'My Water Park').slice(0, 28);
     s.tickets = finite(s.tickets) ? Math.max(0, Math.floor(s.tickets)) : 5;
     s.lifetimeTickets = Math.max(s.tickets, finite(s.lifetimeTickets) ? Math.floor(s.lifetimeTickets) : s.rides.reduce((sum, r) => sum + r.earned, 0));
