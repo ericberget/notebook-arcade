@@ -75,6 +75,7 @@
     s.drafts = Object.fromEntries(Object.entries(s.drafts || {}).filter(([,d]) => d && families.includes(d.kit) && Number.isInteger(d.lot) && d.lot >= 0 && d.lot <= 500 && validStrokes(d.strokes)));
     s.reqsDone = Math.max(0, Math.floor(Number(s.reqsDone) || 0));
     s.riders = Math.max(0, Math.floor(Number(s.riders) || 0));
+    if (s.request?.kind === 'own' && s.request.target === 'rescue' && !s.owned.rescue) s.request = null;
     if (s.request && ((s.request.kind === 'palms' && s.request.base + 2 > 10) || (s.request.kind === 'flowers' && s.request.base >= 12) || !['own','rides','palms','stars','flowers','design'].includes(s.request.kind))) s.request = null;
     return s;
   }
