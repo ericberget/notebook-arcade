@@ -5459,17 +5459,19 @@ function divePodium(c, d) {
 }
 // First-person dive view. The scoring simulation remains in its original units.
 // A separate projection keeps this camera independent of the slide ride camera.
+function divePovHeightScale(ev) { return .45 + .25*clamp((ev.hPx-350)/950,0,1); }
 function divePovCamera(d, ev) {
   const waiting = ['pick','bounce','ready'].includes(d.phase), water = d.phase === 'judge' || d.phase === 'podium';
-  const bounce = d.phase === 'bounce' ? Math.sin(d.bt*5.2)*3 : 0, heightLook=clamp((ev.hPx-350)/950,0,1),basePitch=-.42-heightLook*.45;
-  let y = waiting ? ev.hPx*.45+68-bounce : Math.max(8,-d.y*.45+68);
+  const bounce = d.phase === 'bounce' ? Math.sin(d.bt*5.2)*3 : 0, heightLook=clamp((ev.hPx-350)/950,0,1),basePitch=-.62-heightLook*.44;
+  const heightScale=divePovHeightScale(ev);
+  let y = waiting ? ev.hPx*heightScale+78-bounce : Math.max(8,-d.y*heightScale+78);
   let pitch = basePitch, roll = 0;
   if (d.phase === 'air') {
     pitch = REDUCED ? basePitch-clamp(d.vy/1600,-.25,.45)+Math.sin(d.a)*.06 : basePitch-d.a;
     roll = REDUCED ? 0 : Math.sin(d.tw)*.22;
   }
   if (water) { const u=clamp(d.jt/1.05,0,1),e=u*u*(3-2*u);y=lerp(-18,30,e);pitch=lerp(-.48,-.10,e); }
-  return {z:(d.x-200)*.8-65*(1-heightLook),y,pitch,roll,sp:Math.sin(pitch),cp:Math.cos(pitch),f:620};
+  return {z:(d.x-200)*.8-25*(1-heightLook)+10*heightLook,y,pitch,roll,sp:Math.sin(pitch),cp:Math.cos(pitch),f:620};
 }
 function divePovPoint(cam, p) {
   const dy=p[1]-cam.y,dz=p[2]-cam.z;
@@ -5525,7 +5527,7 @@ function divePovBody(c,d) {
   }
 }
 function divePovWorld(c,d) {
-  const ev=DVS.ev,cam=divePovCamera(d,ev),cliff=ev.kind==='cliff',boardY=ev.hPx*.45-(d.phase==='bounce'?Math.sin(d.bt*5.2)*6:0);
+  const ev=DVS.ev,cam=divePovCamera(d,ev),cliff=ev.kind==='cliff',boardY=ev.hPx*divePovHeightScale(ev)-(d.phase==='bounce'?Math.sin(d.bt*5.2)*6:0);
   c.save();c.beginPath();c.rect(0,58,W,H-58);c.clip();c.translate(600,350);c.rotate(cam.roll);c.translate(-600,-350);
   // A light wash lets the notebook ruling show through the sky.
   c.fillStyle='rgba(170,219,225,.13)';c.fillRect(-W,-H,W*3,H*3);
@@ -5558,13 +5560,37 @@ function divePovWorld(c,d) {
     divePovSprite(c,cam,side*535,z-90,'loungers',2.1);
     divePovSprite(c,cam,side*660,z-130,'flowers',2);
   }
+  if(!cliff){
+    // Tiny swimmers and their wakes sit on the water plane, not in screen space.
+    for(const [x,z] of [[-200,480],[170,990],[-100,1530]]){
+      const head=[];for(let i=0;i<12;i++){const a=i/12*Math.PI*2;head.push([x+Math.cos(a)*6,4,z+Math.sin(a)*6]);}
+      poly(head,'#c99570',INK,.8);
+      line([x-14,1,z+12],[x+14,1,z+12],'rgba(255,253,231,.65)',1.6);
+      line([x-8,2,z+5],[x-14,2,z+10],INK,.8);line([x+8,2,z+5],[x+14,2,z+10],INK,.8);
+    }
+    // The board's soft shadow stays down at pool level as the viewpoint rises.
+    poly([[-48,1,38],[48,1,38],[48,1,165],[-48,1,165]],'rgba(34,101,117,.11)',null);
+  }
   // Only the launch platform is nearby; the pool remains clear beneath the dive.
   if(['pick','bounce','ready'].includes(d.phase)||d.phase==='air'&&d.x<DV_TIP+150) {
-    const width=cliff?210:ev.kind==='platform'?150:58,col=cliff?'#c7ad88':ev.kind==='platform'?'#e9e2cf':ev.kind==='cannon'?'#e99791':'#efce71';
-    poly([[-width,boardY-10,-460],[width,boardY-10,-460],[width,boardY-10,110],[-width,boardY-10,110]],cliff?'#9f8566':'#bfa16c',INK,1.8);
-    poly([[-width,boardY,-460],[width,boardY,-460],[width,boardY,110],[-width,boardY,110]],col,INK,2.2);
-    for(let z=-390;z<100;z+=28){line([-width+8,boardY+.3,z],[width-8,boardY+.3,z+1],'rgba(31,61,158,.22)',1);if(z%3)line([-width+10,boardY+.5,z+3],[width-14,boardY+.5,z+4],'rgba(255,246,203,.45)',1.2);}
-    for(let i=0;i<28;i++){const x=-width+8+rnd(3520+i)*(width*2-30),z=35+rnd(3560+i)*65;line([x,boardY+.7,z],[x+7,boardY+.7,z+6],'rgba(84,75,88,.14)',.8);if(i%3===0)line([x+2,boardY+.7,z+7],[x+8,boardY+.7,z+1],'rgba(84,75,88,.11)',.8);}
+    const width=cliff?180:ev.kind==='platform'?100:42,col=cliff?'#c7ad88':ev.kind==='platform'?'#e9e2cf':ev.kind==='cannon'?'#e99791':'#efce71';
+    // A slim shaded nose gives the board thickness without hiding the drop.
+    poly([[-width,boardY-9,110],[width,boardY-9,110],[width,boardY,110],[-width,boardY,110]],cliff?'#967d62':'#aa915e',INK,1.5);
+    poly([[-width,boardY,-460],[width,boardY,-460],[width,boardY,110],[-width,boardY,110]],col,INK,2);
+    // Worn non-slip paint: short, fixed marks in the board's own perspective.
+    for(let i=0;i<120;i++){
+      const x=-width+4+rnd(3520+i*3)*(width*2-10),z=i<90?72+rnd(3860+i*5)*35:-100+rnd(3860+i*5)*207;
+      const tone=i%4===0?'rgba(255,250,220,.52)':'rgba(99,79,58,.18)';
+      line([x,boardY+.4,z],[x+1.2+rnd(i+3900)*2.2,boardY+.4,z+2.5],tone,i%4===0?1.2:.8);
+      if(i%5===0)line([x,boardY+.5,z+3],[x+3,boardY+.5,z-1],'rgba(65,67,83,.13)',.7);
+    }
+    for(const side of [-1,1]){
+      line([side*(width-5),boardY+.7,-140],[side*(width-5),boardY+.7,105],'rgba(255,248,215,.66)',2);
+      line([side*(width-8),boardY+.5,-140],[side*(width-8),boardY+.5,102],'rgba(95,83,63,.2)',.8);
+    }
+    // A slightly uneven painted edge and a few scuffs retain the pen-and-paper feel.
+    line([-width+3,boardY+.7,105],[width-3,boardY+.7,105],'#fff1c4',3);
+    for(let i=0;i<8;i++){const x=-width+5+i*(width*2-10)/8;line([x,boardY+.8,103],[x+3,boardY+.8,106],'rgba(109,88,51,.24)',.8);}
     if(ev.kind==='platform'||cliff)for(const side of [-1,1]){line([side*width,boardY+75,-330],[side*width,boardY+75,-50],INK,2.3);for(const z of [-330,-170,-50])line([side*width,boardY,z],[side*width,boardY+75,z],INK,2);}
   }
   if(d.phase==='judge') {
