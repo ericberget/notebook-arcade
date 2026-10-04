@@ -1020,15 +1020,34 @@ function drawProp(c, p, id, sketch = false) {
     jcircle(c, x - 17, GY - 5, 6, id, INK, 1.6); jcircle(c, x + 19, GY - 5, 6, id + 1, INK, 1.6);
   }
 }
+const bushArtCache = new Map();
 function drawBush(c, x, id, gy = GY, s = 1, sketch = false) {
+  const key = `${id}:${s}:${sketch}`;
+  let art = bushArtCache.get(key);
+  if (!art) {
+    const scale = Math.max(.1,s), cv = document.createElement('canvas');
+    cv.width = Math.ceil(150*scale*2); cv.height = Math.ceil(80*scale*2);
+    const ctx = cv.getContext('2d'); ctx.scale(2,2);
+    drawBushArt(ctx,75*scale,id,65*scale,scale,sketch);
+    art = {cv,scale}; if(bushArtCache.size>=256)bushArtCache.delete(bushArtCache.keys().next().value); bushArtCache.set(key,art);
+  }
+  c.drawImage(art.cv,x-75*art.scale,gy-65*art.scale,art.cv.width/2,art.cv.height/2);
+}
+function drawBushArt(c, x, id, gy = GY, s = 1, sketch = false) {
   const w = (50 + rnd(id) * 16) * s, h = (30 + rnd(id + 1) * 10) * s, n = 5, cy = gy - h * 0.15, pts = [];
   for (let i = 0; i <= n; i++) { const a = Math.PI - i / n * Math.PI; pts.push({ x: x + Math.cos(a) * w / 2, y: gy - 3 - Math.sin(a) * h }); }
   const P = new Path2D(); P.moveTo(x - w / 2 + 2, gy); P.lineTo(pts[0].x, pts[0].y);
   for (let i = 1; i <= n; i++) { const a = pts[i - 1], b = pts[i], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, nx = mx - x, ny = my - cy, L = Math.hypot(nx, ny) || 1; P.quadraticCurveTo(mx + nx / L * 10 * s, my + ny / L * 10 * s, b.x, b.y); }
   P.lineTo(x + w / 2 - 2, gy); P.closePath();
-  c.fillStyle = '#a6d67a'; c.fill(P);
-  c.save(); c.clip(P); c.fillStyle = 'rgba(63,122,52,.28)'; c.beginPath(); c.ellipse(x + w * 0.22, gy, w * 0.42, h * 0.62, 0, 0, 7); c.fill(); c.restore();
-  if(sketch) {
+  c.fillStyle = ['#b4ce8c','#aacb88','#bad393'][Math.abs(id)%3]; c.fill(P);
+  c.save();c.clip(P);
+  // Loose overlapping pencil washes, without a hard circular shadow boundary.
+  for(let k=0;k<8;k++){
+    c.strokeStyle=k<4?'rgba(58,99,60,.08)':'rgba(250,239,176,.13)';c.lineWidth=(7+rnd(id+k)*5)*s;c.lineCap='round';
+    const bx=x-w*.48+k*w*.12,by=gy-h*(.10+rnd(id+k+19)*.5);
+    c.beginPath();c.moveTo(bx,by);c.quadraticCurveTo(bx+w*.1,by-h*.15,bx+w*.24,by-h*.07);c.stroke();
+  }c.restore();
+  {
     c.save();c.clip(P);c.lineCap='round';c.lineWidth=.65*s;
     for(let patch=0;patch<3;patch++) {
       const px=x+(-.3+patch*.25)*w,py=gy-h*(.15+rnd(id+patch+34)*.24);
@@ -1041,9 +1060,14 @@ function drawBush(c, x, id, gy = GY, s = 1, sketch = false) {
     }
     c.restore();
   }
-  c.strokeStyle = '#3f7a34'; c.lineWidth = 1.8; c.lineJoin = 'round'; c.stroke(P);
-  c.lineWidth = 1.2; c.globalAlpha = 0.75;
-  for (let k = 0; k < 4; k++) { const lx = x + (rnd(id + k * 3) - 0.5) * w * 0.6, ly = gy - 8 * s - rnd(id + k * 5) * h * 0.55; c.beginPath(); c.moveTo(lx - 3 * s, ly - 3 * s); c.lineTo(lx, ly); c.lineTo(lx + 3 * s, ly - 3 * s); c.stroke(); }
+  c.strokeStyle = '#4f704b'; c.lineWidth = 1.15*s; c.lineJoin = 'round'; c.stroke(P);
+  // A few broken pen contours and curved paired leaves instead of check marks.
+  c.save();c.clip(P);c.lineWidth=.7*s;c.strokeStyle='rgba(45,66,89,.42)';
+  for(let k=0;k<7;k++){
+    const lx=x+(rnd(id+k*3)-.5)*w*.8,ly=gy-5*s-rnd(id+k*5)*h*.68;
+    c.beginPath();c.moveTo(lx-4*s,ly-3*s);c.quadraticCurveTo(lx-5*s,ly+1*s,lx,ly+2*s);c.quadraticCurveTo(lx+5*s,ly-1*s,lx+3*s,ly-4*s);c.stroke();
+  }
+  c.translate(-.65*s,.4*s);c.strokeStyle='rgba(42,66,92,.17)';c.lineWidth=.65*s;c.stroke(P);c.restore();
   c.globalAlpha = 1;
   for (let k = 0; k < 3; k++) {
     const fx = x + (rnd(id + k * 7) - 0.5) * w * 0.7, fy = gy - h * 0.35 - rnd(id + k * 11) * h * 0.45;
@@ -3879,7 +3903,10 @@ function openTesters() {
 function updateTesterBtn() {
   $('#testerName').textContent = tester().name;
   const cv = $('#testerIcon'), k = 2, c = cv.getContext('2d'); cv.width = 56 * k; cv.height = 34 * k;
-  c.setTransform(k, 0, 0, k, 0, 0); drawTester(c, 28, 22, -0.05, 'happy', 1.15);
+  c.setTransform(k, 0, 0, k, 0, 0);
+  // Lou’s full-body art is taller than the original small doodle riders.
+  const isLou = tester().id === 'lou';
+  drawTester(c, isLou ? 26 : 28, isLou ? 26 : 22, -0.05, 'happy', isLou ? .78 : 1.15);
 }
 
 // ---------- sky life: gulls, balloons, planes ----------
