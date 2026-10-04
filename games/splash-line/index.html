@@ -262,7 +262,7 @@
   <div id="report" class="card" hidden>
     <div class="head">
       <svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="30" cy="42" rx="20" ry="15" fill="#ffd84d" stroke="#1f3d9e" stroke-width="2"/><circle cx="36" cy="24" r="12" fill="#ffd84d" stroke="#1f3d9e" stroke-width="2"/><path d="M46 25l12 2-11 5z" fill="#ff9f1c" stroke="#1f3d9e" stroke-width="1.6"/><circle cx="39" cy="21" r="2" fill="#1f3d9e"/><path d="M24 14c4-8 20-8 24 0z" fill="#d8342c" stroke="#1f3d9e" stroke-width="1.6"/><path d="M14 40c6 6 14 6 20 2" fill="none" stroke="#1f3d9e" stroke-width="1.6"/><rect x="4" y="30" width="14" height="18" fill="#fff" stroke="#1f3d9e" stroke-width="1.6" transform="rotate(-10 11 39)"/></svg>
-      <div><div class="eyebrow">Inspection report</div><h2 id="repTitle">Tube Twister</h2><div style="font-size:16px;color:#4a4a4f">Inspected by Lifeguard Lou</div></div>
+      <div><div class="eyebrow">Inspection report</div><h2 id="repTitle">Tube Twister</h2><div style="font-size:16px;color:#4a4a4f">Checked by the park lifeguard</div></div>
     </div>
     <div id="stamp" class="stamp">APPROVED</div>
     <ul class="checks" id="checks"></ul>
@@ -278,7 +278,7 @@
 
   <div id="orders" class="card" hidden>
     <div class="row"><div><div class="eyebrow" id="ordersLot">Lot 1</div><h2>Pick a work order</h2></div><div class="grow"></div><button id="ordersClose">Close</button></div>
-    <p style="margin:4px 0 0">Every order comes with its own tower and pool. You draw the slide in between. Your test rider tries it first, and Lifeguard Lou decides if it opens.</p>
+    <p style="margin:4px 0 0">Every order comes with its own tower and pool. You draw the slide in between. Your test rider tries it first, and the park lifeguard checks that it’s safe to open.</p>
     <div class="grid" id="woGrid"></div>
   </div>
 
@@ -357,7 +357,7 @@
   </div>
   <div id="testerCard" class="card" hidden>
     <div class="row"><div><div class="eyebrow">The test crew</div><h2>Pick your test rider</h2></div><div class="grow"></div><button id="testerClose">Close</button></div>
-    <p style="margin:4px 0 0">Every rider weighs the same, so Lifeguard Lou's rules don't change. They just scream differently.</p>
+    <p style="margin:4px 0 0">Every rider weighs the same, so the safety checks stay the same. They just scream differently.</p>
     <div class="grid" id="testerGrid"></div>
   </div>
   <div id="parkBook" class="card" hidden aria-label="Park journal">
@@ -1920,8 +1920,8 @@ function showReport() {
   const stat = (l, v) => `<div>${l}<b>${v}</b></div>`;
   $('#stats').innerHTML = stat('Top speed', `${s.topMph.toFixed(0)} mph`) + stat('Biggest jump', `${s.longestAir.toFixed(1)} s`) + stat('Max force', `${s.maxG.toFixed(1)} g`) + stat('Ride time', `${s.rideTime.toFixed(1)} s`) + stat('Drop', `${Math.max(0, s.dropFt).toFixed(0)} ft`) + stat(...kitStat(kit, { loops: s.loops, hills: s.hills, turns: s.turns, hops: s.hops, big: Math.round(s.bigHillFt) }));
   const note = WS.crashNote && s.outcome !== 'splash' ? WS.crashNote + ' ' : '';
-  $('#tip').innerHTML = (r.approved ? `<div class="stars">${starStr(r.stars)}</div>` : '') + `<b>Lou says:</b> ${esc(tName(note + r.tip))}`;
-  if (!state.rides.length && r.approved) $('#tip').innerHTML = '<b>Lou says:</b> Your first slide is ready. Open it and take a ride!';
+  $('#tip').innerHTML = (r.approved ? `<div class="stars">${starStr(r.stars)}</div>` : '') + `<b>Lifeguard’s note:</b> ${esc(tName(note + r.tip))}`;
+  if (!state.rides.length && r.approved) $('#tip').innerHTML = '<b>Lifeguard’s note:</b> Your first slide is ready. Open it and take a ride!';
   const st = $('#stamp'); st.textContent = r.approved ? 'APPROVED' : WS.sim && WS.sim.stats.outcome === 'stuck' && WS.sim.stats.distFt < 5 ? 'MEH.' : 'TRY AGAIN'; if (st.textContent === 'MEH.') setTimeout(() => stickerGet('meh'), 900); st.className = 'stamp' + (r.approved ? '' : ' blue');
   const acts = $('#repActions'); acts.innerHTML = '';
   const btn = (label, fn, primary) => { const b = document.createElement('button'); b.textContent = label; if (primary) b.className = 'primary'; b.onclick = () => { SFX.pop(); fn(); }; acts.appendChild(b); return b; };
@@ -4357,7 +4357,7 @@ function jumperDraw(c, d, kind) {
 
 // ---------- more attractions to buy, each with its own game ----------
 Object.assign(MINI_INFO, {
-  blaster: { name: 'Water Blasters', how: 'Tap to squirt! Soak the pencils and the ducks before they slide away. Gold ducks are worth 5. Do not soak Lifeguard Lou!', time: 35, div: 3 },
+  blaster: { name: 'Water Blasters', how: 'Tap to squirt! Soak the pencils and the ducks before they slide away. Gold ducks are worth 5. Avoid the lifeguard in the red cap!', time: 35, div: 3 },
   bumper: { name: 'Bumper Boats', how: 'Steer your boat with the mouse or your finger. Bump the pencil boats to splash them, and scoop up the rubber duckies.', time: 40, div: 2 },
 });
 
@@ -4406,7 +4406,7 @@ function louTarget(c, x, y) {
   c.save(); c.translate(x, y);
   c.fillStyle = '#fffdf5'; c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.roundRect(-30, -100, 60, 100, 6); c.fill(); c.stroke();
   c.restore(); drawKid(c, { suit: '#e63946', skin: '#e0ac69', hair: '#3b2a1a', seed: 0.2, whistle: true, hat: '#e63946' }, x, y - 2, 'stand', 62, 0);
-  htext(c, 'LOU', x, y - 80, 18, RED);
+  htext(c, 'GUARD', x, y - 80, 18, RED);
 }
 MINI_DRAW.blaster = (c, d) => {
   c.fillStyle = 'rgba(255,243,176,.35)'; c.fillRect(BL.X0 - 20, 150, BL.X1 - BL.X0 + 40, 440);
@@ -7452,7 +7452,7 @@ function bookButton(parent, text, action, primary = false) {
 }
 function renderPlan(box) {
   const f = Progress.facts(state), completed = !!state.completedAt;
-  if (completed) box.innerHTML = `<div class="parkCertificate"><div class="eyebrow">Lifeguard Lou’s seal of approval</div><h2>${esc(state.name)}</h2><p>Final inspection passed.</p><p>${f.distinct} slide designs · ${f.mastered} mastered designs · ${state.reqsDone || 0} guest requests completed</p><div class="signature">Lifeguard Lou</div><p class="bookSmall">Your gold gate is yours to keep. Keep building, chase all 13 mastery stamps, or just go for a ride.</p></div>`;
+  if (completed) box.innerHTML = `<div class="parkCertificate"><div class="eyebrow">Park inspection passed</div><h2>${esc(state.name)}</h2><p>Final inspection passed.</p><p>${f.distinct} slide designs · ${f.mastered} mastered designs · ${state.reqsDone || 0} guest requests completed</p><div class="signature">Your park lifeguard</div><p class="bookSmall">Your gold gate is yours to keep. Keep building, chase all 13 mastery stamps, or just go for a ride.</p></div>`;
   else box.innerHTML = `<div class="bookLead"><p>Complete four goals to earn the gold gate. Build different slides, fulfill guest requests, and pass the Grand Tour inspection.</p><div class="bookMeters"><span><b>${f.distinct}</b> different designs</span><span><b>${f.mastered}/13</b> mastery stamps</span><span><b>${f.amenities}</b> amenities</span></div></div>`;
   state.milestones = state.milestones || {};
   f.tasks.forEach((task, i) => {
@@ -7465,7 +7465,7 @@ function renderPlan(box) {
     }, true);
     box.appendChild(row);
   });
-  if (f.ready && !completed) bookButton(box, 'Invite Lou for the final inspection', () => {
+  if (f.ready && !completed) bookButton(box, 'Request final inspection', () => {
     if (!Progress.facts(state).ready || state.completedAt) return;
     state.completedAt = Date.now(); state.owned.fireworks = true; updateFireworksBtn(); saveNow();
     hidePanels(); showScene('park'); PARK.camTarget = 0; launchFireworks(); SFX.fanfare(); openBook('plan');

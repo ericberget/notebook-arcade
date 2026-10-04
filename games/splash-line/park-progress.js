@@ -42,7 +42,7 @@
       { name: 'Grand opening', detail: 'Open your first slide and ride it yourself.', done: rides.length > 0 && !!state.firstRide },
       { name: 'Growing park', detail: 'Open 3 different slide designs and build 2 amenities.', done: distinct >= 3 && amenities >= 2 },
       { name: 'Destination park', detail: 'Open 5 different designs, master 3 designs, and style a ride.', done: distinct >= 5 && mastered >= 3 && styled },
-      { name: 'Lou’s final inspection', detail: 'Open Grand Tour with at least 2 stars and complete 3 guest requests.', done: tour && (state.reqsDone || 0) >= 3 },
+      { name: 'Final park inspection', detail: 'Open Grand Tour with at least 2 stars and complete 3 guest requests.', done: tour && (state.reqsDone || 0) >= 3 },
     ];
     return { distinct, mastered, amenities, styled, tour, tasks, ready: tasks.every(t => t.done) };
   }
