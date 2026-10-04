@@ -57,7 +57,7 @@
   #report { top: 68px; width: 470px; padding: 16px 24px 18px; }
   #report h2 { font-size: 36px; }
   #report .head { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
-  #report .head svg { width: 64px; height: 64px; flex: none; }
+  #report .head canvas { width: 90px; height: 90px; flex: none; }
   .checks { list-style: none; padding: 0; margin: 4px 0 10px; display: grid; gap: 3px; }
   .checks li { display: grid; grid-template-columns: 24px 1fr auto; gap: 8px; align-items: center; font-size: 17.5px; border-bottom: 1px solid rgba(120,160,220,.45); padding: 2px 0; }
   .checks li.sep { border-top: 2px solid rgba(31,61,158,.35); margin-top: 4px; padding-top: 5px; }
@@ -261,8 +261,8 @@
 
   <div id="report" class="card" hidden>
     <div class="head">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="30" cy="42" rx="20" ry="15" fill="#ffd84d" stroke="#1f3d9e" stroke-width="2"/><circle cx="36" cy="24" r="12" fill="#ffd84d" stroke="#1f3d9e" stroke-width="2"/><path d="M46 25l12 2-11 5z" fill="#ff9f1c" stroke="#1f3d9e" stroke-width="1.6"/><circle cx="39" cy="21" r="2" fill="#1f3d9e"/><path d="M24 14c4-8 20-8 24 0z" fill="#d8342c" stroke="#1f3d9e" stroke-width="1.6"/><path d="M14 40c6 6 14 6 20 2" fill="none" stroke="#1f3d9e" stroke-width="1.6"/><rect x="4" y="30" width="14" height="18" fill="#fff" stroke="#1f3d9e" stroke-width="1.6" transform="rotate(-10 11 39)"/></svg>
-      <div><div class="eyebrow">Inspection report</div><h2 id="repTitle">Tube Twister</h2><div style="font-size:16px;color:#4a4a4f">Checked by the park lifeguard</div></div>
+      <canvas id="louPortrait" width="240" height="240" role="img" aria-label="Lou, the Safety and Fun Inspector, with silver hair, sunglasses and folded arms"></canvas>
+      <div><div class="eyebrow">Inspection report</div><h2 id="repTitle">Tube Twister</h2><div style="font-size:16px;color:#4a4a4f"><span id="louIntro">Lou · Safety & Fun Inspector</span></div></div>
     </div>
     <div id="stamp" class="stamp">APPROVED</div>
     <ul class="checks" id="checks"></ul>
@@ -278,7 +278,7 @@
 
   <div id="orders" class="card" hidden>
     <div class="row"><div><div class="eyebrow" id="ordersLot">Lot 1</div><h2>Pick a work order</h2></div><div class="grow"></div><button id="ordersClose">Close</button></div>
-    <p style="margin:4px 0 0">Every order comes with its own tower and pool. You draw the slide in between. Your test rider tries it first, and the park lifeguard checks that it’s safe to open.</p>
+    <p style="margin:4px 0 0">Every order comes with its own tower and pool. You draw the slide in between. Your test rider tries it first, and the park inspector checks that it’s safe to open.</p>
     <div class="grid" id="woGrid"></div>
   </div>
 
@@ -1070,19 +1070,67 @@ function drawPool(c, kit, time = 0, id = 3, live = true) {
   c.strokeStyle = 'rgba(31,61,158,.25)'; c.lineWidth = 1; for (let x = x0 + 14; x < x1; x += 14) { c.beginPath(); c.moveTo(x, GY + d - 8); c.lineTo(x, GY + d); c.stroke(); }
   if (live) htext(c, 'splash pool', (x0 + x1) / 2, GY + d + 20, 17, GRAPH, { font: 'Patrick', alpha: 0.75 });
 }
+// One small vector portrait, shared by the inspection card and poolside chair.
+let louPortraitArt = null;
+function drawLouPortrait(c, x, y, width, pose = 0) {
+  if (!louPortraitArt) {
+    louPortraitArt = document.createElement('img');
+    louPortraitArt.onload = () => {
+      const portrait = document.querySelector('#louPortrait');
+      if (portrait && portrait.dataset.pose !== undefined) {
+        const ctx = portrait.getContext('2d');
+        ctx.clearRect(0, 0, portrait.width, portrait.height);
+        drawLouPortrait(ctx, 0, 0, portrait.width, Number(portrait.dataset.pose));
+      }
+    };
+    louPortraitArt.src = 'images/lou-inspector-poses.png';
+  }
+  if (louPortraitArt.complete && louPortraitArt.naturalWidth) {
+    const cell = louPortraitArt.naturalWidth / 3;
+    c.drawImage(louPortraitArt, pose * cell, 0, cell, louPortraitArt.naturalHeight,
+      x, y, width, width * louPortraitArt.naturalHeight / cell);
+    return;
+  }
+  // Lightweight vector fallback while the illustration loads.
+
+  c.save(); c.translate(x, y); c.scale(width / 120, width / 120);
+  c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = INK; c.lineWidth = 2;
+  const shape = (fill, draw) => { c.beginPath(); draw(); c.closePath(); c.fillStyle = fill; c.fill(); c.stroke(); };
+  const line = (draw, color = INK, w = 1.3) => { c.beginPath(); c.strokeStyle = color; c.lineWidth = w; draw(); c.stroke(); c.strokeStyle = INK; c.lineWidth = 2; };
+  // Faded red uniform, uneven hem and a lightly hatched shaded side.
+  shape('#d96560', () => { c.moveTo(35,70); c.quadraticCurveTo(20,73,15,96); c.lineTo(25,105); c.lineTo(24,132); c.quadraticCurveTo(59,137,96,131); c.lineTo(94,104); c.lineTo(105,96); c.quadraticCurveTo(99,73,80,70); });
+  shape('#bd8665', () => { c.moveTo(46,59); c.lineTo(45,75); c.quadraticCurveTo(60,87,75,74); c.lineTo(73,58); });
+  // Ears, broad face, bald crown and silver side tufts.
+  shape('#d2a07b', () => { c.moveTo(35,32); c.bezierCurveTo(23,26,25,51,37,49); c.lineTo(82,49); c.bezierCurveTo(95,48,93,29,83,32); });
+  shape('#d9aa85', () => { c.moveTo(35,28); c.bezierCurveTo(35,1,81,1,84,28); c.lineTo(80,54); c.quadraticCurveTo(75,71,60,72); c.quadraticCurveTo(43,69,38,55); });
+  shape('#e5e1d6', () => { c.moveTo(35,38); c.lineTo(30,22); c.lineTo(35,25); c.lineTo(35,16); c.lineTo(42,20); c.lineTo(40,36); });
+  shape('#e5e1d6', () => { c.moveTo(79,20); c.lineTo(86,17); c.lineTo(85,25); c.lineTo(91,23); c.lineTo(85,39); c.lineTo(80,35); });
+  // Heavy sunglasses, with a small pen highlight rather than glossy lenses.
+  shape('#343a50', () => { c.moveTo(37,32); c.lineTo(57,33); c.lineTo(55,44); c.quadraticCurveTo(43,50,39,42); });
+  shape('#343a50', () => { c.moveTo(64,33); c.lineTo(83,31); c.lineTo(81,42); c.quadraticCurveTo(70,49,66,43); });
+  line(() => { c.moveTo(57,36); c.quadraticCurveTo(61,33,65,36); c.moveTo(42,36); c.lineTo(48,35); c.moveTo(69,36); c.lineTo(74,35); }, '#8e99b8');
+  line(() => { c.moveTo(61,40); c.lineTo(58,51); c.quadraticCurveTo(61,54,65,51); }, '#936348');
+  // A silver moustache and a small, lopsided smile.
+  shape('#e5e1d6', () => { c.moveTo(61,54); c.quadraticCurveTo(52,50,46,58); c.quadraticCurveTo(54,62,61,58); c.quadraticCurveTo(69,61,76,56); c.quadraticCurveTo(67,51,61,54); });
+  line(() => { c.moveTo(55,64); c.quadraticCurveTo(63,67,70,62); c.moveTo(45,26); c.quadraticCurveTo(56,23,66,25); }, '#936348', 1);
+  // Inspector’s badge lanyard peeks out above the folded arms.
+  line(() => { c.moveTo(46,76); c.lineTo(60,97); c.lineTo(75,76); }, '#fff0cd', 1.6);
+  shape('#ead7a4', () => { c.rect(57,94,7,9); });
+  shape('#c38e6a', () => { c.moveTo(92,91); c.quadraticCurveTo(105,104,91,115); c.lineTo(39,101); c.quadraticCurveTo(30,95,38,91); c.lineTo(83,102); });
+  shape('#d9aa85', () => { c.moveTo(26,91); c.quadraticCurveTo(13,108,30,117); c.quadraticCurveTo(42,121,82,102); c.lineTo(89,99); c.quadraticCurveTo(93,92,85,91); c.lineTo(38,105); });
+  line(() => { c.moveTo(78,96); c.lineTo(82,101); c.moveTo(83,95); c.lineTo(86,99); c.moveTo(39,95); c.lineTo(37,100); }, '#936348', 1);
+  for (let i=0;i<7;i++) line(() => { c.moveTo(29+i*4,122); c.lineTo(25+i*4,129); }, 'rgba(92,52,64,.28)', .8);
+  line(() => { c.moveTo(69,126); c.lineTo(87,125); c.moveTo(24,81); c.lineTo(20,91); c.moveTo(30,120); c.quadraticCurveTo(55,124,76,114); }, 'rgba(255,241,207,.45)', 1);
+  c.restore();
+}
 function drawLou(c, x, time = 0, id = 11) {
   // lifeguard chair
   jline(c, x - 12, GY, x - 6, GY - 44, id, GRAPH, 1.6, 1); jline(c, x + 12, GY, x + 6, GY - 44, id + 1, GRAPH, 1.6, 1);
   jline(c, x - 10, GY - 16, x + 10, GY - 16, id + 2, GRAPH, 1.2, 1); jline(c, x - 8, GY - 30, x + 8, GY - 30, id + 3, GRAPH, 1.2, 1);
   jline(c, x - 12, GY - 44, x + 12, GY - 44, id + 4, INK, 2, 1);
-  // Lou the duck
-  const y = GY - 50, blink = (time % 4) > 3.85;
-  c.fillStyle = '#ffd84d'; c.strokeStyle = INK; c.lineWidth = 1.5;
-  c.beginPath(); c.ellipse(x, y, 11, 8, 0, 0, 7); c.fill(); c.stroke();
-  c.beginPath(); c.arc(x + 4, y - 11, 6.5, 0, 7); c.fill(); c.stroke();
-  c.fillStyle = '#ff9f1c'; c.beginPath(); c.moveTo(x + 9, y - 12); c.lineTo(x + 17, y - 10); c.lineTo(x + 9, y - 8); c.closePath(); c.fill(); c.stroke();
-  c.fillStyle = '#d8342c'; c.beginPath(); c.arc(x + 4, y - 14, 6.5, Math.PI * 1.05, Math.PI * 1.95); c.closePath(); c.fill();
-  if (blink) jline(c, x + 5, y - 11, x + 8, y - 11, 1, INK, 1.2, 1); else { c.fillStyle = INK; c.beginPath(); c.arc(x + 6, y - 11, 1.3, 0, 7); c.fill(); }
+  // The same folded-arm inspector seen on the inspection card.
+  drawLouPortrait(c, x - 17, GY - 82, 34);
+
 }
 function drawRuler(c, kit) {
   const px10 = 10 / FT;
@@ -1912,6 +1960,13 @@ function showReport() {
   const r = WS.rep, s = WS.sim.stats, kit = WS.kit, rep = $('#report');
   rep.classList.toggle('firstReport', !state.rides.length); rep.classList.remove('showDetails');
   $('#repTitle').textContent = kit.name;
+  const portrait = $('#louPortrait');
+  const portraitCtx = portrait.getContext('2d');
+  portraitCtx.clearRect(0, 0, portrait.width, portrait.height);
+  portrait.dataset.pose = r.approved ? '2' : '1';
+  portrait.setAttribute('aria-label', r.approved ? 'Lou approves with a thumbs-up and a tiny smirk' : 'Lou checks his clipboard');
+  drawLouPortrait(portraitCtx, 0, 0, portrait.width, Number(portrait.dataset.pose));
+  $('#louIntro').textContent = !state.rides.length ? 'I’m Lou, your Safety & Fun Inspector. Let’s check your slide.' : 'Lou · Safety & Fun Inspector';
   const row = (c, mk, cls) => `<li class="${cls}"><span class="mk">${mk}</span><span>${esc(c.label)}</span><span class="got">${esc(c.got || '')}</span></li>`;
   let html = r.checks.map(c => row(c, c.ok ? '✓' : '✗', c.ok ? 'ok' : 'no')).join('');
   html += row({ label: 'Work order: ' + r.goal.label, got: r.goal.got }, r.goal.ok ? '✓' : '✗', (r.goal.ok ? 'ok' : 'no') + ' sep');
@@ -1920,8 +1975,8 @@ function showReport() {
   const stat = (l, v) => `<div>${l}<b>${v}</b></div>`;
   $('#stats').innerHTML = stat('Top speed', `${s.topMph.toFixed(0)} mph`) + stat('Biggest jump', `${s.longestAir.toFixed(1)} s`) + stat('Max force', `${s.maxG.toFixed(1)} g`) + stat('Ride time', `${s.rideTime.toFixed(1)} s`) + stat('Drop', `${Math.max(0, s.dropFt).toFixed(0)} ft`) + stat(...kitStat(kit, { loops: s.loops, hills: s.hills, turns: s.turns, hops: s.hops, big: Math.round(s.bigHillFt) }));
   const note = WS.crashNote && s.outcome !== 'splash' ? WS.crashNote + ' ' : '';
-  $('#tip').innerHTML = (r.approved ? `<div class="stars">${starStr(r.stars)}</div>` : '') + `<b>Lifeguard’s note:</b> ${esc(tName(note + r.tip))}`;
-  if (!state.rides.length && r.approved) $('#tip').innerHTML = '<b>Lifeguard’s note:</b> Your first slide is ready. Open it and take a ride!';
+  $('#tip').innerHTML = (r.approved ? `<div class="stars">${starStr(r.stars)}</div>` : '') + `<b>Lou:</b> ${esc(tName(note + r.tip))}`;
+  if (!state.rides.length && r.approved) $('#tip').innerHTML = '<b>Lou:</b> Your first slide is ready. Open it and take a ride!';
   const st = $('#stamp'); st.textContent = r.approved ? 'APPROVED' : WS.sim && WS.sim.stats.outcome === 'stuck' && WS.sim.stats.distFt < 5 ? 'MEH.' : 'TRY AGAIN'; if (st.textContent === 'MEH.') setTimeout(() => stickerGet('meh'), 900); st.className = 'stamp' + (r.approved ? '' : ' blue');
   const acts = $('#repActions'); acts.innerHTML = '';
   const btn = (label, fn, primary) => { const b = document.createElement('button'); b.textContent = label; if (primary) b.className = 'primary'; b.onclick = () => { SFX.pop(); fn(); }; acts.appendChild(b); return b; };
@@ -7452,7 +7507,7 @@ function bookButton(parent, text, action, primary = false) {
 }
 function renderPlan(box) {
   const f = Progress.facts(state), completed = !!state.completedAt;
-  if (completed) box.innerHTML = `<div class="parkCertificate"><div class="eyebrow">Park inspection passed</div><h2>${esc(state.name)}</h2><p>Final inspection passed.</p><p>${f.distinct} slide designs · ${f.mastered} mastered designs · ${state.reqsDone || 0} guest requests completed</p><div class="signature">Your park lifeguard</div><p class="bookSmall">Your gold gate is yours to keep. Keep building, chase all 13 mastery stamps, or just go for a ride.</p></div>`;
+  if (completed) box.innerHTML = `<div class="parkCertificate"><div class="eyebrow">Park inspection passed</div><h2>${esc(state.name)}</h2><p>Final inspection passed.</p><p>${f.distinct} slide designs · ${f.mastered} mastered designs · ${state.reqsDone || 0} guest requests completed</p><div class="signature">Lou · Safety &amp; Fun Inspector</div><p class="bookSmall">Your gold gate is yours to keep. Keep building, chase all 13 mastery stamps, or just go for a ride.</p></div>`;
   else box.innerHTML = `<div class="bookLead"><p>Complete four goals to earn the gold gate. Build different slides, fulfill guest requests, and pass the Grand Tour inspection.</p><div class="bookMeters"><span><b>${f.distinct}</b> different designs</span><span><b>${f.mastered}/13</b> mastery stamps</span><span><b>${f.amenities}</b> amenities</span></div></div>`;
   state.milestones = state.milestones || {};
   f.tasks.forEach((task, i) => {
