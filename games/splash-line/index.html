@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<title>Splash Line</title>
+<title>Sketchwater Park</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Patrick+Hand&family=Rubik+Distressed&display=swap" rel="stylesheet">
@@ -361,7 +361,7 @@
     <div class="grid" id="testerGrid"></div>
   </div>
   <div id="parkBook" class="card" hidden aria-label="Park journal">
-    <div class="bookTop"><div><div class="eyebrow">Splash Line · Park journal</div><h2 id="bookTitle">Your park journal</h2></div><button id="bookClose" aria-label="Close journal">Close</button></div>
+    <div class="bookTop"><div><div class="eyebrow">Sketchwater Park · Park journal</div><h2 id="bookTitle">Your park journal</h2></div><button id="bookClose" aria-label="Close journal">Close</button></div>
     <nav class="bookTabs" aria-label="Journal sections"><button data-page="plan">Park goals</button><button data-page="rides">My rides</button><button data-page="help">How to play</button><button data-page="settings">Settings &amp; saves</button></nav>
     <div id="bookContent"></div>
   </div>
@@ -1649,7 +1649,7 @@ function drawRider(c, g, x, y, r, tube) {
 
 // ---------- saved game ----------
 const SAVE_KEY = 'splash-line-park-v1';
-const state = { version: 2, name: 'Splash Line Water Park', tickets: 5, rides: [], owned: {}, palms: 0, umbrellas: 0, unlocked: 0, riders: 0, welcomed: false, tester: 'sandy', mastered: {}, drafts: {}, settings: { muted: false, comfort: true } };
+const state = { version: 2, name: 'Sketchwater Park', tickets: 5, rides: [], owned: {}, palms: 0, umbrellas: 0, unlocked: 0, riders: 0, welcomed: false, tester: 'sandy', mastered: {}, drafts: {}, settings: { muted: false, comfort: true } };
 let saveIssue = '', saveBlocked = false;
 const SAVED = { local: false, cloud: false, at: 0, shownAt: 0 };
 function load() {
@@ -2594,9 +2594,10 @@ function drawTitle(c) {
   drawBush(c, 318, 5, TGY, 1.3); drawBush(c, 884, 9, TGY, 1.3); drawBush(c, 60, 13, TGY, 1.1); drawBush(c, 1150, 17, TGY, 1.1);
   drawGateArch(c, name);
   // headline
-  htext(c, 'Build your own water park!', GATE_CX, 92, 70, INK, { rot: -0.015 });
+  htext(c, 'Sketchwater Park', GATE_CX, 86, 76, INK, { rot: -0.015 });
+  htext(c, 'Dream it. Draw it. Ride it.', GATE_CX, 130, 30, GRAPH, { font: 'hand' });
   c.strokeStyle = AQUA; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath();
-  for (let x = 300; x <= 900; x += 6) { const y = 116 + Math.sin(x * 0.05 + now * 2) * 3; x === 300 ? c.moveTo(x, y) : c.lineTo(x, y); } c.stroke();
+  for (let x = 300; x <= 900; x += 6) { const y = 147 + Math.sin(x * 0.05 + now * 2) * 3; x === 300 ? c.moveTo(x, y) : c.lineTo(x, y); } c.stroke();
 }
 function titleZoom() { return TITLE.zoomAt ? clamp((now - TITLE.zoomAt) / 0.8, 0, 1) : 0; }
 function renderTitle(c) {
