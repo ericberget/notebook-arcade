@@ -1,7 +1,7 @@
 /* Shared, deterministic rules for drawing assistance, saves, and park milestones. */
 (function (root) {
   'use strict';
-  const families = ['kiddie', 'body', 'tube', 'loop', 'launch', 'drop', 'bunny', 'lazy', 'camel', 'switch', 'dloop', 'cliff', 'tour'];
+  const families = ['kiddie', 'body', 'tube', 'loop', 'launch', 'drop', 'bunny', 'lazy', 'camel', 'switch', 'dloop', 'cliff', 'tour', 'needle', 'hoops', 'bullseye', 'postage', 'lastdrop', 'lemonade', 'lunchbreak', 'splashzone', 'express', 'scenic', 'roofrun', 'underpass', 'slalom', 'airmail', 'pretzel', 'ripple'];
   const services = ['snack', 'hottub', 'fountain', 'gift', 'river', 'wave', 'surf'];
   const entrances = [
     {id:'classic',name:'Notebook classic',need:0,price:0,paper:'#fff3b0',letter:'#bd4031',left:'#ef476f',right:'#118ab2',desc:'Striped posts and a little splash of color.'},

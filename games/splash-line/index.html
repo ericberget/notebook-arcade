@@ -459,6 +459,56 @@ const KITS = [
              { text: 'Smooth: under 7.5 g', test: s => s.maxG < 7.5, got: s => `${s.maxG.toFixed(1)} g` } ] },
 ];
 
+// Extra work orders reuse the same physics, with distinct geometry and measured goals.
+const EXTRA_ORDERS = [
+  {id:'needle',name:'Thread the Needle',base:'launch',unlock:4,blurb:'Fly through the hoop before splashing down.',gates:[{x:790,y:480,r:75,air:true}],goalType:'gates'},
+  {id:'hoops',name:'Hoop Parade',base:'body',unlock:2,pool:[720,820],blurb:'Thread two hoops on your way to the pool.',gates:[{x:355,y:520,r:65},{x:650,y:570,r:65}],goalType:'gates'},
+  {id:'bullseye',name:'Bullseye',base:'launch',unlock:5,pool:[960,1040],blurb:'A small pool. A very large reason to aim carefully.',goalType:'landing'},
+  {id:'postage',name:'Postage Stamp',base:'body',unlock:3,pool:[735,800],blurb:'Fit your splash into the smallest pool on the block.',goalType:'landing'},
+  {id:'lastdrop',name:'The Last Drop',base:'kiddie',unlock:1,towerH:100,blurb:'A tiny tower. Make every inch of height count.',goalType:'time',min:2.4},
+  {id:'lemonade',name:'No-Spill Express',base:'lazy',unlock:3,blurb:'Pretend you are carrying lemonade: keep the forces low.',goalType:'gentle',max:2},
+  {id:'lunchbreak',name:'Lou’s Lunch Break',base:'kiddie',unlock:4,blurb:'Keep it smooth enough for an inspector on his lunch break.',goalType:'gentle',max:2.2},
+  {id:'splashzone',name:'Splash Zone',base:'drop',unlock:5,blurb:'Build up speed for a big splash at the finish.',goalType:'splash',min:35},
+  {id:'express',name:'Closing Time',base:'drop',unlock:5,pool:[680,800],blurb:'Last ride of the day. Get down in under 2.5 seconds.',goalType:'quick',max:2.5},
+  {id:'scenic',name:'Scenic Route',base:'lazy',unlock:4,blurb:'Take the long way. Nobody is in a hurry.',goalType:'time',min:7},
+  {id:'roofrun',name:'Rooftop Run',base:'body',unlock:3,pool:[720,820],obstacles:[{x:430,y:580,w:125,h:60,label:'snack shack'}],blurb:'Keep the rider above the snack-shack roof.',goalType:'obstacles'},
+  {id:'underpass',name:'Under the Boardwalk',base:'body',unlock:4,pool:[720,820],obstacles:[{x:540,y:320,w:130,h:150,label:'boardwalk'}],blurb:'Thread your rider below the raised boardwalk.',goalType:'obstacles'},
+  {id:'slalom',name:'Slalom Run',base:'switch',unlock:6,pool:[650,740],gates:[{x:380,y:355,r:55},{x:300,y:500,r:50},{x:550,y:610,r:45}],blurb:'Wind through three hoops on the way down.',goalType:'gates'},
+  {id:'airmail',name:'Air Mail',base:'cliff',unlock:7,blurb:'Send your rider across the canyon. Aim for a long flight.',goalType:'air',min:1.3},
+  {id:'pretzel',name:'The Pretzel',base:'dloop',unlock:7,blurb:'Two loops, then a soft splash. Keep some speed in reserve.',goalType:'loops',min:2},
+  {id:'ripple',name:'Ripple Run',base:'bunny',unlock:2,blurb:'Skip across four little hops like a pebble on water.',goalType:'hops',min:4},
+];
+function extraGoal(order) {
+  const n=order.min,m=order.max;
+  const goals={
+    gates:{text:order.gates?.length===1?'Fly through the hoop':`Pass all ${order.gates?.length || 0} hoops`,test:s=>s.gatesPassed===(order.gates?.length||0),got:s=>`${s.gatesPassed||0}/${order.gates?.length||0} hoops`},
+    obstacles:{text:'Clear the marked obstacle',test:s=>s.obstaclesHit===0,got:s=>s.obstaclesHit?'too close!':'clear'},
+    landing:{text:'Land in the small pool',test:s=>s.outcome==='splash',got:s=>s.outcome==='splash'?'on target!':'missed'},
+    gentle:{text:`No airtime; stay under ${m} g`,test:s=>s.airTime<.15&&s.maxG<m,got:s=>`${s.maxG.toFixed(1)} g · ${s.airTime.toFixed(1)}s air`},
+    time:{text:`Ride for ${n}+ seconds`,test:s=>s.rideTime>=n,got:s=>`${s.rideTime.toFixed(1)}s`},
+    quick:{text:`Reach the pool in under ${m}s`,test:s=>s.rideTime<m,got:s=>`${s.rideTime.toFixed(1)}s`},
+    splash:{text:`Splash at ${n}+ mph`,test:s=>s.splashMph>=n,got:s=>`${s.splashMph.toFixed(0)} mph splash`},
+    air:{text:`Fly for ${n}+ seconds`,test:s=>s.airLanded&&s.longestAir>=n,got:s=>`${s.longestAir.toFixed(1)}s flight`},
+    loops:{text:`Complete ${n} loops`,test:s=>s.loops>=n,got:s=>`${s.loops} loops`},
+    hops:{text:`Make ${n} little hops`,test:s=>s.hops>=n,got:s=>`${s.hops} hops`},
+  };return goals[order.goalType];
+}
+for(const order of EXTRA_ORDERS){
+  const base=KITS.find(k=>k.id===order.base);
+  const smoothLimit=order.goalType==='gentle'?1.9:order.base==='tube'||order.base==='dloop'?7.5:6.5;
+  KITS.push({...base,...order,short:order.name,prize:undefined,goal:extraGoal(order),bonus:[
+    {text:`Smooth: under ${smoothLimit} g`,test:s=>s.maxG<smoothLimit,got:s=>`${s.maxG.toFixed(1)} g`},
+    order.goalType==='landing'||order.goalType==='gates'||order.goalType==='obstacles'?
+      {text:'Land within 25 px of pool center',test:s=>Math.abs(s.end.x-((order.pool||base.pool)[0]+(order.pool||base.pool)[1])/2)<25,got:s=>`${Math.round(Math.abs(s.end.x-((order.pool||base.pool)[0]+(order.pool||base.pool)[1])/2))} px off center`}:
+    order.goalType==='air'?{text:'Fly 1.45s+',test:s=>s.longestAir>=1.45,got:s=>`${s.longestAir.toFixed(2)}s air`}:
+    order.goalType==='hops'?{text:'One hop lasts 0.3s+',test:s=>s.longestAir>=.3,got:s=>`${s.longestAir.toFixed(1)}s air`}:
+    order.goalType==='splash'?{text:'Splash at 37+ mph',test:s=>s.splashMph>=37,got:s=>`${s.splashMph.toFixed(0)} mph`}:
+    order.goalType==='quick'?{text:'Finish in under 2.2s',test:s=>s.rideTime<2.2,got:s=>`${s.rideTime.toFixed(1)}s`}:
+    order.goalType==='loops'?{text:'Splash below 24 mph',test:s=>s.splashMph<24,got:s=>`${s.splashMph.toFixed(0)} mph`}:
+    {text:'Splash below 24 mph',test:s=>s.splashMph<24,got:s=>`${s.splashMph.toFixed(0)} mph`},
+  ]});
+}
+
 function towerTop(kit) { return GY - kit.towerH; }
 
 // ---- geometry helpers ----
@@ -651,6 +701,19 @@ function simulate(T, kit) {
     dropFt: (lowestY - T.pts[0].y) * FT, splashMph: splashV, lengthFt: T.L * FT, distFt: (outcome === 'splash' ? T.L : maxSReached) * FT,
     squishAt, launchAt, hardAt, hardV, end: { x, y }
   };
+  stats.gatesPassed=(kit.gates||[]).filter(gate=>frames.some((f,i)=>{
+    if(!i)return false;const p=frames[i-1],dx=f.x-p.x;
+    if(Math.abs(dx)<1e-8)return false;const u=(gate.x-p.x)/dx;
+    return u>=0&&u<=1&&Math.abs(p.y+(f.y-p.y)*u-gate.y)<=gate.r&&(!gate.air||(!p.a&&!f.a));
+  })).length;
+  stats.obstaclesHit=(kit.obstacles||[]).filter(o=>frames.some((f,i)=>{
+    const p=frames[Math.max(0,i-1)];
+    return (f.x>=o.x-6&&f.x<=o.x+o.w+6&&f.y>=o.y-6&&f.y<=o.y+o.h+6)||
+      !!segCross(p.x,p.y,f.x,f.y,o.x-6,o.y-6,o.x+o.w+6,o.y-6)||
+      !!segCross(p.x,p.y,f.x,f.y,o.x-6,o.y-6,o.x-6,o.y+o.h+6)||
+      !!segCross(p.x,p.y,f.x,f.y,o.x+o.w+6,o.y-6,o.x+o.w+6,o.y+o.h+6)||
+      !!segCross(p.x,p.y,f.x,f.y,o.x-6,o.y+o.h+6,o.x+o.w+6,o.y+o.h+6);
+  })).length;
   return { frames, events, stats };
 }
 
@@ -939,6 +1002,10 @@ const EXAMPLES = {
   camel: [[290, 300], [350, 460], [440, 580], [540, 585], [620, 500], [670, 460], [720, 470], [780, 540], [850, 610], [950, 646]],
   switch: [[340, 330], [440, 370], [470, 420], [420, 460], [320, 480], [270, 520], [330, 570], [480, 600], [620, 620], [700, 646]],
 };
+for(const order of EXTRA_ORDERS){
+  const kit=KITS.find(k=>k.id===order.id),base=KITS.find(k=>k.id===order.base);
+  EXAMPLES[order.id]=EXAMPLES[order.base].map(([x,y])=>[x,GY-(GY-y)*kit.towerH/base.towerH]);
+}
 const kitById = id => KITS.find(k => k.id === id);
 function propsFor(kit) {
   const cand = [[300, 'bush'], [420, 'cart'], [560, 'bush'], [660, 'bush'], [1110, 'bush'], [1165, 'bush'], [790, 'cart']];
@@ -954,7 +1021,20 @@ function propsFor(kit) {
 function chairX(kit) { return kit.pool[1] + 40 < 1180 ? kit.pool[1] + 34 : kit.pool[0] - 30; }
 
 // ---------- scenery (workshop coordinates) ----------
+function drawChallengeMarkers(c,kit) {
+  for(const g of kit.gates||[]){
+    c.strokeStyle='rgba(31,61,158,.22)';c.lineWidth=1;c.setLineDash([4,6]);c.beginPath();c.moveTo(g.x,g.y+g.r);c.lineTo(g.x,GY);c.stroke();c.setLineDash([]);
+    c.strokeStyle='#e5aa54';c.lineWidth=7;c.beginPath();c.ellipse(g.x,g.y,14,g.r,0,0,Math.PI*2);c.stroke();
+    c.strokeStyle=INK;c.lineWidth=1.2;c.stroke();htext(c,g.air?'fly through':'through here',g.x,g.y-g.r-12,15,INK,{font:'Patrick'});
+  }
+  for(const o of kit.obstacles||[]){
+    c.fillStyle='#ead4a8';c.fillRect(o.x,o.y,o.w,o.h);c.strokeStyle=INK;c.lineWidth=1.5;c.strokeRect(o.x,o.y,o.w,o.h);
+    c.save();c.beginPath();c.rect(o.x,o.y,o.w,o.h);c.clip();for(let k=-o.h;k<o.w;k+=12)jline(c,o.x+k,o.y+o.h,o.x+k+o.h,o.y,k,'rgba(133,89,57,.2)',1,1);c.restore();
+    htext(c,o.label,o.x+o.w/2,o.y+o.h/2,16,INK,{font:'Patrick'});
+  }
+}
 function drawGround(c, kit, id = 1) {
+  drawChallengeMarkers(c,kit);
   const [p0, p1] = kit.pool;
   c.fillStyle = 'rgba(160,130,80,.09)'; c.fillRect(112, GY, 1088, H - GY);
   for (let i = 0; i < 160; i++) {
@@ -1799,7 +1879,7 @@ const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;
 const NAME_A = ['Soggy', 'Mega', 'Wild', 'Turbo', 'Sneaky', 'Giant', 'Cosmic', 'Slippery', 'Wobbly', 'Screaming', 'Tiny', 'Thunder', 'Bubbly', 'Rocket', 'Sloshy', 'Midnight', 'Dizzy', 'Grumpy'];
 const NAME_B = { kiddie: ['Splish', 'Puddle', 'Duckling', 'Drip', 'Bubbles', 'Sprinkle'], body: ['Slide', 'Chute', 'Plunge', 'Swoosh', 'Flume', 'Zoom'], tube: ['Twister', 'Wiggler', 'Tumbler', 'Noodle', 'Rapids', 'Bumper'], loop: ['Loop', 'Corkscrew', 'Spinner', 'Pretzel', 'Tornado', 'Yo-Yo'], launch: ['Launch', 'Cannonball', 'Belly Flop', 'Jumper', 'Flyer', 'Catapult'], drop: ['Drop', 'Plummet', 'Freefall', 'Gulp', 'Abyss', 'Elevator'], bunny: ['Hopper', 'Bouncer', 'Bunny', 'Kangaroo', 'Pogo'], lazy: ['Drifter', 'Snail', 'Meander', 'Daydream', 'Lazybones'], camel: ['Hump', 'Camel', 'Mountain', 'Floater', 'Big Bump'], switch: ['Zig-Zag', 'Switcheroo', 'Pretzel', 'Scribble', 'Back-n-Forth'], dloop: ['Double Trouble', 'Loopity Loop', 'Twin Twister', 'Figure Eight'], cliff: ['Canyon Cannon', 'Cliff Diver', 'Sky Hopper', 'Big Leap'], tour: ['Grand Tour', 'Everything Slide', 'Mega Mix', 'Whole Enchilada'] };
 const NAME_FIXED = ['The Big Gulp', 'Soggy Bottom', 'The Drain Brain', 'Pickle Chute', 'Belly Flopper', 'Cloud Diver', 'The Toilet Bowl', 'Wet Sock', 'Splashzilla', "Sandy's Revenge", 'The Wet Noodle', 'Wedgie Express'];
-function randomName(kit) { const used = new Set(state.rides.map(r => r.name)); for (let i = 0; i < 30; i++) { const n = Math.random() < 0.3 ? pick(NAME_FIXED) : `${pick(NAME_A)} ${pick(NAME_B[kit.id])}`; if (!used.has(n)) return n; } return `${pick(NAME_A)} ${pick(NAME_B[kit.id])}`; }
+function randomName(kit) { const used = new Set(state.rides.map(r => r.name)); for (let i = 0; i < 30; i++) { const n = Math.random() < 0.3 ? pick(NAME_FIXED) : `${pick(NAME_A)} ${pick(NAME_B[kit.id] || NAME_B[kit.base] || NAME_B.body)}`; if (!used.has(n)) return n; } return `${pick(NAME_A)} ${pick(NAME_B[kit.id] || NAME_B[kit.base] || NAME_B.body)}`; }
 
 // ---------- Ride Workshop ----------
 const WS = { kit: KITS[1], lot: 0, strokes: [], cur: null, track: null, sim: null, rep: null, play: null, marks: [], labels: [], parts: [], hintAt: -99, penV: 0, last: null, crashNote: '' };
@@ -2781,7 +2861,7 @@ const SWAY = { kiddie: [10, 380], body: [22, 460], tube: [70, 420], loop: [30, 5
 const POV = { on: false, from: 'park', kit: null, T: null, sim: null, name: '', stars: 0, t: 0, phase: 'ride', endT: 0, cam: null, look: { yaw: 0, pitch: 0, ty: 0, tp: 0 }, drag: null, labels: [], drops: [], fired: 0, lastZ: 0, shake: 0, scenery: null, rgb: [0, 0, 0] };
 
 function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
-function povZ(s) { const [A, L] = SWAY[POV.kit.id]; if (!A) return 0; return A * Math.sin(s / L * 6.283) * smoothstep(0, 140, s) * smoothstep(0, 200, POV.T.L - s); }
+function povZ(s) { const [A, L] = (SWAY[POV.kit.id] || SWAY[POV.kit.base] || [0, 1]); if (!A) return 0; return A * Math.sin(s / L * 6.283) * smoothstep(0, 140, s) * smoothstep(0, 200, POV.T.L - s); }
 function povP(s) { const k = trackAt(POV.T, s); return { p: V3(k.x, GY - k.y, povZ(s)), th: k.th }; }
 function povFrame(s) {
   const a = povP(s), b = povP(Math.min(POV.T.L, s + 3)), c = povP(Math.max(0, s - 3));
@@ -3205,6 +3285,14 @@ function povCollect() {
     face([c,d,up(d),up(c)],colors[1],null,grain(2),across); face([d,a,up(a),up(d)],colors[0],null,grain(3),across);
     face([up(a),up(b),up(c),up(d)],colors[2],null,grain(4),across);
   };
+  // Challenge props sit in the same world locations as the workshop targets.
+  for(const g of kit.gates||[]){
+    for(let i=0;i<32;i++){
+      const a=i*Math.PI/16,b=(i+1)*Math.PI/16;
+      seg(V3(g.x,GY-g.y+Math.sin(a)*g.r,Math.cos(a)*75),V3(g.x,GY-g.y+Math.sin(b)*g.r,Math.cos(b)*75),'#dca34e',5,.95);
+    }
+  }
+  for(const o of kit.obstacles||[])block(o.x+o.w/2,GY-o.y-o.h,0,o.w,o.h,140,['#c6a875','#b99a68','#ead9ad'],2050);
   for (const x of [x0, x1]) for (const z of zs) seg(V3(x, 0, z), V3(x, top, z), INK, 2.2, 0.9);
   for (let y = 48; y < top; y += 48) { seg(V3(x0, y, -34), V3(x1, y, -34), GRAPH, 1.2, 0.6); seg(V3(x0, y, 34), V3(x1, y, 34), GRAPH, 1.2, 0.6); seg(V3(x0, y, -34), V3(x0, y, 34), GRAPH, 1.2, 0.6); seg(V3(x1, y, -34), V3(x1, y, 34), GRAPH, 1.2, 0.6); }
   // Individual deck boards and side rails make the standing viewpoint feel grounded.
@@ -3366,26 +3454,28 @@ function povTubeArt() {
   const c=art.getContext('2d');c.setTransform(2,0,0,2,800,260);
   c.lineCap='round';c.lineJoin='round';
   const ring=new Path2D();
-  ring.ellipse(0,90,360,182,0,0,Math.PI*2);
-  ring.ellipse(0,110,244,150,0,0,Math.PI*2,true);
-  c.fillStyle='#ff9b53';c.fill(ring,'evenodd');
+  ring.ellipse(0,120,380,210,0,0,Math.PI*2);
+  ring.ellipse(0,132,236,120,0,0,Math.PI*2,true);
+  c.fillStyle='#de773a';c.fill(ring,'evenodd');
   c.save();c.clip(ring,'evenodd');
-  // Broad, slightly uneven brush passes follow the inflated surface.
-  c.strokeStyle='rgba(180,76,35,.25)';c.lineWidth=28;
-  c.beginPath();c.ellipse(0,96,352,178,0,Math.PI,Math.PI*2);c.stroke();
-  c.strokeStyle='rgba(255,207,131,.43)';c.lineWidth=19;
-  c.beginPath();c.ellipse(-3,111,320,185,0,Math.PI*1.09,Math.PI*1.91);c.stroke();
-  c.strokeStyle='rgba(189,80,43,.22)';c.lineWidth=17;
-  c.beginPath();c.ellipse(0,112,249,155,0,Math.PI,Math.PI*2);c.stroke();
+  // Rounded cross-section: dark shoulders, broad lit crown, recessed inner wall.
+  // Thin nested bands are baked once into the cached art, not drawn during rides.
+  const stops=[[0,[195,94,43]],[.16,[239,133,62]],[.40,[255,187,105]],[.56,[255,172,82]],[.76,[240,127,51]],[1,[169,76,35]]];
+  for(let i=0;i<90;i++){
+    const t=i/89;let j=1;while(j<stops.length-1&&t>stops[j][0])j++;
+    const [a,A]=stops[j-1],[b,B]=stops[j],u=(t-a)/(b-a);
+    c.strokeStyle=`rgb(${A.map((v,k)=>Math.round(v+(B[k]-v)*u)).join(',')})`;c.lineWidth=3;
+    c.beginPath();c.ellipse(0,120+12*t,380-144*t,210-90*t,0,Math.PI,Math.PI*2);c.stroke();
+  }
   for(let k=0;k<28;k++) {
     const a=Math.PI*(1.03+rnd(1620+k)*.85),len=.035+rnd(1660+k)*.16;
     c.strokeStyle=k%3===0?'rgba(255,226,167,.25)':'rgba(156,86,50,.1)';
     c.lineWidth=.6+rnd(1690+k)*2.2;c.beginPath();
-    c.ellipse(-3+rnd(1700+k)*6,106,284+rnd(1710+k)*60,158+rnd(1730+k)*17,0,a,Math.min(Math.PI*1.98,a+len));c.stroke();
+    c.ellipse(-3+rnd(1700+k)*6,126,270+rnd(1710+k)*80,145+rnd(1730+k)*45,0,a,Math.min(Math.PI*1.98,a+len));c.stroke();
   }
   // Short pen hatching sits in small patches, mostly along the shadowed edges.
   for(let patch=0;patch<8;patch++) {
-    const x=-315+patch*88,y=90-182*Math.sqrt(Math.max(0,1-(x/360)**2))+12;
+    const x=-315+patch*88,y=120-210*Math.sqrt(Math.max(0,1-(x/380)**2))+12;
     for(let k=0;k<9;k++) {
       const px=x+k*3.1,py=y+(rnd(1770+patch*17+k)-.5)*7;
       c.strokeStyle='rgba(130,68,45,.24)';c.lineWidth=.65;c.beginPath();
@@ -3395,25 +3485,25 @@ function povTubeArt() {
   }
   // Panel seams curve from the outer shoulder toward the recessed inner edge.
   for(const a of [1.16,1.36,1.64,1.84]) {
-    const angle=a*Math.PI,ox=Math.cos(angle)*360,oy=90+Math.sin(angle)*182;
-    const ix=Math.cos(angle)*244,iy=110+Math.sin(angle)*150;
+    const angle=a*Math.PI,ox=Math.cos(angle)*380,oy=120+Math.sin(angle)*210;
+    const ix=Math.cos(angle)*236,iy=132+Math.sin(angle)*120;
     c.strokeStyle='rgba(120,72,60,.38)';c.lineWidth=1.1;c.beginPath();c.moveTo(ox,oy);
-    c.bezierCurveTo(ox*.96,oy+13,ix*1.08,iy-6,ix,iy);c.stroke();
+    c.bezierCurveTo(ox*.97,oy+38,ix*1.10,iy-24,ix,iy);c.stroke();
     c.strokeStyle='rgba(255,233,185,.5)';c.lineWidth=1.2;c.beginPath();c.moveTo(ox+3,oy+2);
-    c.bezierCurveTo(ox*.96+3,oy+13,ix*1.08+3,iy-6,ix+3,iy);c.stroke();
+    c.bezierCurveTo(ox*.97+3,oy+38,ix*1.10+3,iy-24,ix+3,iy);c.stroke();
   }
   c.restore();
   c.strokeStyle=INK;c.lineWidth=2.2;c.stroke(ring);
   c.strokeStyle='rgba(98,60,46,.32)';c.lineWidth=.8;c.beginPath();
-  c.ellipse(-1,92,357,180,0,Math.PI*1.1,Math.PI*1.42);c.stroke();
+  c.ellipse(-1,122,377,208,0,Math.PI*1.1,Math.PI*1.42);c.stroke();
   // Broken light strokes leave a softer, drawn sheen than one solid white stripe.
   c.strokeStyle='rgba(255,242,204,.8)';c.lineWidth=4;c.beginPath();
-  c.ellipse(-3,108,324,181,0,Math.PI*1.2,Math.PI*1.36);c.stroke();
-  c.lineWidth=2.6;c.beginPath();c.ellipse(-3,108,324,181,0,Math.PI*1.39,Math.PI*1.46);c.stroke();
+  c.ellipse(-3,125,326,176,0,Math.PI*1.2,Math.PI*1.36);c.stroke();
+  c.lineWidth=2.6;c.beginPath();c.ellipse(-3,125,326,176,0,Math.PI*1.39,Math.PI*1.46);c.stroke();
   c.strokeStyle='rgba(255,226,165,.7)';c.lineWidth=2;c.beginPath();
-  c.ellipse(0,110,247,153,0,Math.PI*1.2,Math.PI*1.8);c.stroke();
+  c.ellipse(0,132,239,123,0,Math.PI*1.2,Math.PI*1.8);c.stroke();
   for(const side of [-1,1]) {
-    c.save();c.translate(side*250,-35);c.scale(-side,1);c.rotate(-.16);
+    c.save();c.translate(side*266,-8);c.scale(-side,1);c.rotate(-.16);
     drawPovTubeGrip(c);c.restore();
   }
   POV_TUBE_ART=art;return art;
@@ -3471,7 +3561,7 @@ function povRider(c) {
   const bob = POV.float ? Math.sin((now - POV.endAt) * 1.8) * 2 : Math.sin(now * 9) * Math.min(4, POV.mph * 0.12), y = H + bob;
   c.lineWidth = 2.2; c.strokeStyle = INK;
   if (POV.kit.tube) {
-    c.drawImage(povTubeArt(),W/2-400,y-146,800,240);
+    c.drawImage(povTubeArt(),W/2-440,y-154,880,264);
   } else {
     const air = POV.air && POV.phase === 'ride', fast = POV.mph > 22, t = now;
     const spread = air ? 26 + Math.sin(t * 10) * 8 : 0;
@@ -7665,7 +7755,7 @@ function bookButton(parent, text, action, primary = false) {
 function renderPlan(box) {
   const f = Progress.facts(state), completed = !!state.completedAt;
   if (completed) box.innerHTML = `<div class="parkCertificate"><div class="eyebrow">Park inspection passed</div><h2>${esc(state.name)}</h2><p>Final inspection passed.</p><p>${f.distinct} slide designs · ${f.mastered} mastered designs · ${state.reqsDone || 0} guest requests completed</p><div class="signature">Lou · Safety &amp; Fun Inspector</div><p class="bookSmall">Your gold gate is yours to keep. Keep building, or go for a ride.</p></div>`;
-  else box.innerHTML = `<div class="bookLead"><p>Complete four goals to earn the gold gate. Build different slides, fulfill guest requests, and pass the Grand Tour inspection.</p><div class="bookMeters"><span><b>${f.distinct}</b> different designs</span><span><b>${f.mastered}/13</b> mastery stamps</span><span><b>${f.amenities}</b> amenities</span></div></div>`;
+  else box.innerHTML = `<div class="bookLead"><p>Complete four goals to earn the gold gate. Build different slides, fulfill guest requests, and pass the Grand Tour inspection.</p><div class="bookMeters"><span><b>${f.distinct}</b> different designs</span><span><b>${f.mastered}/${KITS.length}</b> mastery stamps</span><span><b>${f.amenities}</b> amenities</span></div></div>`;
   state.milestones = state.milestones || {};
   f.tasks.forEach((task, i) => {
     const previousDone = f.tasks.slice(0,i).every(t => t.done), ready = task.done && previousDone;
@@ -7730,7 +7820,7 @@ function renderRideBook(box) {
     bookButton(buttons,'Redesign',()=>openWorkshop(r.kit,r.lot,r));
     if (!r.dispatch) { const b=bookButton(buttons,'Train dispatcher · 25 tickets',()=>{if(state.tickets<25||r.dispatch)return;r.dispatch=true;setTickets(state.tickets-25);openBook('rides');});b.disabled=state.tickets<25; }
   }
-  const mastered=Object.keys(state.mastered); box.insertAdjacentHTML('beforeend', `<p class="bookSmall">Mastered ${mastered.length}/13: ${mastered.length ? mastered.map(k=>esc(kitById(k).name)).join(', ') : 'Your first three-star design earns the first stamp.'}</p>`);
+  const mastered=Object.keys(state.mastered); box.insertAdjacentHTML('beforeend', `<p class="bookSmall">Mastered ${mastered.length}/${KITS.length}: ${mastered.length ? mastered.map(k=>esc(kitById(k).name)).join(', ') : 'Your first three-star design earns the first stamp.'}</p>`);
 }
 function showAmenity(type) {
   hidePanels(); const item = type === 'rescue' ? {name:'Lifeguard Tower',desc:'A shaded lookout for your park’s lifeguard.'} : SHOP.find(it=>it.id===type), el=$('#lotCard'); el.style.left='390px';el.style.top='150px';
