@@ -3695,8 +3695,10 @@ const TESTERS = [
   { id: 'pickle', name: 'Mr. Pickle', blurb: 'Briny, green and brave.', voice: 'whee' },
   { id: 'penguin', name: 'Pengo', blurb: 'Born to slide. Belly first.', voice: 'honk' },
   { id: 'tri', name: 'Tri-Tim', blurb: 'Three pointy sides of courage.', voice: 'whee' },
+  { id: 'lou', name: 'Lou', blurb: 'Fine. I’ll test it myself.', voice: 'whee', finalUnlock: true },
 ];
-const tester = () => TESTERS.find(t => t.id === state.tester) || TESTERS[0];
+const testerAvailable = t => !t.finalUnlock || !!state.completedAt;
+const tester = () => TESTERS.find(t => t.id === state.tester && testerAvailable(t)) || TESTERS[0];
 const tName = s => String(s).replace(/Sandy/g, tester().name);
 function faceAt(c, x, y, s, mood, eyeGap = 2.8) {
   c.fillStyle = INK; c.strokeStyle = INK; c.lineWidth = 1.3 * s;
@@ -3710,11 +3712,25 @@ function faceAt(c, x, y, s, mood, eyeGap = 2.8) {
 }
 function armsUp(c, x, y, mood) { if (mood === 'whee' || mood === 'air') { jline(c, x - 2, y, x - 8, y - 12, 3, INK, 1.8, 1); jline(c, x + 4, y, x + 7, y - 12, 4, INK, 1.8, 1); } }
 function drawTester(c, x, y, r, mood = 'happy', sc = 1, g = 1, id = null) {
-  const who = id || state.tester || 'sandy';
+  const who = id || tester().id;
   if (who === 'sandy') return drawSandy(c, x, y, r, mood, sc);
   c.save(); c.translate(x, y); c.rotate(r); c.scale(sc, sc); c.lineJoin = 'round'; c.lineCap = 'round';
   const O = (fill, w = 1.8) => { c.fillStyle = fill; c.fill(); c.strokeStyle = INK; c.lineWidth = w; c.stroke(); };
-  if (who === 'ducky') {
+  if (who === 'lou') {
+    // Tiny seated rider: folded arms, silver moustache, shades that never come off.
+    const airborne = mood === 'air' || mood === 'whee', kick = airborne ? -4 : 0;
+    c.beginPath();c.moveTo(-7,-1);c.lineTo(3,0);c.lineTo(12,2+kick);c.lineTo(19,1+kick);c.lineTo(20,5+kick);c.lineTo(8,7);c.lineTo(-8,5);c.closePath();O('#586a82',1.2);
+    c.beginPath();c.moveTo(17,2+kick);c.lineTo(24,1+kick);c.quadraticCurveTo(27,4+kick,22,5+kick);c.lineTo(18,5+kick);c.closePath();O('#d2a078',1);
+    c.beginPath();c.moveTo(-12,-12);c.quadraticCurveTo(-5,-17,2,-10);c.lineTo(5,0);c.quadraticCurveTo(-3,5,-11,1);c.closePath();O('#df7b70',1.2);
+    c.beginPath();c.arc(-6,-19,7,0,7);O('#d2a078',1.2);
+    c.beginPath();c.moveTo(-12,-23);c.lineTo(-16,-23);c.lineTo(-14,-17);c.lineTo(-11,-16);c.closePath();O('#f4efdf',.8);
+    c.beginPath();c.moveTo(-11,-21);c.lineTo(-1,-21);c.lineTo(0,-18);c.lineTo(-10,-18);c.closePath();O('#273657',.8);
+    c.beginPath();c.moveTo(-4,-17);c.quadraticCurveTo(1,-19,3,-14);c.quadraticCurveTo(-1,-13,-5,-15);c.lineTo(-9,-14);c.closePath();O('#f4efdf',.7);
+    c.beginPath();c.moveTo(-11,-8);c.quadraticCurveTo(-10,-3,1,-7);c.lineTo(2,-4);c.quadraticCurveTo(-9,1,-12,-5);c.closePath();O('#d2a078',.9);
+    jline(c,-9,-9,0,-4,88,'#9d684b',.7,1);
+    if(mood==='dizzy'||mood==='worried'){jline(c,4,-23,7,-26,89,INK,.8,1);jline(c,5,-19,9,-20,90,INK,.8,1);}
+    else if(airborne){jline(c,-18,-10,-22,-12,91,INK,.7,1);}
+  } else if (who === 'ducky') {
     if (mood === 'whee' || mood === 'air') { c.beginPath(); c.ellipse(-3, -9, 7, 3, -0.8, 0, 7); O('#ffd84d', 1.5); }
     c.beginPath(); c.moveTo(-12, -2); c.lineTo(-18, -9); c.lineTo(-10, -6); c.closePath(); O('#ffd84d', 1.5);
     c.beginPath(); c.ellipse(-1, -1, 12.5, 7.5, 0, 0, 7); O('#ffd84d');
@@ -3786,8 +3802,10 @@ function openTesters() {
   const grid = $('#testerGrid'); grid.innerHTML = '';
   for (const t of TESTERS) {
     const b = document.createElement('button'); b.className = 'tester' + (tester().id === t.id ? ' on' : '');
-    b.innerHTML = `<canvas></canvas><span class="nm">${esc(t.name)}</span><span class="bl">${esc(t.blurb)}</span>`;
-    b.onclick = () => { state.tester = t.id; save(); $('#testerCard').hidden = true; updateTesterBtn(); SFX.voice(t.voice); if (scene === 'surf') { surfMenuRender(); toast(`${t.name} is surfing now.`); } else if (!$('#lotCard').hidden && $('#dvRider')) { showDiveCard(); toast(`${t.name} is diving now.`); } else toast(`${t.name} is your test rider now.`); };
+    const locked = !testerAvailable(t);
+    b.disabled = locked;
+    b.innerHTML = `<canvas></canvas><span class="nm">${esc(t.name)}${locked ? ' · Locked' : ''}</span><span class="bl">${esc(locked ? 'Final unlock: pass the final park inspection.' : t.blurb)}</span>`;
+    b.onclick = () => { if (!testerAvailable(t)) return; state.tester = t.id; save(); $('#testerCard').hidden = true; updateTesterBtn(); SFX.voice(t.voice); if (scene === 'surf') { surfMenuRender(); toast(`${t.name} is surfing now.`); } else if (!$('#lotCard').hidden && $('#dvRider')) { showDiveCard(); toast(`${t.name} is diving now.`); } else toast(`${t.name} is your test rider now.`); };
     grid.appendChild(b);
     requestAnimationFrame(() => drawTesterCard(b.querySelector('canvas'), t.id));
   }
@@ -4557,25 +4575,72 @@ function drawDiveArea(c, s) {
   if (dy < PG) { c.save(); c.translate(dx, dy); c.rotate(u * 7); c.scale(1.1, 1.1); drawPerson(c, { suit: '#9b5de5', skin: '#f1c27d', hair: '#3b2a1a', seed: 7 }, 0, 8, 'play', now); c.restore(); }
   htext(c, 'high dive', s.x + s.w / 2 + 20, top - 26, 20, RED);
 }
+// Small, deterministic pen marks: no random texture regeneration during animation.
+function attractionHatch(c,x,y,w,h,seed,color='rgba(88,67,55,.18)') {
+  c.save(); c.beginPath(); c.rect(x,y,w,h); c.clip(); c.strokeStyle=color; c.lineWidth=.65;
+  for(let i=0;i<Math.ceil(w/7);i++){const px=x+i*7,py=y+((i*13+seed)%17)/17*h;c.beginPath();c.moveTo(px,py);c.lineTo(px+7,py-10);if(i%3===0){c.moveTo(px-2,py-7);c.lineTo(px+8,py-2);}c.stroke();}c.restore();
+}
 function drawBlasterArea(c, s) {
   if (!state.owned.blaster) return salePlaceholder(c, s, 210, 120, 'water blasters', 30, 2011);
-  const x0 = s.x + 25, x1 = s.x + s.w - 25, top = PG - 120;
-  c.fillStyle = 'rgba(255,243,176,.5)'; c.fillRect(x0, top + 20, x1 - x0, 100);
-  jline(c, x0, PG, x0, top + 20, 2012, INK, 2, 1); jline(c, x1, PG, x1, top + 20, 2013, INK, 2, 1);
-  for (let k = 0; k < 6; k++) { const w = (x1 - x0 + 20) / 6, xx = x0 - 10 + k * w; c.fillStyle = k % 2 ? '#fff' : '#ef476f'; c.beginPath(); c.moveTo(xx, top); c.lineTo(xx + w, top); c.lineTo(xx + w, top + 16); c.quadraticCurveTo(xx + w / 2, top + 28, xx, top + 16); c.closePath(); c.fill(); c.strokeStyle = INK; c.lineWidth = 1.2; c.stroke(); }
-  c.fillStyle = '#c9a26b'; c.fillRect(x0, top + 74, x1 - x0, 6);
-  for (let k = 0; k < 4; k++) { const tx = x0 + 20 + ((k * 50 + now * 30) % (x1 - x0 - 40)); duckShape(c, tx, top + 64, 0.8, k === 2); }
-  const sx = x0 + 30 + ((now * 0.8) % 1) * 100; c.strokeStyle = 'rgba(79,195,224,.8)'; c.lineWidth = 3; c.beginPath(); c.moveTo((x0 + x1) / 2, PG - 10); c.quadraticCurveTo((x0 + x1) / 2 - 20, top + 30, sx, top + 58); c.stroke();
-  htext(c, 'water blasters', (x0 + x1) / 2, top - 8, 20, '#118ab2');
+  const x0=s.x+25,x1=s.x+s.w-25,top=PG-120,cx=(x0+x1)/2,t=REDUCED?0:now;
+  c.save(); c.lineJoin='round';
+  // Recessed back wall, timber uprights and a striped pitched canopy.
+  c.fillStyle='#eee0b8';c.fillRect(x0,top+14,x1-x0,106);
+  c.fillStyle='rgba(111,78,52,.13)';c.fillRect(x0,top+20,x1-x0,14);c.fillRect(x1-12,top+25,12,89);
+  for(let y=top+45;y<PG;y+=23)jline(c,x0+5,y,x1-5,y,2010+y,'rgba(112,89,63,.25)',.7,.5);
+  attractionHatch(c,x0+4,top+33,x1-x0-8,77,12);
+  for(const x of [x0,x1-5]){c.fillStyle='#c69b69';c.fillRect(x,top+17,5,103);jline(c,x,PG,x,top+16,x,INK,1.5,.6);jline(c,x+3,top+30,x+3,PG-6,x+5,'#ecd0a0',.8,.4);}
+  for(let k=0;k<6;k++){
+    const w=(x1-x0+20)/6,xx=x0-10+k*w;
+    c.fillStyle=k%2?'#fff9e6':'#df5771';c.strokeStyle=INK;c.lineWidth=1.2;c.beginPath();c.moveTo(xx+7,top-12);c.lineTo(xx+w+7,top-12);c.lineTo(xx+w,top+6);c.lineTo(xx,top+6);c.closePath();c.fill();c.stroke();
+    c.beginPath();c.moveTo(xx,top+6);c.lineTo(xx+w,top+6);c.lineTo(xx+w,top+17);c.quadraticCurveTo(xx+w/2,top+29,xx,top+17);c.closePath();c.fill();c.stroke();
+    attractionHatch(c,xx+3,top+8,w-6,10,k,'rgba(49,49,101,.17)');
+    jline(c,xx+9,top-9,xx+4,top+2,k,'rgba(255,255,255,.55)',1,.5);
+  }
+  // Target shelf has a top face, darker edge and brackets.
+  c.fillStyle='#e0b77e';c.beginPath();c.moveTo(x0-3,top+73);c.lineTo(x1+3,top+73);c.lineTo(x1-3,top+68);c.lineTo(x0+3,top+68);c.closePath();c.fill();
+  c.fillStyle='#a87d52';c.fillRect(x0-3,top+73,x1-x0+6,5);
+  jline(c,x0-3,top+73,x1+3,top+73,2021,INK,1,.4);
+  for(const x of [x0+17,x1-17])jline(c,x,top+79,x+8,top+87,x,'#866345',2,.3);
+  for(let k=0;k<4;k++){const tx=x0+20+((k*50+t*30)%(x1-x0-40));duckShape(c,tx,top+63,.8,k===2);}
+  // Counter and visible mounted water gun explain where the stream comes from.
+  c.fillStyle='#d2ab78';c.fillRect(x0-5,PG-17,x1-x0+10,8);attractionHatch(c,x0,PG-16,x1-x0,7,4);
+  jline(c,x0-5,PG-17,x1+5,PG-17,2014,INK,1.3,.5);
+  c.fillStyle='#a8825b';c.fillRect(cx-4,PG-29,8,12);
+  c.save();c.translate(cx,PG-29);c.rotate(-.4);c.fillStyle='#148fa9';c.strokeStyle=INK;c.lineWidth=1.1;c.beginPath();c.roundRect(-13,-7,23,11,3);c.fill();c.stroke();c.fillStyle='#e7b95d';c.fillRect(-6,4,7,8);c.fillStyle='#ecdbb5';c.fillRect(-18,-5,6,6);c.restore();
+  const sx=x0+30+((t*.8)%1)*Math.min(100,x1-x0-60);
+  c.strokeStyle='rgba(51,170,193,.7)';c.lineWidth=1.7;c.beginPath();c.moveTo(cx-15,PG-28);c.quadraticCurveTo(cx-38,top+27,sx,top+59);c.stroke();
+  for(let i=0;i<3;i++){c.fillStyle='#68bdcb';c.beginPath();c.arc(sx-3+i*4,top+55-Math.sin(i+t*4)*3,1,0,7);c.fill();}
+  htext(c,'water blasters',cx,top-20,20,'#118ab2');c.restore();
 }
 function drawBumperArea(c, s) {
-  if (!state.owned.bumper) return salePlaceholder(c, s, 260, 70, 'bumper boats', 45, 2021);
-  const cx = s.x + s.w / 2, w = s.w / 2 - 24;
-  c.fillStyle = PAPER; c.beginPath(); c.ellipse(cx, PG + 8, w, 20, 0, 0, 7); c.fill();
-  c.fillStyle = 'rgba(79,195,224,.45)'; c.fill(); c.strokeStyle = INK; c.lineWidth = 2; c.stroke();
-  const cols = ['#ef476f', '#ffd166', '#06d6a0', '#9b5de5'];
-  for (let k = 0; k < 4; k++) { const a = now * (0.5 + k * 0.13) + k * 1.6, bx = cx + Math.cos(a) * (w - 30), by = PG + 8 + Math.sin(a) * 9; c.fillStyle = cols[k]; c.beginPath(); c.ellipse(bx, by, 18, 7, 0, 0, 7); c.fill(); c.strokeStyle = INK; c.lineWidth = 1.4; c.stroke(); c.fillStyle = '#f1c27d'; c.beginPath(); c.arc(bx, by - 8, 5, 0, 7); c.fill(); c.stroke(); }
-  htext(c, 'bumper boats', cx, PG - 40, 20, RED);
+  if (!state.owned.bumper) return salePlaceholder(c,s,260,70,'bumper boats',45,2021);
+  const cx=s.x+s.w/2,w=s.w/2-24,t=REDUCED?0:now;
+  c.save();
+  // Raised pool rim: the front wall gives the water a visible thickness.
+  c.fillStyle='#c9c5ad';c.strokeStyle=INK;c.lineWidth=1.5;c.beginPath();c.ellipse(cx,PG+12,w+4,24,0,0,7);c.fill();c.stroke();
+  c.fillStyle='#f4e8c6';c.beginPath();c.ellipse(cx,PG+5,w+4,24,0,0,7);c.fill();c.stroke();
+  c.fillStyle='#9cd5dd';c.beginPath();c.ellipse(cx,PG+5,w-3,19,0,0,7);c.fill();c.strokeStyle='#338da8';c.lineWidth=1;c.stroke();
+  c.save();c.beginPath();c.ellipse(cx,PG+5,w-4,18,0,0,7);c.clip();
+  attractionHatch(c,cx-w,PG-13,w*2,35,7,'rgba(22,111,151,.13)');
+  for(let k=0;k<15;k++){const x=cx-w+12+k*(w*2-24)/15,y=PG-7+(k*11)%25;jline(c,x,y,x+11,y-1,k,'rgba(255,255,240,.6)',1,.6);}
+  c.restore();
+  const cols=['#ef6780','#edc65a','#39b6a4','#a37bd2'],skins=['#bc805d','#e1b18a','#945d43','#cd956d'];
+  const boats=cols.map((col,k)=>{const a=t*(.5+k*.13)+k*1.6;return {k,col,x:cx+Math.cos(a)*(w-30),y:PG+5+Math.sin(a)*9};}).sort((a,b)=>a.y-b.y);
+  for(const b of boats){const {k,col,x,y}=b;
+    c.strokeStyle='rgba(255,255,245,.8)';c.lineWidth=1;c.beginPath();c.ellipse(x-3,y+3,23,8,0,.1,2.9);c.stroke();
+    c.fillStyle='#43506a';c.strokeStyle=INK;c.lineWidth=1.2;c.beginPath();c.ellipse(x,y+2,19,8,0,0,7);c.fill();c.stroke();
+    c.fillStyle=col;c.beginPath();c.ellipse(x,y-1,17,7,0,0,7);c.fill();c.stroke();
+    c.fillStyle='#4e6575';c.beginPath();c.ellipse(x,y-2,8,3.6,0,0,7);c.fill();
+    c.fillStyle=k%2?'#fff2d1':'#efc35d';c.beginPath();c.moveTo(x-4,y-2);c.lineTo(x-3,y-10);c.lineTo(x+3,y-10);c.lineTo(x+5,y-2);c.closePath();c.fill();c.stroke();
+    c.fillStyle=skins[k];c.beginPath();c.arc(x,y-13,4.5,0,7);c.fill();c.stroke();
+    c.strokeStyle='#65503c';c.lineWidth=1.6;c.beginPath();c.arc(x,y-14,4,3.4,6);c.stroke();
+    c.strokeStyle=INK;c.lineWidth=.8;c.beginPath();c.ellipse(x+5,y-4,3,2,0,0,7);c.stroke();
+    jline(c,x-11,y-2,x-5,y-4,k,'rgba(255,255,235,.75)',1.3,.3);
+    attractionHatch(c,x+7,y,8,4,k,'rgba(30,40,97,.3)');
+  }
+  for(let i=0;i<11;i++){const a=.16+i*(Math.PI-.32)/10;const x=cx+Math.cos(a)*(w+2),y=PG+5+Math.sin(a)*23;jline(c,x,y,x,y+5,i,'rgba(65,72,104,.45)',.8,.3);}
+  htext(c,'bumper boats',cx,PG-40,20,RED);c.restore();
 }
 function drawRescueArea(c, s) {
   if (!state.owned.rescue) return salePlaceholder(c, s, 170, 140, 'lifeguard tower', 35, 2031);
@@ -5833,7 +5898,7 @@ function ctrStep(cfg, dt, d) {
   d.spawn -= dt;
   const free = [0, 1, 2].filter(i => !d.cus.some(c => c.spot === i && c.state !== 'happy' && c.state !== 'mad'));
   if (d.spawn <= 0 && free.length && MINI.t < MINI_INFO[cfg.key].time - 4) {
-    const spot = pick(free), order = cfg.order(MINI.t), tester = Math.random() < 0.3 ? pick(TESTERS).id : null;
+    const spot = pick(free), order = cfg.order(MINI.t), tester = Math.random() < 0.3 ? pick(TESTERS.filter(testerAvailable)).id : null;
     const patMax = Math.max(13, 24 - MINI.t * 0.12) + cfg.size(order) * 1.5;
     d.cus.push({ id: d.cid++, spot, x: SNK_SPOTS[spot] < 600 ? -120 : SNK_SPOTS[spot] > 600 ? W + 120 : (Math.random() < 0.5 ? -120 : W + 120), state: 'in', order, pat: patMax, patMax, tester,
       g: { suit: pick(SNK_SUITS), skin: pick(SNK_SKINS), hair: pick(SNK_HAIR), seed: Math.random() * 9 } });
@@ -6693,7 +6758,7 @@ function surfKey(e, down) {
 const FP = { cam: null, yaw: 0, pitch: -0.1, roll: 0, drops: [], sp: [], foc: 560, shake: 0, lastT: -1, dropT: 0 };
 const FP_EYE = 48, FP_NEAR = 4, FP_FT = [0, 0.12, 0.25, 0.38, 0.5, 0.62, 0.74, 0.85, 0.93, 1];
 const FP_LIGHT = vnorm(V3(-0.25, 0.85, -0.45));
-const FP_FOOT = { sandy: ['#ecd9ae'], ducky: ['#ff9f1c', 1], blob: ['#7bd389'], robo: ['#9aa3ad'], dude: ['#f1c27d'], pickle: ['#8ac926'], penguin: ['#ff9f1c', 1], tri: ['#ffd166'] };
+const FP_FOOT = { lou: ['#d2a078'], sandy: ['#ecd9ae'], ducky: ['#ff9f1c', 1], blob: ['#7bd389'], robo: ['#9aa3ad'], dude: ['#f1c27d'], pickle: ['#8ac926'], penguin: ['#ff9f1c', 1], tri: ['#ffd166'] };
 
 function fpBez(u, a, b, c, d) { const v = 1 - u; return [v * v * v * a[0] + 3 * v * v * u * b[0] + 3 * v * u * u * c[0] + u * u * u * d[0], v * v * v * a[1] + 3 * v * v * u * b[1] + 3 * v * u * u * c[1] + u * u * u * d[1]]; }
 function fpFaceZ(F, t) { return F * 0.85 * (1 - (1 - t) * (1 - t)); }
@@ -7507,13 +7572,13 @@ function bookButton(parent, text, action, primary = false) {
 }
 function renderPlan(box) {
   const f = Progress.facts(state), completed = !!state.completedAt;
-  if (completed) box.innerHTML = `<div class="parkCertificate"><div class="eyebrow">Park inspection passed</div><h2>${esc(state.name)}</h2><p>Final inspection passed.</p><p>${f.distinct} slide designs · ${f.mastered} mastered designs · ${state.reqsDone || 0} guest requests completed</p><div class="signature">Lou · Safety &amp; Fun Inspector</div><p class="bookSmall">Your gold gate is yours to keep. Keep building, chase all 13 mastery stamps, or just go for a ride.</p></div>`;
-  else box.innerHTML = `<div class="bookLead"><p>Complete four goals to earn the gold gate. Build different slides, fulfill guest requests, and pass the Grand Tour inspection.</p><div class="bookMeters"><span><b>${f.distinct}</b> different designs</span><span><b>${f.mastered}/13</b> mastery stamps</span><span><b>${f.amenities}</b> amenities</span></div></div>`;
+  if (completed) box.innerHTML = `<div class="parkCertificate"><div class="eyebrow">Park inspection passed</div><h2>${esc(state.name)}</h2><p>Final inspection passed.</p><p>${f.distinct} slide designs · ${f.mastered} mastered designs · ${state.reqsDone || 0} guest requests completed</p><div class="signature">Lou · Safety &amp; Fun Inspector</div><p class="bookSmall">Lou is now available as a test rider. “Fine. I’ll test it myself.” Your gold gate is yours to keep.</p></div>`;
+  else box.innerHTML = `<div class="bookLead"><p>Complete four goals to earn the gold gate and unlock Lou as a test rider. Build different slides, fulfill guest requests, and pass the Grand Tour inspection.</p><div class="bookMeters"><span><b>${f.distinct}</b> different designs</span><span><b>${f.mastered}/13</b> mastery stamps</span><span><b>${f.amenities}</b> amenities</span></div></div>`;
   state.milestones = state.milestones || {};
   f.tasks.forEach((task, i) => {
     const previousDone = f.tasks.slice(0,i).every(t => t.done), ready = task.done && previousDone;
     const row = document.createElement('div'); row.className = 'milestone' + (ready ? ' achieved' : '');
-    row.innerHTML = `<span class="stepNumber">${ready ? '✓' : i + 1}</span><div><h3>${task.name}</h3><p>${task.detail}</p>${i < 3 ? `<small>${state.milestones[i] ? 'Reward collected' : i === 0 ? 'Reward: a free color for your first slide' : 'Reward: 20 tickets'}</small>` : ''}</div>`;
+    row.innerHTML = `<span class="stepNumber">${ready ? '✓' : i + 1}</span><div><h3>${task.name}</h3><p>${task.detail}</p>${i < 3 ? `<small>${state.milestones[i] ? 'Reward collected' : i === 0 ? 'Reward: a free color for your first slide' : 'Reward: 20 tickets'}</small>` : '<small>Final reward: Lou joins the test crew.</small>'}</div>`;
     if (i < 3 && ready && !state.milestones[i]) bookButton(row, i === 0 ? 'Choose a color' : 'Collect reward', () => {
       if (i === 0) { chooseWelcomeColor(); return; }
       state.milestones[i] = true; setTickets(state.tickets + 20); openBook('plan');
@@ -7533,6 +7598,7 @@ function renderPlan(box) {
     bookButton(actions, 'Entrance styles', openEntranceStyles);
     renderCommission(box);
   }
+  if (completed) bookButton(box, state.tester === 'lou' ? 'Lou is your test rider' : 'Choose Lou as test rider', () => { state.tester = 'lou'; saveNow(); updateTesterBtn(); toast('Lou: Fine. I’ll test it myself.'); openBook('plan'); }, true);
   if (completed) bookButton(box, 'Celebrate in the park', () => { hidePanels(); showScene('park'); PARK.camTarget = 0; launchFireworks(); });
 }
 function chooseWelcomeColor() {
