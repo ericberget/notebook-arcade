@@ -2872,8 +2872,10 @@ function povFrame(s) {
 function openPOV({ kit, T, sim, name, stars, from, style = null }) {
   POV.style = style;
   POV.on = true; POV.from = from; POV.kit = kit; POV.T = T; POV.sim = sim; POV.name = name; POV.stars = stars;
-  POV.t = -POV_COMFORT.readySeconds * POV_COMFORT.rate; POV.phase = 'ride'; POV.endT = sim.frames[sim.frames.length - 1].t; POV.cam = null; POV.fired = 0; POV.labels = []; POV.drops = []; POV.lastZ = 0; POV.shake = 0;
-  POV.waiting = true; $('#povSend').hidden = false;
+  // Free Fall keeps its original seated, automatic start.
+  POV.boarding = kit.id !== 'drop';
+  POV.t = -(POV.boarding ? POV_COMFORT.readySeconds : 2) * POV_COMFORT.rate; POV.phase = 'ride'; POV.endT = sim.frames[sim.frames.length - 1].t; POV.cam = null; POV.fired = 0; POV.labels = []; POV.drops = []; POV.lastZ = 0; POV.shake = 0;
+  POV.waiting = POV.boarding; $('#povSend').hidden = !POV.waiting;
   POV.float = null; POV.endShown = false;
   POV.look = { yaw: 0, pitch: 0, ty: 0, tp: 0 }; POV.rgb = hexRgb(rideColor(kit, style));
   POV.reportWasOpen = !$('#report').hidden; $('#report').hidden = true; $('#toast').classList.remove('on');
@@ -2929,10 +2931,12 @@ function povSend() {
   POV.t = -(POV_COMFORT.readySeconds - 1.5) * POV_COMFORT.rate;
 }
 function povBoardingProgress() {
+  if (!POV.boarding) return 1;
   const elapsed = POV_COMFORT.readySeconds + POV.t / POV_COMFORT.rate;
   return smoothstep(1.5, 3.1, elapsed);
 }
 function povBoardingCam(seat) {
+  if (!POV.boarding) return { ...seat, mph: 0 };
   const u = povBoardingProgress();
   const standing = V3(START_X - 60, POV.kit.towerH + 44, 0);
   const F = vnorm(vlerp(vnorm(V3(1, -0.6, 0)), seat.F, u));
@@ -3323,7 +3327,7 @@ function povCollect() {
     face(pts, 'rgba(25,18,13,0.08)');
   }
   const shadow = list.splice(shadowStart);
-  const deck = POV.t < 0 ? list.splice(deckStart) : null;
+  const deck = POV.boarding && POV.t < 0 ? list.splice(deckStart) : null;
   // scenery
   for (const it of POV.scenery) {
     if(it.kind==='extra'){const phase=now+it.x*.01;billboard(list,it.x,it.z,c=>drawExtraObject(c,it.id,0,0,it.scale,phase),it.floating?.8+Math.sin(phase)*.5:0);}
@@ -3388,7 +3392,7 @@ function povCollect() {
     }
   }
   const rimStart = list.length;
-  if (POV.t < 0 && secs.length && secs[0].s === 0) {
+  if (POV.boarding && POV.t < 0 && secs.length && secs[0].s === 0) {
     const fr = povFrame(0);
     // Molded front edge: a short return below and behind the open mouth.
     for (let j = 0; j < NS; j++) {
