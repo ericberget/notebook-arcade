@@ -69,6 +69,15 @@ vm.runInContext([
      povUpdate(0);
      const start = { ...POV.cam.C };
      assert.equal(POV.mph, 0, 'standing rider is not already moving');
+     if (kit.id === 'drop') {
+       assert.equal(POV.waiting, false, 'Free Fall starts automatically');
+       assert.equal($('#povSend').hidden, true, 'Free Fall has no boarding button');
+       assert.equal(povBoardingProgress(), 1, 'Free Fall rider is seated immediately');
+       assert.deepEqual(POV.cam.C, povTargetCam(0).C, 'original seated camera');
+       for (let i = 0; i < 90; i++) tick(1 / 60);
+       assert(POV.t < 0, 'Free Fall keeps its two-second ready pause');
+       assert.deepEqual(POV.cam.C, start, 'ready camera stays steady');
+     } else {
      assert(start.y > kit.towerH + 40, 'starts standing above the wooden platform');
      assert(start.x < START_X - 30, 'starts behind the slide entrance');
      for (let i = 0; i < 89; i++) tick(1 / 60);
@@ -86,6 +95,7 @@ vm.runInContext([
      assert(Math.abs(POV.t - before - 0.6) < 1e-8, 'one second advances 0.6 seconds of ride');
      assert(POV.cam.C.y < start.y && POV.cam.C.x > start.x, 'camera lowers and moves toward the seat');
      assert.equal(POV.mph, 0, 'boarding has no ride speed');
+     }
      while (POV.t < -0.01) { tick(1 / 60); checkCamera(); }
      const seated = povTargetCam(0);
      assert(Math.hypot(POV.cam.C.x - seated.C.x, POV.cam.C.y - seated.C.y, POV.cam.C.z - seated.C.z) < 0.001, 'boarding meets the starting camera without a position jump');
