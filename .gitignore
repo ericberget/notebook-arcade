@@ -1,2 +1,7 @@
 .DS_Store
 .claude/
+
+ios/SketchwaterPark/Web/
+ios/build/
+ios/com.apple.DeveloperTools/
+**/xcuserdata/

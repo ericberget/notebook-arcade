@@ -1,0 +1,47 @@
+// !$*UTF8*$!
+{ archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
+C45D1486CC92B7021ED39D21 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
+BB2064B8F952F14E8F003E21 = { isa = PBXBuildFile; fileRef = C45D1486CC92B7021ED39D21; };
+67FBF3883236733BB500BAA3 = { isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = SketchwaterParkUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+55DA93A03A609655EA720A5B = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (BB2064B8F952F14E8F003E21,); runOnlyForDeploymentPostprocessing = 0; };
+754069D8B653D57080346823 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+0D06F70398D0415DED9A89A3 = { isa = PBXGroup; children = (C45D1486CC92B7021ED39D21,); path = SketchwaterParkUITests; sourceTree = "<group>"; };
+B2647E8C1E931462035F7CC8 = { isa = PBXContainerItemProxy; containerPortal = 98F54143AB4E86B28C3AFEE0; proxyType = 1; remoteGlobalIDString = 0E8A3AD980EC179856012B7E; remoteInfo = SketchwaterPark; };
+F0B09A5BB3490F075282F456 = { isa = PBXTargetDependency; target = 0E8A3AD980EC179856012B7E; targetProxy = B2647E8C1E931462035F7CC8; };
+38B7EED03A3A1CA4F8C6E137 = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_NAME = SketchwaterParkUITests; PRODUCT_BUNDLE_IDENTIFIER = com.ericberget.sketchwaterpark.uitests; GENERATE_INFOPLIST_FILE = YES; TARGETED_DEVICE_FAMILY = 2; TEST_TARGET_NAME = SketchwaterPark; CODE_SIGN_STYLE = Automatic; }; name = Debug; };
+5BB7B391643D68EFADD7103C = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_NAME = SketchwaterParkUITests; PRODUCT_BUNDLE_IDENTIFIER = com.ericberget.sketchwaterpark.uitests; GENERATE_INFOPLIST_FILE = YES; TARGETED_DEVICE_FAMILY = 2; TEST_TARGET_NAME = SketchwaterPark; CODE_SIGN_STYLE = Automatic; }; name = Release; };
+54806D8E2554EFBD89774B1C = { isa = XCConfigurationList; buildConfigurations = (38B7EED03A3A1CA4F8C6E137,5BB7B391643D68EFADD7103C,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+B4627B7D825DA4B68AD2A663 = { isa = PBXNativeTarget; buildConfigurationList = 54806D8E2554EFBD89774B1C; buildPhases = (55DA93A03A609655EA720A5B,754069D8B653D57080346823,); buildRules = (); dependencies = (F0B09A5BB3490F075282F456,); name = SketchwaterParkUITests; productName = SketchwaterParkUITests; productReference = 67FBF3883236733BB500BAA3; productType = "com.apple.product-type.bundle.ui-testing"; };
+
+7508EF28938C079BDC9AE35F = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate.swift"; sourceTree = "<group>"; };
+36DFD3EF3EC86712DC170B73 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ParkViewController.swift"; sourceTree = "<group>"; };
+B483E396AF05FD443EB05BEC = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SaveStore.swift"; sourceTree = "<group>"; };
+142DE6A371B86A55B4703B74 = { isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "native-bridge.js"; sourceTree = "<group>"; };
+A8323A2A9B34AE7E0CBE8181 = { isa = PBXFileReference; lastKnownFileType = folder; path = "Web"; sourceTree = "<group>"; };
+26B2A637F7DC4079D5AB78A5 = { isa = PBXFileReference; lastKnownFileType = text.xml; path = "PrivacyInfo.xcprivacy"; sourceTree = "<group>"; };
+28AAD1477D5182D66D4B03B3 = { isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
+7B594B6DB375E1BF3F23CDD6 = { isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+7D1043473D55BFA90E8530D3 = { isa = PBXFileReference; explicitFileType = wrapper.application; path = SketchwaterPark.app; sourceTree = BUILT_PRODUCTS_DIR; };
+A39EF5AF6A1BEA9942DDDFF2 = { isa = PBXBuildFile; fileRef = 7508EF28938C079BDC9AE35F; };
+62282B016E72F1A638031108 = { isa = PBXBuildFile; fileRef = 36DFD3EF3EC86712DC170B73; };
+5CA9E47E476B7C19ED2988FC = { isa = PBXBuildFile; fileRef = B483E396AF05FD443EB05BEC; };
+27FD90094357AAAB36401199 = { isa = PBXBuildFile; fileRef = 142DE6A371B86A55B4703B74; };
+6B54E17105CE16D6902A7B8E = { isa = PBXBuildFile; fileRef = A8323A2A9B34AE7E0CBE8181; };
+4D41DD372D8E0FAD9BCA5A62 = { isa = PBXBuildFile; fileRef = 26B2A637F7DC4079D5AB78A5; };
+993A6F0DC816349E9715E5C7 = { isa = PBXBuildFile; fileRef = 28AAD1477D5182D66D4B03B3; };
+BCE16DD0260827ECF338C787 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A39EF5AF6A1BEA9942DDDFF2,62282B016E72F1A638031108,5CA9E47E476B7C19ED2988FC,); runOnlyForDeploymentPostprocessing = 0; };
+0189424A5A60FED329FA868E = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (27FD90094357AAAB36401199,6B54E17105CE16D6902A7B8E,4D41DD372D8E0FAD9BCA5A62,993A6F0DC816349E9715E5C7,); runOnlyForDeploymentPostprocessing = 0; };
+7561BFB015D8F536760CB671 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+D59795DE8A4D83834E525B58 = { isa = PBXShellScriptBuildPhase; buildActionMask = 2147483647; files = (); inputPaths = (); outputPaths = ("$(SRCROOT)/SketchwaterPark/Web",); alwaysOutOfDate = 1; name = "Bundle offline game"; shellPath = /bin/sh; shellScript = "set -eu\n/usr/bin/python3 \"$SRCROOT/../scripts/prepare-ipad.py\"\n"; runOnlyForDeploymentPostprocessing = 0; };
+3A2A88DEEFF3D1D23E496597 = { isa = PBXGroup; children = (7508EF28938C079BDC9AE35F,36DFD3EF3EC86712DC170B73,B483E396AF05FD443EB05BEC,142DE6A371B86A55B4703B74,A8323A2A9B34AE7E0CBE8181,26B2A637F7DC4079D5AB78A5,28AAD1477D5182D66D4B03B3,7B594B6DB375E1BF3F23CDD6,); path = SketchwaterPark; sourceTree = "<group>"; };
+FBDC4F23F93125BBEEAE800C = { isa = PBXGroup; children = (67FBF3883236733BB500BAA3,7D1043473D55BFA90E8530D3,); name = Products; sourceTree = "<group>"; };
+B28B7AF69320201D1CF206EB = { isa = PBXGroup; children = (0D06F70398D0415DED9A89A3,3A2A88DEEFF3D1D23E496597,FBDC4F23F93125BBEEAE800C,); sourceTree = "<group>"; };
+89E1FD6268CC0F221A2BE178 = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 16.0; SWIFT_VERSION = 5.0; ENABLE_USER_SCRIPT_SANDBOXING = NO; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; DEBUG_INFORMATION_FORMAT = dwarf; }; name = Debug; };
+E6DE6C99132752C914FEF632 = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 16.0; SWIFT_VERSION = 5.0; ENABLE_USER_SCRIPT_SANDBOXING = NO; SWIFT_OPTIMIZATION_LEVEL = "-O"; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; }; name = Release; };
+FBD3510CED826C9DAA696E48 = { isa = XCConfigurationList; buildConfigurations = (89E1FD6268CC0F221A2BE178,E6DE6C99132752C914FEF632,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+7082CC0B6FC1282FCEABD07A = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_NAME = SketchwaterPark; PRODUCT_BUNDLE_IDENTIFIER = com.ericberget.sketchwaterpark; INFOPLIST_FILE = SketchwaterPark/Info.plist; TARGETED_DEVICE_FAMILY = 2; CODE_SIGN_STYLE = Automatic; MARKETING_VERSION = 0.1.0; CURRENT_PROJECT_VERSION = 1; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; DEBUG_INFORMATION_FORMAT = dwarf; }; name = Debug; };
+639A7CA24D39909E713B47F7 = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_NAME = SketchwaterPark; PRODUCT_BUNDLE_IDENTIFIER = com.ericberget.sketchwaterpark; INFOPLIST_FILE = SketchwaterPark/Info.plist; TARGETED_DEVICE_FAMILY = 2; CODE_SIGN_STYLE = Automatic; MARKETING_VERSION = 0.1.0; CURRENT_PROJECT_VERSION = 1; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_OPTIMIZATION_LEVEL = "-O"; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; }; name = Release; };
+DBC1F132A3B6D94B1DF33607 = { isa = XCConfigurationList; buildConfigurations = (7082CC0B6FC1282FCEABD07A,639A7CA24D39909E713B47F7,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+0E8A3AD980EC179856012B7E = { isa = PBXNativeTarget; buildConfigurationList = DBC1F132A3B6D94B1DF33607; buildPhases = (D59795DE8A4D83834E525B58,BCE16DD0260827ECF338C787,7561BFB015D8F536760CB671,0189424A5A60FED329FA868E,); buildRules = (); dependencies = (); name = SketchwaterPark; productName = SketchwaterPark; productReference = 7D1043473D55BFA90E8530D3; productType = "com.apple.product-type.application"; };
+98F54143AB4E86B28C3AFEE0 = { isa = PBXProject; attributes = { LastUpgradeCheck = 2600; }; buildConfigurationList = FBD3510CED826C9DAA696E48; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en,Base,); mainGroup = B28B7AF69320201D1CF206EB; productRefGroup = FBDC4F23F93125BBEEAE800C; projectDirPath = ""; projectRoot = ""; targets = (B4627B7D825DA4B68AD2A663,0E8A3AD980EC179856012B7E,); };
+}; rootObject = 98F54143AB4E86B28C3AFEE0; }

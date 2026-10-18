@@ -42,4 +42,8 @@ Football source is in `games/xo-football/`. Run `node tests/football-phone.cjs`,
 
 Splash Line has expressive notebook guests and customizable entrance signs. Seaside Blue, Warm Boardwalk, and Summer Festival become available after opening 3, 5, and 7 different slide designs. Styles cost game tickets once, remain owned, and can be switched freely from the park entrance or journal.
 
-Splash Line checks: `node tests/splash-line-pov.cjs` and `node tests/splash-line-care.cjs`. The latter covers forgiving slide starts, save recovery, progression, attainable requests, and entrance purchases. Native iPad packaging and physical-device testing remain separate release work.
+Splash Line checks: `node tests/splash-line-pov.cjs` and `node tests/splash-line-care.cjs`. The latter covers forgiving slide starts, save recovery, progression, attainable requests, and entrance purchases. The native iPad package and simulator checks are documented in [ios/README.md](ios/README.md); physical-device testing and release signing remain pending.
+
+## Sketchwater Park iPad app
+
+The current Splash Line game is branded Sketchwater Park. Its native iPad wrapper is in `ios/SketchwaterPark.xcodeproj`; see [iPad build and TestFlight instructions](ios/README.md). It bundles the existing game offline and adds acknowledged native saves and Apple share-sheet exports. Browser saves transfer through the existing JSON export/import flow. Full Xcode signing, device testing, and a TestFlight upload are still required.

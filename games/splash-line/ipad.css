@@ -1,0 +1,9 @@
+/* Preserve the original notebook; compensate for its scaled touch targets. */
+@media (pointer: coarse) and (min-width: 760px) {
+  #stage button, #stage .back { min-height: var(--touch-min, 44px); min-width: var(--touch-min, 44px); }
+  #stage input { min-height: var(--touch-min, 44px); font-size: max(20px, calc(var(--touch-min, 44px) * .4)); }
+  .card { max-height: 580px; overflow-y: auto; overscroll-behavior: contain; }
+}
+html { overscroll-behavior: none; }
+body { -webkit-touch-callout: none; }
+button, canvas { -webkit-user-select: none; user-select: none; }

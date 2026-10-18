@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <title>Sketchwater Park</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Patrick+Hand&family=Rubik+Distressed&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../shared/fonts.css?v=f88008029b48">
+<link rel="stylesheet" href="ipad.css?v=eaf109ac4b44">
 <style>
   :root {
     --desk: #e9e4d6; --paper: #fbf8ee; --card: #fffdf5; --ink: #1f3d9e; --red: #c0392b; --graphite: #4a4a4f;
@@ -25,6 +24,8 @@
   #c { position: absolute; inset: 0; width: 1200px; height: 720px; display: block; touch-action: none; cursor: crosshair; }
   #c.grab { cursor: grab; }
   button { font-family: 'Patrick Hand', cursive; font-size: 19px; background: rgba(251,248,238,.85); border: 2px solid var(--ink); color: var(--ink); padding: 3px 13px; border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; cursor: pointer; line-height: 1.2; }
+  /* Rapid confirmations are button taps, not Safari double-tap zoom gestures. */
+  button, .back { touch-action: manipulation; }
   button:hover { background: rgba(31,61,158,.09); }
   button:focus-visible, input:focus-visible { outline: 3px dashed var(--red); outline-offset: 2px; }
   button:disabled { opacity: .4; cursor: default; }
@@ -225,8 +226,8 @@
   #rotate { position: fixed; left: 16px; right: 16px; bottom: 16px; text-align: center; color: #5a5040; font-size: 18px; }
   @media (prefers-reduced-motion: reduce) { .stamp.go, .shake, .tickets.bump { animation: none; } }
 </style>
-<link rel="stylesheet" href="park-polish.css">
-<link rel="stylesheet" href="mobile.css">
+<link rel="stylesheet" href="park-polish.css?v=de83059dca2b">
+<link rel="stylesheet" href="mobile.css?v=2a5d9fe71b0e">
 </head>
 <body>
 <div id="wrap"><div id="stage">
@@ -260,6 +261,7 @@
   <button id="navR" class="nav" aria-label="Scroll right">&rsaquo;</button>
 
   <div id="report" class="card" hidden>
+    <div id="reportDetails" tabindex="0" role="region" aria-label="Inspection details">
     <div class="head">
       <canvas id="louPortrait" width="240" height="240" role="img" aria-label="Lou, the Safety and Fun Inspector, with silver hair, sunglasses and folded arms"></canvas>
       <div><div class="eyebrow">Inspection report</div><h2 id="repTitle">Tube Twister</h2><div style="font-size:16px;color:#4a4a4f"><span id="louIntro">Lou · Safety & Fun Inspector</span></div></div>
@@ -268,11 +270,15 @@
     <ul class="checks" id="checks"></ul>
     <div class="stats" id="stats"></div>
     <div class="tip" id="tip"></div>
-    <div class="row" id="repActions"></div>
-    <div class="namer" id="namer" hidden>
-      <label for="rideName">Name your ride</label>
-      <div class="row" style="flex-wrap:nowrap"><input type="text" id="rideName" maxlength="26" autocomplete="off"><button id="dice" title="Random name" aria-label="Random name">&#127922;</button></div>
-      <div class="row"><button id="openRide" class="primary">Open it in the park!</button><button id="nameBack">Back</button></div>
+    </div>
+    <div id="reportFooter">
+      <p id="repNext"></p>
+      <div class="row" id="repActions"></div>
+      <div class="namer" id="namer" hidden>
+        <label for="rideName">Name your ride</label>
+        <div class="row" style="flex-wrap:nowrap"><input type="text" id="rideName" maxlength="26" autocomplete="off"><button id="dice" title="Random name" aria-label="Random name">&#127922;</button></div>
+        <div class="row"><button id="openRide" class="primary">Open it in the park!</button><button id="nameBack">Back</button></div>
+      </div>
     </div>
   </div>
 
@@ -798,7 +804,10 @@ function drawPaper() {
 }
 function fit() {
   const vw = document.documentElement.clientWidth, vh = window.visualViewport ? window.visualViewport.height : innerHeight;
-  layoutControls(vw < 760 || vh < 560);
+  // The keyboard reduces visible space, not the device's layout. Reparenting an
+  // active input into the phone controls blurs it and dismisses the iPad keyboard.
+  const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || '') || document.activeElement?.isContentEditable;
+  if (!typing) layoutControls(vw < 760 || document.documentElement.clientHeight < 560);
   document.body.dataset.scene = scene;
   document.documentElement.style.setProperty('--view-height', `${vh}px`);
   const rim = phoneLayout ? 6 : 34, bind = phoneLayout ? 0 : 46;
@@ -811,7 +820,8 @@ function fit() {
   stage.style.transform = `scale(${SC})`;
   stage.style.left = (left + (vw - left - (W + bind) * SC) / 2 + bind * SC) + 'px';
   stage.style.top = Math.max(0, phoneLayout && scene === 'title' && vh > vw ? 80 : top + (room - H * SC) / 2) + 'px';
-  const nk = clamp((devicePixelRatio || 1) * SC, 1, 2.5);
+  const nk = clamp((devicePixelRatio || 1) * SC, 1, window.SketchwaterNative ? 1.5 : 2.5);
+  document.documentElement.style.setProperty('--touch-min', `${44 / SC}px`);
   if (Math.abs(nk - K) > 0.05) { K = nk; cv.width = Math.round(W * K); cv.height = Math.round(H * K); drawPaper(); rideCache.clear(); }
   $('#rotate').hidden = !(phoneLayout && vh > vw * 1.15 && scene === 'ws');
   $('#rotate').textContent = 'Turn sideways for more drawing room. You can keep drawing here, too.';
@@ -1802,11 +1812,13 @@ function drawRider(c, g, x, y, r, tube) {
 
 // ---------- saved game ----------
 const SAVE_KEY = 'splash-line-park-v1';
+const ParkStorage = window.SketchwaterNative?.storage || localStorage;
+let saveRevision = 0;
 const state = { version: 2, name: 'Sketchwater Park', tickets: 5, lifetimeTickets: 5, rides: [], owned: {}, palms: 0, umbrellas: 0, unlocked: 0, riders: 0, welcomed: false, tester: 'sandy', mastered: {}, drafts: {}, settings: { muted: false, comfort: true } };
 let saveIssue = '', saveBlocked = false;
 const SAVED = { local: false, cloud: false, at: 0, shownAt: 0 };
 function load() {
-  const result = Progress.readSave(localStorage, SAVE_KEY);
+  const result = Progress.readSave(ParkStorage, SAVE_KEY);
   if (result.park) { Object.assign(state, result.park); SAVED.local = true; }
   saveBlocked = !result.park && result.errors.length > 0;
   saveIssue = result.recovered ? 'Recovered your previous save. Export a backup in Settings & saves.' : saveBlocked ? 'Your save could not be read. It has been kept. Open Help & saved parks to import a backup or start a new park.' : '';
@@ -1817,7 +1829,21 @@ function saveNow() {
   clearTimeout(saveTimer); saveTimer = 0;
   if (saveBlocked) return;
   state.version = 2; state.savedAt = Date.now(); const j = JSON.stringify(state);
-  try { Progress.writeSave(localStorage, SAVE_KEY, state); SAVED.local = true; saveIssue = ''; }
+  const revision = ++saveRevision;
+  try {
+    Progress.writeSave(ParkStorage, SAVE_KEY, state);
+    SAVED.local = !window.SketchwaterNative; saveIssue = '';
+    if (window.SketchwaterNative) {
+      saveIssue = 'Saving your park…';
+      ParkStorage.flush().then(() => {
+        if (revision !== saveRevision) return;
+        SAVED.local = true; saveIssue = ''; savedTag();
+      }).catch(() => {
+        if (revision !== saveRevision) return;
+        SAVED.local = false; saveIssue = 'Your park could not be saved. Export a backup before leaving.'; savedTag();
+      });
+    }
+  }
   catch (e) { SAVED.local = false; saveIssue = 'Your park could not be saved. Export a backup from the journal before leaving.'; }
   cloudSave(j); SAVED.at = Date.now(); savedTag();
 }
@@ -1853,7 +1879,7 @@ async function cloudInit() {
 }
 function savedTag() {
   const el = document.getElementById('savedTag'); if (!el) return;
-  el.hidden = false; el.textContent = SAVED.local || SAVED.cloud ? '✓ park saved' : 'Save needs attention'; el.title = saveIssue || 'Your park saves as you play';
+  el.hidden = false; el.textContent = SAVED.local || SAVED.cloud ? '✓ park saved' : (saveIssue === 'Saving your park…' ? saveIssue : 'Save needs attention'); el.title = saveIssue || 'Your park saves as you play';
   if (Date.now() - SAVED.shownAt > 12000) { SAVED.shownAt = Date.now(); el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
 }
 function unlockedCount() { return Math.max(state.unlocked, state.rides.length); }
@@ -2070,6 +2096,7 @@ function wsRender(c) {
 function showReport() {
   const r = WS.rep, s = WS.sim.stats, kit = WS.kit, rep = $('#report');
   rep.classList.toggle('firstReport', !state.rides.length); rep.classList.remove('showDetails');
+  $('#repNext').textContent = r.approved ? 'Next: name your ride and open it in your park.' : 'Next: fix your slide, then give it another test run.';
   $('#repTitle').textContent = kit.name;
   const portrait = $('#louPortrait');
   const portraitCtx = portrait.getContext('2d');
@@ -2094,17 +2121,25 @@ function showReport() {
   const ride = () => openPOV({ kit: WS.kit, T: WS.track, sim: WS.sim, name: `${WS.kit.name} (test ride)`, stars: 0, from: 'ws', style: WS.style });
   if (r.approved) { btn('Name it & open it', startNaming, true); btn('Ride it yourself', ride); btn(r.stars < 3 ? 'Keep fixing' : 'Edit', closeReport); }
   else { btn('Fix it', closeReport, true); btn('Ride it yourself', ride); btn('Watch again', () => wsTest(1)); }
-  if (!state.rides.length) btn('Ride details', () => rep.classList.toggle('showDetails'));
-  $('#namer').hidden = true; acts.hidden = false;
+  if (!state.rides.length) {
+    const details = btn('Ride details', () => {
+      const expanded = rep.classList.toggle('showDetails');
+      details.setAttribute('aria-expanded', String(expanded));
+      details.textContent = expanded ? 'Fewer details' : 'Ride details';
+    });
+    details.setAttribute('aria-expanded', 'false'); details.setAttribute('aria-controls', 'reportDetails');
+  }
+  $('#namer').hidden = true; acts.hidden = false; $('#repNext').hidden = false;
   const mx = WS.marks.length ? WS.marks.reduce((a, m) => a + m.x, 0) / WS.marks.length : 0;
   rep.style.left = (mx > 640 ? 128 : 700) + 'px';
   rep.hidden = false;
+  $('#reportDetails').scrollTop = 0;
   st.style.visibility = 'hidden';
   setTimeout(() => { st.style.visibility = 'visible'; st.classList.add('go'); rep.classList.remove('shake'); void rep.offsetWidth; if (!REDUCED) rep.classList.add('shake'); SFX.stamp(); if (r.approved) setTimeout(() => SFX.fanfare(), 250); else setTimeout(() => SFX.fail(), 200); }, 550);
 }
 function closeReport() { $('#report').hidden = true; }
 function startNaming() {
-  $('#repActions').hidden = true; $('#namer').hidden = false;
+  $('#repActions').hidden = true; $('#repNext').hidden = true; $('#namer').hidden = false;
   const inp = $('#rideName'); const old = state.rides.find(r => r.lot === WS.lot && r.kit === WS.kit.id);
   inp.value = old ? old.name : randomName(WS.kit); setTimeout(() => { inp.focus(); inp.select(); }, 30);
 }
@@ -7203,7 +7238,7 @@ function fpText(c, str, x, y, size, color, alpha = 1) {
 // ---------- Quackers has had enough: heat wave, a pay dispute, and A-or-B choices ----------
 const QK = { heat: false, heatT: 0, parkT: 0, taps: [], quip: null, quipT: 0, node: null, typer: 0, cone: 0 };
 function qkData() { if (!state.quackers) state.quackers = { mood: 'ok', quit: false, raises: 0, owed: false, lastHeat: 0 }; return state.quackers; }
-const QK_QUIPS = ['Quack.', 'No autographs, please.', "I'm on break.", 'Do you know how hot this suit is?', 'Stop poking the duck.'];
+const QK_QUIPS = ['Quack.', 'No autographs, please.', "I'm on break.", 'Looking good, park boss!', 'Stop poking the duck.'];
 // who: 'q' is Quackers, 'h' is Honks the Goose. mood picks the face.
 const QK_TREE = {
   start: { who: 'q', mood: 'mad', text: () => qkData().owed ? "Boss. You still owe me from last time. And now it's 98 degrees in a FEATHER SUIT. I want a raise, or I quit." : "Boss. BOSS. It's 98 degrees and I'm wearing a whole duck. I want a raise, or I quit.",
@@ -7234,24 +7269,17 @@ function qkTap(p) {
   const m = qkMascotPos(); if (Math.abs(p.x - m.x) > 34 || p.y < m.y - 84 || p.y > m.y + 10) return false;
   const q = qkData();
   if (q.quit) { qkOpen('honks'); return true; }
-  if (QK.heat && q.mood === 'upset') { qkOpen('start'); return true; }
   QK.taps = QK.taps.filter(t => now - t < 4); QK.taps.push(now);
   if (QK.taps.length >= 5 && q.mood !== 'upset') { QK.taps = []; q.mood = 'upset'; qkOpen('poke'); return true; }
   QK.quip = QK_QUIPS[(QK.taps.length - 1) % QK_QUIPS.length]; QK.quipT = now; SFX.voice('squeak');
   return true;
 }
-function qkHeatStart() {
-  const q = qkData(); QK.heat = true; QK.heatT = now; q.mood = 'upset'; q.lastHeat = Date.now(); save();
-  PARK.camTarget = clamp(MASCOT.x - W / 2, 0, PW - W);
-  toast('Heat wave! It’s 98° in the park, and Quackers looks upset. Tap him.', 4200); SFX.fail();
-}
 // called every park frame from mascotUpdate
 function qkUpdate(dt) {
   const q = qkData();
-  if (!QK.heat && !q.quit && q.mood !== 'upset') { QK.parkT += dt; if (QK.parkT > 70 && Date.now() - (q.lastHeat || 0) > 6 * 60e3 && Math.random() < dt / 45) qkHeatStart(); }
-  if (QK.heat && q.mood !== 'upset' && now - QK.heatT > 150) { QK.heat = false; toast('The heat wave is over. Phew.'); }
+  // Release mascots left upset by the retired heat event in an older save.
+  if (q.mood === 'upset' && !QK.node) { q.mood = 'ok'; save(); }
   if (q.mood === 'cone' && now - QK.cone > 60) { q.mood = 'ok'; save(); }
-  if (QK.heat && Math.random() < dt * 0.6) { const g = pick(PARK.guests); if (g && g.state === 'walk' && (!g.bubble || now - g.bubble.t0 > 3)) g.bubble = { text: 'phew', t0: now }; }
 }
 function qkOpen(id) { hidePanels(); SFX.pop(); $('#qkCard').hidden = false; qkShow(id); }
 function qkShow(id) {
@@ -7829,6 +7857,10 @@ function showAmenity(type) {
 }
 function exportPark() {
   if(scene==='ws')stashDraft();saveNow();
+  if (window.SketchwaterNative) {
+    window.SketchwaterNative.exportPark(JSON.stringify(state,null,2)).catch(() => toast('Could not export. Please try again.'));
+    return;
+  }
   const data=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),url=URL.createObjectURL(data),a=document.createElement('a');
   a.href=url;a.download='splash-line-park.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
@@ -7869,12 +7901,11 @@ function renderSettings(box) {
     box.innerHTML='<h3>Start a new park?</h3><p>Your current park will be kept as a previous-park backup on this device. Export a copy first if you want to keep it somewhere safe.</p>';
     bookButton(box,'Export current park',exportPark);
     bookButton(box,'Keep backup & start new park',()=>{
-      try { localStorage.setItem(SAVE_KEY+'-previous-park',JSON.stringify(state)); Progress.writeSave(localStorage,SAVE_KEY,{version:2,name:'My Water Park',tickets:5,rides:[],owned:{},welcomed:false}); location.reload(); }
-      catch(e){toast('Could not keep a backup. Please export your park first.');}
+      replacePark({version:2,name:'My Water Park',tickets:5,rides:[],owned:{},welcomed:false});
     });
     bookButton(box,'Keep playing',()=>openBook('settings'),true);
   });
-  let previous=null;try{const raw=localStorage.getItem(SAVE_KEY+'-previous-park');if(raw)previous=Progress.normalize(JSON.parse(raw));}catch(_){}
+  let previous=null;try{const raw=ParkStorage.getItem(SAVE_KEY+'-previous-park');if(raw)previous=Progress.normalize(JSON.parse(raw));}catch(_){}
   if(previous)bookButton(secondary,'Restore previous park',()=>confirmImport(previous));
   if(scene!=='title')bookButton(secondary,'Park entrance',()=>{saveNow();hidePanels();showScene('title');titleSaveInfo();});
   box.insertAdjacentHTML('beforeend',`<footer class="bookCredit"><span>Made by Eric Berget</span><a href="https://x.com/ericberget" target="_blank" rel="noopener noreferrer">${bookIcon('link')} Twitter · @ericberget<span class="sr-only"> (opens in a new tab)</span></a></footer>`);
@@ -7903,9 +7934,28 @@ function openEntranceStyles() {
   if(scene!=='title')bookButton(box,'See my entrance',()=>{hidePanels();showScene('park');PARK.camTarget=0;},true);
   else bookButton(box,'Back to the entrance',()=>hidePanels(),true);
 }
+async function replacePark(park) {
+  if (replacePark.busy) return;
+  replacePark.busy = true;
+  const wasBlocked = saveBlocked;
+  try {
+    park = Progress.normalize(park);
+    if (scene === 'ws') { endStroke(null); stashDraft(); }
+    clearTimeout(saveTimer); saveTimer = 0;
+    // A reload fires pagehide: keep that handler from writing the OLD park back.
+    saveBlocked = true;
+    ParkStorage.setItem(SAVE_KEY+'-previous-park', JSON.stringify(state));
+    Progress.writeSave(ParkStorage, SAVE_KEY, park);
+    if (ParkStorage.flush) await ParkStorage.flush();
+    location.reload();
+  } catch (e) {
+    saveBlocked = wasBlocked; replacePark.busy = false;
+    toast('Could not finish switching parks. Export your current park before trying again.',6000);
+  }
+}
 function confirmImport(park) {
   openBook('settings');const box=$('#bookContent');box.innerHTML=`<h3>Open ${esc(park.name)}?</h3><p>${park.rides.length} rides. Your current park will be kept as the previous-park backup.</p>`;
-  bookButton(box,'Open this park',()=>{try{localStorage.setItem(SAVE_KEY+'-previous-park',JSON.stringify(state));Progress.writeSave(localStorage,SAVE_KEY,park);location.reload();}catch(e){toast('Could not import safely. Your current park is unchanged.');}},true);
+  bookButton(box,'Open this park',()=>replacePark(park),true);
   bookButton(box,'Cancel',()=>openBook('settings'));
 }
 $('#btnBook').onclick=()=>openBook();$('#titleOptions').onclick=()=>openBook('settings');$('#bookClose').onclick=()=>hidePanels();
@@ -8006,7 +8056,7 @@ $('#btnHint').onclick = () => { WS.hintAt = now; SFX.pop(); };
 $('#dice').onclick = () => { $('#rideName').value = randomName(WS.kit); SFX.pop(); };
 $('#openRide').onclick = () => { SFX.pop(); openRide(); };
 $('#rideName').onkeydown = e => { if (e.key === 'Enter') openRide(); };
-$('#nameBack').onclick = () => { $('#namer').hidden = true; $('#repActions').hidden = false; };
+$('#nameBack').onclick = () => { $('#rideName').blur(); $('#namer').hidden = true; $('#repActions').hidden = false; $('#repNext').hidden = false; };
 const SPK_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="#1f3d9e" stroke-width="2" stroke-linecap="round"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#1f3d9e22"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>';
 const SPK_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="#1f3d9e" stroke-width="2" stroke-linecap="round"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#1f3d9e22"/><path d="M16 9l5 6M21 9l-5 6"/></svg>';
 $('#mute').innerHTML = SPK_ON;
@@ -8015,9 +8065,11 @@ $('#startBtn').onclick = openGates;
 $('#parkName').onkeydown = e => { if (e.key === 'Enter') openGates(); };
 
 // ---------- loop ----------
+let nativePaused = false;
 let lastT = performance.now();
 function frame(t) {
   if (!alive()) { SFX.close(); return; }
+  if (document.hidden || nativePaused) { lastT = t; requestAnimationFrame(frame); return; }
   const dt = document.hidden ? 0 : Math.min(0.05, Math.max(0, (t - lastT) / 1000)); lastT = t; now += dt; frameN++;
   if (scene !== 'title' && scene !== 'park' && dt) parkUpdate(dt);
   if (scene === 'ws') wsUpdate(dt); else if (scene === 'park') parkUpdate(dt); else if (scene === 'pov') povUpdate(dt); else if (scene === 'mini') miniUpdate(dt); else if (scene === 'surf') surfUpdate(dt); else if (scene === 'balloon') balUpdate(dt);
@@ -8052,14 +8104,20 @@ function start() {
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { rideCache.clear(); POV_SCENERY_ART.clear(); surfParkArtCache=null; });
   requestAnimationFrame(frame);
 }
+if (window.SketchwaterNative) {
+  window.SketchwaterLifecycle = active => {
+    nativePaused = !active; lastT = performance.now();
+    if (!active) { endStroke(null); if (scene === 'ws') stashDraft(); saveNow(); SFX.suspend(); }
+  };
+}
 addEventListener('pagehide', () => { if (scene === 'ws') stashDraft(); saveNow(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden) { if (scene === 'ws') { wsUp(); stashDraft(); } saveNow(); SFX.suspend(); } else { lastT = performance.now(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { endStroke(null); if (scene === 'ws') { stashDraft(); } saveNow(); SFX.suspend(); } else { lastT = performance.now(); } });
 function spawnStartGuests() { PARK.guests = []; if (state.rides.length) for (let i = 0; i < Math.min(10, maxGuests()); i++) PARK.guests.push(newGuest(200 + Math.random() * 2400)); }
 function applyLoadedPark(s) {
   Object.assign(state, Progress.normalize(s)); applySettings(); buildSlots(); updateFireworksBtn(); updateStickerBtn();
   for (const r of state.rides) prepRide(r);
   $('#tix').textContent = state.tickets; spawnStartGuests(); rideCache.clear();
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { }
+  try { ParkStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { }
 }
 function titleSaveInfo() {
   const note = $('#saveNote');
